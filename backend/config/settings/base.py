@@ -63,12 +63,20 @@ INSTALLED_APPS = [
 ]
 
 MIDDLEWARE = [
-    # Step 5: CORS must be high
+    # Step 1: CORS first
     "corsheaders.middleware.CorsMiddleware",
+
+    # Step 2: security + static
     "django.middleware.security.SecurityMiddleware",
-    # Step 6: static in prod (harmless in dev)
     "whitenoise.middleware.WhiteNoiseMiddleware",
+
+    # Step 3: session first (so request has session/cookies ready)
     "django.contrib.sessions.middleware.SessionMiddleware",
+
+    # Step 4: resolve org for the request (header/subdomain)
+    "shared.tenancy.middleware.OrganizationResolutionMiddleware",
+
+    # Step 5: standard django middleware
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",
@@ -136,3 +144,15 @@ STATIC_ROOT = BASE_DIR / "staticfiles"
 STATICFILES_STORAGE = "whitenoise.storage.CompressedManifestStaticFilesStorage"
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
+
+
+REST_FRAMEWORK = {
+    "DEFAULT_AUTHENTICATION_CLASSES": [
+        "rest_framework.authentication.BasicAuthentication",
+        "rest_framework.authentication.SessionAuthentication",
+    ],
+    "DEFAULT_PERMISSION_CLASSES": [
+        "rest_framework.permissions.IsAuthenticated",
+    ],
+    "DEFAULT_SCHEMA_CLASS": "drf_spectacular.openapi.AutoSchema",
+}
