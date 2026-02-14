@@ -1,13 +1,15 @@
 # Step 1: base settings shared across environments
 import os
 from pathlib import Path
+from datetime import timedelta
 
-from dotenv import load_dotenv  # ✅ New Code
+from dotenv import load_dotenv 
+from shared.logging.logging_conf import build_logging_config
 
 BASE_DIR = Path(__file__).resolve().parents[2]
 
 # Step 2: Load .env for local development (prod will use real env vars)
-load_dotenv(BASE_DIR / ".env")  # ✅ New Code
+load_dotenv(BASE_DIR / ".env")  
 
 
 def _env_bool(key: str, default: str = "0") -> bool:
@@ -45,6 +47,8 @@ def _env_csv(key: str, default: str = "") -> list[str]:
 SECRET_KEY = os.getenv("DJANGO_SECRET_KEY", "unsafe-dev-secret")
 DEBUG = _env_bool("DJANGO_DEBUG", default="0")
 ALLOWED_HOSTS = _env_csv("DJANGO_ALLOWED_HOSTS", default="localhost,127.0.0.1")
+AUTH_USER_MODEL = "users.CustomUser"
+LOGGING = build_logging_config(BASE_DIR)
 
 INSTALLED_APPS = [
     # Step 2: Django
@@ -56,10 +60,13 @@ INSTALLED_APPS = [
     "django.contrib.staticfiles",
     # Step 3: Third-party
     "rest_framework",
+    "rest_framework_simplejwt",
+    "rest_framework_simplejwt.token_blacklist",
     "corsheaders",
     "drf_spectacular",
     # Step 4: Local apps
-    "apps.core", 
+    "apps.core",
+    "apps.users",
 ]
 
 MIDDLEWARE = [
@@ -85,6 +92,7 @@ MIDDLEWARE = [
 ]
 
 ROOT_URLCONF = "config.urls"
+
 
 TEMPLATES = [
     {
@@ -118,14 +126,18 @@ REDIS_URL = os.getenv("REDIS_URL", "redis://localhost:6379/0")
 CELERY_BROKER_URL = os.getenv("CELERY_BROKER_URL", "redis://localhost:6379/1")
 CELERY_RESULT_BACKEND = os.getenv("CELERY_RESULT_BACKEND", "redis://localhost:6379/2")
 
-# Step 9: DRF
+# Step 9: DRF (Django REST Framework configuration)
 REST_FRAMEWORK = {
-    "DEFAULT_AUTHENTICATION_CLASSES": [
+    # Step 1: Auth backends (JWT for API clients, Session for browsable API/dev)
+    "DEFAULT_AUTHENTICATION_CLASSES": (
+        "rest_framework_simplejwt.authentication.JWTAuthentication",
         "rest_framework.authentication.SessionAuthentication",
-    ],
-    "DEFAULT_PERMISSION_CLASSES": [
+    ),
+    # Step 2: Default permission (lock down by default)
+    "DEFAULT_PERMISSION_CLASSES": (
         "rest_framework.permissions.IsAuthenticated",
-    ],
+    ),
+    # Step 3: Schema generator
     "DEFAULT_SCHEMA_CLASS": "drf_spectacular.openapi.AutoSchema",
 }
 
@@ -146,13 +158,18 @@ STATICFILES_STORAGE = "whitenoise.storage.CompressedManifestStaticFilesStorage"
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
 
-REST_FRAMEWORK = {
-    "DEFAULT_AUTHENTICATION_CLASSES": [
-        "rest_framework.authentication.BasicAuthentication",
-        "rest_framework.authentication.SessionAuthentication",
-    ],
-    "DEFAULT_PERMISSION_CLASSES": [
-        "rest_framework.permissions.IsAuthenticated",
-    ],
-    "DEFAULT_SCHEMA_CLASS": "drf_spectacular.openapi.AutoSchema",
+
+
+
+SIMPLE_JWT = {
+    # Step 1: Keep access short-lived
+    "ACCESS_TOKEN_LIFETIME": timedelta(minutes=10),
+    # Step 2: Refresh longer-lived
+    "REFRESH_TOKEN_LIFETIME": timedelta(days=14),
+    # Step 3: Safer refresh handling
+    "ROTATE_REFRESH_TOKENS": True,
+    "BLACKLIST_AFTER_ROTATION": True,
+    # Step 4: Useful for auditing (admin)
+    "UPDATE_LAST_LOGIN": True,
+    "AUTH_HEADER_TYPES": ("Bearer",),
 }
