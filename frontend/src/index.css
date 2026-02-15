@@ -1,68 +1,54 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Step 1: Theme tokens (dark default, mobile-first) */
 :root {
-  font-family: system-ui, Avenir, Helvetica, Arial, sans-serif;
-  line-height: 1.5;
-  font-weight: 400;
+  --bg: 9 9 11;           /* zinc-950 */
+  --surface: 12 12 14;    /* near zinc-950 */
+  --card: 18 18 22;       /* zinc-900-ish */
+  --text: 244 244 245;    /* zinc-100 */
+  --muted: 161 161 170;   /* zinc-400 */
+  --border: 39 39 42;     /* zinc-800 */
 
-  color-scheme: light dark;
-  color: rgba(255, 255, 255, 0.87);
-  background-color: #242424;
+  --primary: 244 244 245;     /* zinc-100 */
+  --primaryText: 24 24 27;    /* zinc-900 */
 
-  font-synthesis: none;
-  text-rendering: optimizeLegibility;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
+  --danger: 239 68 68;        /* red-500 */
+  --dangerText: 255 255 255;
 }
 
-a {
-  font-weight: 500;
-  color: #646cff;
-  text-decoration: inherit;
-}
-a:hover {
-  color: #535bf2;
+/* Step 2: Base */
+html,
+body,
+#root {
+  height: 100%;
 }
 
 body {
-  margin: 0;
-  display: flex;
-  place-items: center;
-  min-width: 320px;
-  min-height: 100vh;
+  background: rgb(var(--bg));
+  color: rgb(var(--text));
 }
 
-h1 {
-  font-size: 3.2em;
-  line-height: 1.1;
-}
-
-button {
-  border-radius: 8px;
-  border: 1px solid transparent;
-  padding: 0.6em 1.2em;
-  font-size: 1em;
-  font-weight: 500;
-  font-family: inherit;
-  background-color: #1a1a1a;
-  cursor: pointer;
-  transition: border-color 0.25s;
-}
-button:hover {
-  border-color: #646cff;
-}
-button:focus,
-button:focus-visible {
-  outline: 4px auto -webkit-focus-ring-color;
-}
-
-@media (prefers-color-scheme: light) {
-  :root {
-    color: #213547;
-    background-color: #ffffff;
+/* Step 3: Minimal semantic helpers */
+@layer components {
+  .app-surface {
+    @apply rounded-2xl border shadow-xl;
+    border-color: rgb(var(--border));
+    background: rgb(var(--surface));
   }
-  a:hover {
-    color: #747bff;
+
+  .app-card {
+    @apply rounded-2xl border;
+    border-color: rgb(var(--border));
+    background: rgb(var(--card));
   }
-  button {
-    background-color: #f9f9f9;
+
+  .app-muted {
+    color: rgb(var(--muted));
+  }
+
+  .app-focus {
+    @apply focus:outline-none focus:ring-2 focus:ring-zinc-500/40;
   }
 }
