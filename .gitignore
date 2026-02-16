@@ -1,11 +1,3 @@
-
----
-
-## `.gitignore` (replace entire file)
-
-This keeps your Python/Django ignores **and adds Node/Vite/React + OS + editor**.
-
-```gitignore
 # =========================
 # OS / Editor
 # =========================
@@ -86,6 +78,9 @@ ENV/
 env/
 env.bak/
 venv.bak/
+estateiq_venv/
+backend/estateiq_venv/
+**/estateiq_venv/
 
 # Jupyter
 .ipynb_checkpoints/
