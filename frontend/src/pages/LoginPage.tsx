@@ -1,93 +1,90 @@
 // # Filename: src/pages/LoginPage.tsx
-
-import React, { useState } from "react";
-import { Link } from "react-router-dom";
-
-import Input from "../components/ui/Input";
-import Button from "../components/ui/Button";
-import AuthLayout from "../components/ui/AuthLayout";
-import { Card, CardHeader, CardTitle, CardSubtitle } from "../components/ui/Card";
+import React, { useCallback, useState } from "react";
+import { useNavigate } from "react-router-dom";
 
 import { useAuth } from "../auth/useAuth";
 
+/**
+ * LoginPage
+ *
+ * Minimal login screen:
+ *  - collects email/password
+ *  - calls AuthProvider.login(email, password)
+ */
+
 export default function LoginPage() {
-  const { login, isLoading } = useAuth();
+  const navigate = useNavigate();
+  const { login } = useAuth();
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [error, setError] = useState<string>("");
 
-  const onSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setError("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-    try {
-      await login(email.trim(), password);
-    } catch (err: any) {
-      // Where: login() -> /api/v1/auth/token/ then /api/v1/auth/me/
-      // Why: invalid credentials, backend down, CORS misconfig, or API response mismatch
-      // Fix: check DevTools -> Network for status code + response body
-      setError(
-        err?.response?.data?.detail ||
-          "Login failed. Check credentials and backend."
-      );
-    }
-  };
+  const handleSubmit = useCallback(
+    async (e: React.FormEvent) => {
+      e.preventDefault();
+      setError(null);
+      setIsSubmitting(true);
+
+      try {
+        await login(email.trim(), password);
+        navigate("/dashboard", { replace: true });
+      } catch (err: any) {
+        setError(err?.response?.data?.detail ?? "Login failed. Please try again.");
+      } finally {
+        setIsSubmitting(false);
+      }
+    },
+    [email, password, login, navigate]
+  );
 
   return (
-    <AuthLayout>
-      <Card className="p-6">
-        <CardHeader>
-          <CardTitle>Sign in</CardTitle>
-          <CardSubtitle>
-            Access your portfolio analytics and org workspace.
-          </CardSubtitle>
-        </CardHeader>
+    <div className="min-h-screen flex items-center justify-center px-4">
+      <form onSubmit={handleSubmit} className="w-full max-w-md space-y-4">
+        <div>
+          <h1 className="text-2xl font-semibold">Sign in</h1>
+          <p className="text-sm opacity-80">Use your email and password.</p>
+        </div>
 
-        <form onSubmit={onSubmit} className="space-y-4">
-          <Input
-            label="Email"
+        {error ? (
+          <div className="rounded-md border border-red-500/30 bg-red-500/10 p-3 text-sm">{error}</div>
+        ) : null}
+
+        <div className="space-y-2">
+          <label className="block text-sm">Email</label>
+          <input
+            className="w-full rounded-md border border-white/10 bg-black/40 px-3 py-2"
             type="email"
-            autoComplete="email"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
-            placeholder="you@company.com"
+            autoComplete="email"
             required
           />
+        </div>
 
-          <Input
-            label="Password"
+        <div className="space-y-2">
+          <label className="block text-sm">Password</label>
+          <input
+            className="w-full rounded-md border border-white/10 bg-black/40 px-3 py-2"
             type="password"
-            autoComplete="current-password"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
-            placeholder="••••••••"
+            autoComplete="current-password"
             required
           />
-
-          {error ? (
-            <div className="rounded-xl border border-red-900/60 bg-red-950/30 p-3 text-sm text-red-300">
-              {error}
-            </div>
-          ) : null}
-
-          <Button
-            type="submit"
-            variant="primary"
-            isLoading={isLoading}
-            className="w-full"
-          >
-            Sign in
-          </Button>
-        </form>
-
-        <div className="mt-5 text-sm app-muted">
-          No account?{" "}
-          <Link to="/register" className="text-text hover:underline">
-            Create one
-          </Link>
         </div>
-      </Card>
-    </AuthLayout>
+
+        <button
+          className="w-full rounded-md border border-white/10 bg-white/10 px-3 py-2 disabled:opacity-60"
+          type="submit"
+          disabled={isSubmitting}
+        >
+          {isSubmitting ? "Signing in..." : "Sign in"}
+        </button>
+      </form>
+    </div>
   );
 }
+

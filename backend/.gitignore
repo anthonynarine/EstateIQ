@@ -1,0 +1,10 @@
+# Python venv in backend
+estateiq_venv/
+
+# Django / Python artifacts
+__pycache__/
+*.py[codz]
+*.log
+db.sqlite3
+media/
+staticfiles/

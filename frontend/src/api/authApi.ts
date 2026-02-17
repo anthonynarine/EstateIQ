@@ -1,48 +1,65 @@
-// # Filename: src/api/authApi.ts
+// # Filename: src/auth/authApi.ts
 
-import { apiClient } from "./axios";
-import type { MeResponse } from "../auth/types";
+import api from "../api/axios";
+import type { MeResponse, RegisterPayload, TokenPair } from "./types";
 
-export type RegisterPayload = {
+/**
+ * authApi.ts
+ *
+ * Auth API wrapper for PortfolioOS / EstateIQ.
+ *
+ * Endpoints (Django + SimpleJWT):
+ *  - POST /api/v1/auth/register/
+ *  - POST /api/v1/auth/token/
+ *  - POST /api/v1/auth/token/refresh/
+ *  - GET  /api/v1/auth/me/
+ *
+ * Notes:
+ *  - Token refresh is handled automatically by axios interceptor (src/api/axios.ts)
+ *    for authenticated endpoints (including /me/).
+ *  - This module is intentionally thin: it just calls endpoints and returns typed data.
+ */
+
+// Step 1: Payload + response types
+export type LoginPayload = {
   email: string;
   password: string;
-  password2?: string;
-  first_name?: string;
-  last_name?: string;
 };
 
-export type TokenResponse = {
-  access: string;
-  refresh: string;
+export type RegisterResponse = {
+  id: number | string;
+  email: string;
 };
 
+// Step 2: API functions
 export const authApi = {
-  // Step 1: Register
-  async register(payload: RegisterPayload): Promise<void> {
-    await apiClient.post("/api/v1/auth/register/", payload);
+  async register(payload: RegisterPayload): Promise<RegisterResponse> {
+    // Step 1: Create a new user (no org membership created here)
+    const res = await api.post<RegisterResponse>("/api/v1/auth/register/", payload);
+    return res.data;
   },
 
-  // Step 2: Login
-  async login(email: string, password: string): Promise<TokenResponse> {
-    const res = await apiClient.post<TokenResponse>("/api/v1/auth/token/", {
-      email,
-      password,
+  async login(payload: LoginPayload): Promise<TokenPair> {
+    // Step 1: Get access + refresh tokens
+    // SimpleJWT expects: { email, password } because USERNAME_FIELD=email
+    const res = await api.post<TokenPair>("/api/v1/auth/token/", payload);
+    return res.data;
+  },
+
+  async refresh(refreshToken: string): Promise<TokenPair> {
+    // Step 1: Refresh access token (and possibly rotate refresh, depending on backend)
+    const res = await api.post<TokenPair>("/api/v1/auth/token/refresh/", {
+      refresh: refreshToken,
     });
     return res.data;
   },
 
-  // Step 3: Refresh
-  async refresh(refreshToken: string): Promise<{ access: string }> {
-    const res = await apiClient.post<{ access: string }>(
-      "/api/v1/auth/token/refresh/",
-      { refresh: refreshToken }
-    );
-    return res.data;
-  },
-
-  // Step 4: /me
   async me(): Promise<MeResponse> {
-    const res = await apiClient.get<MeResponse>("/api/v1/auth/me/");
+    // Step 1: Fetch identity + memberships
+    // IMPORTANT: /me/ is authenticated and should be allowed to trigger refresh.
+    const res = await api.get<MeResponse>("/api/v1/auth/me/");
     return res.data;
   },
 };
+
+export default authApi;

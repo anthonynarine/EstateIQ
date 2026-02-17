@@ -4,6 +4,8 @@
 export type OrgRole = "owner" | "admin" | "manager" | "accountant" | "read_only";
 
 export type Membership = {
+  org_id?: string;
+  org_name?: string;
   org_slug: string;
   role: OrgRole;
 };

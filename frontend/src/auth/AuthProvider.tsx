@@ -1,150 +1,165 @@
 // # Filename: src/auth/AuthProvider.tsx
+// ✅ New Code
+import React, { createContext, useCallback, useEffect, useMemo, useRef, useState } from "react";
 
-import React, { createContext, useCallback, useEffect, useMemo, useState } from "react";
-import { useNavigate } from "react-router-dom";
-
-import { configureAxiosAuth } from "../api/axios";
 import { authApi } from "../api/authApi";
-import type { RegisterPayload } from "../api/authApi";
-import type { Membership, User } from "./types";
+import api, { setAxiosLogoutHandler } from "../api/axios";
 import { tokenStorage } from "./tokenStorage";
+import type { AuthContextValue, AuthState, MeResponse } from "./types";
 
-type AuthContextValue = {
-  user: User | null;
-  memberships: Membership[];
-  isAuthenticated: boolean;
-  isLoading: boolean;
-  login: (email: string, password: string) => Promise<void>;
-  register: (payload: RegisterPayload) => Promise<void>;
-  logout: () => void;
-  refresh: () => Promise<string>;
-  hydrate: () => Promise<void>;
-};
+/**
+ * AuthProvider
+ *
+ * Owns authenticated identity state:
+ *  - login/register/logout
+ *  - hydrate on boot via /api/v1/auth/me/
+ *  - wires logout hook into axios interceptor
+ *
+ * Tenant scoping:
+ *  - Org boundary is enforced by X-Org-Slug on domain endpoints.
+ *  - /auth/me is identity-only (safe: returns user's memberships).
+ */
 
 export const AuthContext = createContext<AuthContextValue | null>(null);
 
-export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const navigate = useNavigate();
+const initialState: AuthState = {
+  user: null,
+  memberships: [],
+  isAuthenticated: false,
+  isHydrating: true,
+};
 
-  const [user, setUser] = useState<User | null>(null);
-  const [memberships, setMemberships] = useState<Membership[]>([]);
-  const [isLoading, setIsLoading] = useState<boolean>(true);
+type Props = {
+  children: React.ReactNode;
+};
 
-  const isAuthenticated = Boolean(user);
+export default function AuthProvider({ children }: Props) {
+  const [state, setState] = useState<AuthState>(initialState);
+
+  // Step 1: prevent state updates after unmount
+  const isMountedRef = useRef(true);
+
+  useEffect(() => {
+    isMountedRef.current = true;
+    return () => {
+      isMountedRef.current = false;
+    };
+  }, []);
+
+  const setSafeState = useCallback((next: AuthState) => {
+    if (!isMountedRef.current) return;
+    setState(next);
+  }, []);
+
+  const clearAuth = useCallback(() => {
+    tokenStorage.clearTokens();
+    delete api.defaults.headers.common.Authorization;
+
+    setSafeState({
+      user: null,
+      memberships: [],
+      isAuthenticated: false,
+      isHydrating: false,
+    });
+  }, [setSafeState]);
 
   const logout = useCallback(() => {
-    tokenStorage.clearTokens();
-    tokenStorage.clearOrgSlug();
-    setUser(null);
-    setMemberships([]);
-    navigate("/login", { replace: true });
-  }, [navigate]);
+    clearAuth();
+  }, [clearAuth]);
 
-  const refresh = useCallback(async (): Promise<string> => {
-    const refreshToken = tokenStorage.getRefresh();
-    if (!refreshToken) {
-      throw new Error("No refresh token available.");
-    }
-    const data = await authApi.refresh(refreshToken);
-    tokenStorage.setAccess(data.access);
-    return data.access;
-  }, []);
+  // Step 2: allow axios interceptor to force logout (refresh failure, 403, etc.)
+  useEffect(() => {
+    setAxiosLogoutHandler(() => logout);
+    return () => setAxiosLogoutHandler(null);
+  }, [logout]);
+
+  const applyMe = useCallback(
+    (me: MeResponse) => {
+      // Step 1: persist memberships + auth state
+      const memberships = me.memberships ?? [];
+
+      // Step 2: Optional: if only 1 org, auto-select it
+      if (memberships.length === 1) {
+        tokenStorage.setOrgSlug(memberships[0].org_slug);
+      }
+
+      setSafeState({
+        user: me.user,
+        memberships,
+        isAuthenticated: true,
+        isHydrating: false,
+      });
+    },
+    [setSafeState]
+  );
 
   const hydrate = useCallback(async () => {
-    // Step 1: If no tokens, treat as logged out
-    const access = tokenStorage.getAccess();
-    const refreshToken = tokenStorage.getRefresh();
-
-    if (!access || !refreshToken) {
-      setIsLoading(false);
-      return;
-    }
-
-    // Step 2: Fetch /me to hydrate user + memberships
     try {
+      // Step 1: if no access token, finish hydration logged-out
+      const access = tokenStorage.getAccess();
+      if (!access) {
+        setSafeState({ ...initialState, isHydrating: false });
+        return;
+      }
+
+      // Step 2: set default header (request interceptor also sets it)
+      api.defaults.headers.common.Authorization = `Bearer ${access}`;
+
+      // Step 3: load identity (axios will refresh access if expired)
       const me = await authApi.me();
-      setUser(me.user);
-      setMemberships(me.memberships);
-
-      // Step 3: Auto-select org if exactly one membership
-      if (me.memberships.length === 1) {
-        tokenStorage.setOrgSlug(me.memberships[0].org_slug);
-      }
-    } catch {
-      // Step 4: Invalid tokens -> clear + logged out
-      tokenStorage.clearTokens();
-      tokenStorage.clearOrgSlug();
-      setUser(null);
-      setMemberships([]);
-    } finally {
-      setIsLoading(false);
+      applyMe(me);
+    } catch (err) {
+      clearAuth();
     }
-  }, []);
+  }, [applyMe, clearAuth, setSafeState]);
 
-  const login = useCallback(
-    async (email: string, password: string) => {
-      setIsLoading(true);
-      try {
-        const tokens = await authApi.login(email, password);
-        tokenStorage.setTokens(tokens.access, tokens.refresh);
-
-        const me = await authApi.me();
-        setUser(me.user);
-        setMemberships(me.memberships);
-
-        if (me.memberships.length === 1) {
-          tokenStorage.setOrgSlug(me.memberships[0].org_slug);
-        } else {
-          tokenStorage.clearOrgSlug();
-        }
-
-        navigate("/dashboard", { replace: true });
-      } finally {
-        setIsLoading(false);
-      }
-    },
-    [navigate]
-  );
-
-  const register = useCallback(
-    async (payload: RegisterPayload) => {
-      setIsLoading(true);
-      try {
-        await authApi.register(payload);
-        navigate("/login", { replace: true });
-      } finally {
-        setIsLoading(false);
-      }
-    },
-    [navigate]
-  );
-
-  // Step 5: Wire axios refresh/logout hooks once
-  useEffect(() => {
-    configureAxiosAuth({
-      refresh: async () => await refresh(),
-      logout: () => logout(),
-    });
-  }, [refresh, logout]);
-
-  // Step 6: Hydrate on app load
   useEffect(() => {
     void hydrate();
   }, [hydrate]);
 
-  const value = useMemo<AuthContextValue>(
+  const login = useCallback(
+    async (email: string, password: string) => {
+      // Step 1: get tokens (IMPORTANT: payload must be { email, password })
+      const tokens = await authApi.login({ email, password });
+
+      // Step 2: store tokens
+      tokenStorage.setTokens(tokens.access, tokens.refresh);
+
+      // Step 3: set default header
+      api.defaults.headers.common.Authorization = `Bearer ${tokens.access}`;
+
+      // Step 4: fetch /me
+      const me = await authApi.me();
+      applyMe(me);
+
+      return me;
+    },
+    [applyMe]
+  );
+
+  const register = useCallback(
+    async (payload: { email: string; password: string; first_name?: string; last_name?: string }) => {
+      // Step 1: register
+      await authApi.register(payload);
+
+      // Step 2: auto-login for smoother UX
+      return await login(payload.email, payload.password);
+    },
+    [login]
+  );
+
+  const value: AuthContextValue = useMemo(
     () => ({
-      user,
-      memberships,
-      isAuthenticated,
-      isLoading,
+      user: state.user,
+      memberships: state.memberships,
+      isAuthenticated: state.isAuthenticated,
+      isHydrating: state.isHydrating,
       login,
       register,
       logout,
-      refresh,
       hydrate,
     }),
-    [user, memberships, isAuthenticated, isLoading, login, register, logout, refresh, hydrate]
+    [state, login, register, logout, hydrate]
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
