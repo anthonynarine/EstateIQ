@@ -1,14 +1,14 @@
 # Filename: apps/buildings/views.py
+
 from __future__ import annotations
 
-from django.core.exceptions import ValidationError as DjangoValidationError
 from rest_framework import status, viewsets
 from rest_framework.decorators import action
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
 from apps.buildings import selectors, services
-from apps.buildings.models import Building, Unit
+from apps.buildings.models import Building
 from apps.buildings.permissions import IsBuildingOrgMember
 from apps.buildings.serializers import BuildingSerializer, UnitSerializer
 
@@ -29,15 +29,17 @@ class BuildingViewSet(viewsets.ModelViewSet):
 
     def perform_update(self, serializer):
         # Step 1: update via service layer
-        services.update_building(building=self.get_object(), data=serializer.validated_data)
+        services.update_building(
+            building=self.get_object(),
+            data=serializer.validated_data,
+        )
 
     @action(detail=True, methods=["get"], url_path="units")
     def units(self, request, pk=None):
         # Step 1: ensure building is org-scoped (get_object uses org-scoped queryset)
         building: Building = self.get_object()
         qs = selectors.building_units_qs_for_org(org=request.org, building_id=building.id)
-        data = UnitSerializer(qs, many=True).data
-        return Response(data, status=status.HTTP_200_OK)
+        return Response(UnitSerializer(qs, many=True).data, status=status.HTTP_200_OK)
 
 
 class UnitViewSet(viewsets.ModelViewSet):
@@ -57,16 +59,8 @@ class UnitViewSet(viewsets.ModelViewSet):
         return context
 
     def perform_create(self, serializer):
-        # Step 1: enforce org server-side, validate building ownership in serializer + service
-        try:
-            services.create_unit(org=self.request.org, data=serializer.validated_data)
-        except DjangoValidationError as exc:
-            # Step 2: surface as 400 with message
-            raise DjangoValidationError(exc)
+        # Step 1: service raises DRF-safe ValidationError if needed
+        services.create_unit(org=self.request.org, data=serializer.validated_data)
 
     def perform_update(self, serializer):
-        # Step 1: update via service layer
-        try:
-            services.update_unit(unit=self.get_object(), data=serializer.validated_data)
-        except DjangoValidationError as exc:
-            raise DjangoValidationError(exc)
+        services.update_unit(unit=self.get_object(), data=serializer.validated_data)
