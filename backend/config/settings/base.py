@@ -67,6 +67,7 @@ INSTALLED_APPS = [
     # Step 4: Local apps
     "apps.core",
     "apps.users",
+    "apps.buildings",
 ]
 
 MIDDLEWARE = [
@@ -156,10 +157,6 @@ STATIC_ROOT = BASE_DIR / "staticfiles"
 STATICFILES_STORAGE = "whitenoise.storage.CompressedManifestStaticFilesStorage"
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
-
-
-
-
 
 SIMPLE_JWT = {
     # Step 1: Keep access short-lived
