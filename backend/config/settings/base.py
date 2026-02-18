@@ -1,5 +1,16 @@
-# Filename: backend/setting/base.py
-# Step 1: base settings shared across environments
+# Filename: backend/config/settings/base.py
+"""
+Base Django settings for EstateIQ / PortfolioOS.
+
+Shared settings for dev/staging/prod.
+
+Key rules:
+- Multi-tenant requests use X-Org-Slug (CORS-allowed header).
+- CORS is explicit in production (env-driven).
+- In DEBUG, safe localhost defaults apply if env vars are missing.
+- JWT is the primary auth mechanism (SimpleJWT).
+"""
+
 from __future__ import annotations
 
 import os
@@ -7,15 +18,19 @@ from datetime import timedelta
 from pathlib import Path
 from typing import List
 
+from corsheaders.defaults import default_headers
 from dotenv import load_dotenv
 
 from shared.logging.logging_conf import build_logging_config
 
-BASE_DIR = Path(__file__).resolve().parents[2]
+# Step 1: Base directory
+# base.py is at: backend/config/settings/base.py
+# parents[3] => backend/
+BASE_DIR = Path(__file__).resolve().parents[3]
 
-# Step 2: Load .env for local development (prod will use real env vars)
+# Step 2: Load .env for local development (production should use real env vars)
+# NOTE: If you ever move .env elsewhere, update this path.
 load_dotenv(BASE_DIR / ".env")
-
 
 # Step 3: Env helpers
 def _env_str(key: str, default: str = "") -> str:
@@ -60,6 +75,10 @@ DEBUG = _env_bool("DJANGO_DEBUG", default="0")
 
 ALLOWED_HOSTS = _env_csv("DJANGO_ALLOWED_HOSTS", default="localhost,127.0.0.1")
 
+ROOT_URLCONF = "config.urls"
+WSGI_APPLICATION = "config.wsgi.application"
+ASGI_APPLICATION = "config.asgi.application"
+
 # Step 5: Custom user model
 AUTH_USER_MODEL = "users.CustomUser"
 
@@ -87,32 +106,31 @@ INSTALLED_APPS = [
     "apps.leases",
 ]
 
-# Step 8: Middleware
+# Step 8: Middleware (ORDER MATTERS)
 MIDDLEWARE = [
-    # Step 1: CORS first
+    # Step 1: CORS must be high to ensure headers are added to *all* responses (including errors)
     "corsheaders.middleware.CorsMiddleware",
 
     # Step 2: security + static
     "django.middleware.security.SecurityMiddleware",
     "whitenoise.middleware.WhiteNoiseMiddleware",
 
-    # Step 3: session first
+    # Step 3: session
     "django.contrib.sessions.middleware.SessionMiddleware",
 
-    # Step 4: resolve org for the request (X-Org-Slug)
-    "shared.tenancy.middleware.OrganizationResolutionMiddleware",
-
-    # Step 5: standard django middleware
+    # Step 4: standard django middleware
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
+
+    # Step 5: resolve org for request (X-Org-Slug)
+    # IMPORTANT: this middleware must bypass auth endpoints like /api/v1/auth/token/
+    "shared.tenancy.middleware.OrganizationResolutionMiddleware",
 ]
 
-ROOT_URLCONF = "config.urls"
-
-# Step 9: Templates (admin / browsable API)
+# Step 9: Templates
 TEMPLATES = [
     {
         "BACKEND": "django.template.backends.django.DjangoTemplates",
@@ -129,13 +147,9 @@ TEMPLATES = [
     }
 ]
 
-WSGI_APPLICATION = "config.wsgi.application"
-ASGI_APPLICATION = "config.asgi.application"
-
-# Step 10: Database (SQLite for now; can switch to Postgres via env)
+# Step 10: Database (SQLite default; DATABASE_URL optional)
 DATABASE_URL = _env_str("DATABASE_URL", "")
 if DATABASE_URL:
-    # Step 1: optional DATABASE_URL support (requires dj-database-url installed)
     import dj_database_url  # type: ignore
 
     DATABASES = {"default": dj_database_url.parse(DATABASE_URL, conn_max_age=600)}
@@ -153,8 +167,6 @@ CELERY_BROKER_URL = _env_str("CELERY_BROKER_URL", "redis://localhost:6379/1")
 CELERY_RESULT_BACKEND = _env_str("CELERY_RESULT_BACKEND", "redis://localhost:6379/2")
 
 # Step 12: DRF
-# NOTE: Pagination uses shared.api.pagination.StandardResultsSetPagination
-# Create it at: backend/shared/api/pagination.py (snippet below).
 REST_FRAMEWORK = {
     # Step 1: Auth backends
     "DEFAULT_AUTHENTICATION_CLASSES": (
@@ -165,32 +177,49 @@ REST_FRAMEWORK = {
     "DEFAULT_PERMISSION_CLASSES": (
         "rest_framework.permissions.IsAuthenticated",
     ),
-    # Step 3: Pagination defaults (safe for production)
+    # Step 3: Pagination defaults
     "DEFAULT_PAGINATION_CLASS": "shared.api.pagination.StandardResultsSetPagination",
     "PAGE_SIZE": _env_int("DJANGO_PAGE_SIZE", default=25),
 }
 
 # Step 13: JWT
 SIMPLE_JWT = {
-    # Step 1: Keep access short-lived
     "ACCESS_TOKEN_LIFETIME": timedelta(minutes=_env_int("JWT_ACCESS_MINUTES", 10)),
-    # Step 2: Refresh longer-lived
     "REFRESH_TOKEN_LIFETIME": timedelta(days=_env_int("JWT_REFRESH_DAYS", 14)),
-    # Step 3: Safer refresh handling
     "ROTATE_REFRESH_TOKENS": True,
     "BLACKLIST_AFTER_ROTATION": True,
-    # Step 4: Useful for auditing (admin)
     "UPDATE_LAST_LOGIN": True,
     "AUTH_HEADER_TYPES": ("Bearer",),
 }
 
-# Step 14: CORS (env-configured; avoid allow-all by default)
+# Step 14: CORS (multi-tenant + frontend-safe)
 CORS_ALLOW_ALL_ORIGINS = _env_bool("CORS_ALLOW_ALL_ORIGINS", "0")
 CORS_ALLOWED_ORIGINS = _env_csv("CORS_ALLOWED_ORIGINS", "")
 CORS_ALLOW_CREDENTIALS = _env_bool("CORS_ALLOW_CREDENTIALS", "1")
 
-# If you're using cookies anywhere later, you'll likely want these too:
+# Step 14.1: Allow required custom headers
+CORS_ALLOW_HEADERS = list(default_headers) + [
+    "x-org-slug",
+]
+
+# Step 14.2: Dev-safe defaults (prevents empty-origin footgun)
+if DEBUG and not CORS_ALLOW_ALL_ORIGINS and not CORS_ALLOWED_ORIGINS:
+    CORS_ALLOWED_ORIGINS = [
+        "http://localhost:5173",
+        "http://127.0.0.1:5173",
+        "http://localhost:3000",
+        "http://127.0.0.1:3000",
+    ]
+
+# Step 14.3: CSRF trusted origins (future-proof)
 CSRF_TRUSTED_ORIGINS = _env_csv("CSRF_TRUSTED_ORIGINS", "")
+if DEBUG and not CSRF_TRUSTED_ORIGINS:
+    CSRF_TRUSTED_ORIGINS = [
+        "http://localhost:5173",
+        "http://127.0.0.1:5173",
+        "http://localhost:3000",
+        "http://127.0.0.1:3000",
+    ]
 
 # Step 15: Static
 STATIC_URL = "/static/"
