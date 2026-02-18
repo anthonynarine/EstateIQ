@@ -1,66 +1,91 @@
-# Filename: apps/buildings/views.py
-
+# Filename: backend/apps/buildings/views.py
 from __future__ import annotations
 
 from rest_framework import status, viewsets
 from rest_framework.decorators import action
-from rest_framework.permissions import IsAuthenticated
+from rest_framework.filters import OrderingFilter
 from rest_framework.response import Response
 
 from apps.buildings import selectors, services
-from apps.buildings.models import Building
-from apps.buildings.permissions import IsBuildingOrgMember
 from apps.buildings.serializers import BuildingSerializer, UnitSerializer
+from shared.auth.permissions import IsOrgMember
+from apps.leases import selectors as lease_selectors
+from apps.leases.serializers import LeaseSerializer
 
 
 class BuildingViewSet(viewsets.ModelViewSet):
-    """CRUD for buildings, strictly scoped to request.org."""
+    """CRUD for buildings (org-scoped)."""
 
+    permission_classes = [IsOrgMember]
     serializer_class = BuildingSerializer
-    permission_classes = [IsAuthenticated, IsBuildingOrgMember]
+    filter_backends = [OrderingFilter]
+    ordering_fields = ["name", "created_at", "updated_at"]
+    ordering = ["-created_at"]
 
     def get_queryset(self):
-        # Step 1: org-scoped queryset only
+        # Step 1: org-scoped queryset
         return selectors.buildings_qs_for_org(org=self.request.org)
 
     def perform_create(self, serializer):
-        # Step 1: enforce org ownership server-side
-        services.create_building(org=self.request.org, data=serializer.validated_data)
+        # Step 1: org derived from request (client never sends org)
+        services.create_building(org=self.request.org, serializer=serializer)
 
     def perform_update(self, serializer):
-        # Step 1: update via service layer
+        # Step 1: org-safe update
         services.update_building(
-            building=self.get_object(),
-            data=serializer.validated_data,
+            org=self.request.org,
+            instance=self.get_object(),
+            serializer=serializer,
         )
 
     @action(detail=True, methods=["get"], url_path="units")
     def units(self, request, pk=None):
-        # Step 1: ensure building is org-scoped (get_object uses org-scoped queryset)
-        building: Building = self.get_object()
-        qs = selectors.building_units_qs_for_org(org=request.org, building_id=building.id)
-        return Response(UnitSerializer(qs, many=True).data, status=status.HTTP_200_OK)
+        """Nice-to-have: /api/v1/buildings/<id>/units/"""
+        building = self.get_object()
+
+        # Step 1: org-scoped units for this building
+        qs = selectors.building_units_qs_for_org(
+            org=request.org,
+            building_id=building.id,
+        )
+
+        serializer = UnitSerializer(qs, many=True, context={"request": request})
+        return Response(serializer.data, status=status.HTTP_200_OK)
 
 
 class UnitViewSet(viewsets.ModelViewSet):
-    """CRUD for units, strictly scoped to request.org."""
+    """CRUD for units (org-scoped)."""
 
+    permission_classes = [IsOrgMember]
     serializer_class = UnitSerializer
-    permission_classes = [IsAuthenticated, IsBuildingOrgMember]
+    filter_backends = [OrderingFilter]
+    ordering_fields = ["label", "bedrooms", "bathrooms", "sqft", "created_at", "updated_at"]
+    ordering = ["-created_at"]
 
     def get_queryset(self):
-        # Step 1: org-scoped queryset only
+        # Step 1: org-scoped queryset (already select_related("building") in selector)
         return selectors.units_qs_for_org(org=self.request.org)
 
-    def get_serializer_context(self):
-        # Step 1: provide request for validate_building
-        context = super().get_serializer_context()
-        context["request"] = self.request
-        return context
-
     def perform_create(self, serializer):
-        # Step 1: service raises DRF-safe ValidationError if needed
-        services.create_unit(org=self.request.org, data=serializer.validated_data)
+        # Step 1: org derived from request (client never sends org)
+        services.create_unit(org=self.request.org, serializer=serializer)
 
     def perform_update(self, serializer):
-        services.update_unit(unit=self.get_object(), data=serializer.validated_data)
+        # Step 1: org-safe update
+        services.update_unit(
+            org=self.request.org,
+            instance=self.get_object(),
+            serializer=serializer,
+        )
+
+    @action(detail=True, methods=["get"], url_path="leases")
+    def leases(self, request, pk=None):
+        """Nice-to-have: /api/v1/units/<id>/leases/ (org-safe)."""
+        # Step 1: get_object() is org-safe because get_queryset() is org-filtered
+        unit = self.get_object()
+
+        # Step 2: pull org-scoped leases for this unit
+        qs = lease_selectors.leases_qs(org=request.org).filter(unit=unit)
+
+        serializer = LeaseSerializer(qs, many=True, context={"request": request})
+        return Response(serializer.data, status=status.HTTP_200_OK)
