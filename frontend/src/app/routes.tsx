@@ -1,5 +1,6 @@
 // # Filename: src/app/routes.tsx
 // ✅ New Code
+
 import React from "react";
 import { createBrowserRouter, Navigate } from "react-router-dom";
 
@@ -8,13 +9,19 @@ import App from "./App";
 
 import LoginPage from "../pages/LoginPage";
 import RegisterPage from "../pages/RegisterPage";
-import DashboardPage from "../pages/DashboardPage";
+
 import RequireAuth from "../auth/requireAuth";
+
+import DashboardLayout from "../pages/DashboardLayout";
+import DashboardPage from "../pages/DashboardPage";
+
+import TenantsPage from "../features/tenancy/pages/TenantsPage";
+import UnitLeasesPage from "../features/tenancy/pages/UnitLeasesPage";
 
 export const routes = createBrowserRouter([
   {
     path: "/",
-    element: <RootProviders />, // <-- Providers live inside Router now
+    element: <RootProviders />,
     children: [
       {
         element: <App />,
@@ -25,14 +32,21 @@ export const routes = createBrowserRouter([
           { path: "login", element: <LoginPage /> },
           { path: "register", element: <RegisterPage /> },
 
-          // Protected
+          // Protected Dashboard (DashboardLayout owns header/nav; children render in <Outlet />)
           {
             path: "dashboard",
             element: (
               <RequireAuth>
-                <DashboardPage />
+                <DashboardLayout />
               </RequireAuth>
             ),
+            children: [
+              { index: true, element: <DashboardPage /> },
+
+              // Tenancy
+              { path: "tenants", element: <TenantsPage /> },
+              { path: "units/:unitId/leases", element: <UnitLeasesPage /> },
+            ],
           },
         ],
       },
@@ -40,3 +54,5 @@ export const routes = createBrowserRouter([
   },
   { path: "*", element: <Navigate to="/dashboard" replace /> },
 ]);
+
+export default routes;

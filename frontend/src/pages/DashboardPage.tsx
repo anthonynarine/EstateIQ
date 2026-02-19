@@ -1,75 +1,58 @@
 // # Filename: src/pages/DashboardPage.tsx
+// ✅ New Code
 
-import Button from "../components/ui/Button";
-import { useAuth } from "../auth/useAuth";
-import { useOrg } from "../org/useOrg";
-import OrgSwitcher from "../org/OrgSwitcher";
+import React from "react";
+import { Link } from "react-router-dom";
 
+/**
+ * DashboardPage (Home)
+ *
+ * IMPORTANT:
+ * - This should be content-only.
+ * - Do NOT render the top nav here.
+ * - The nav belongs in DashboardLayout.tsx only.
+ *
+ * Purpose:
+ * - Provide a clean “home” card
+ * - Provide quick-entry actions to the vertical slice (Tenants + Leases)
+ * - Keep links lightweight until we have full sidebar/nav + units browsing
+ */
 export default function DashboardPage() {
-  const { user, memberships, logout } = useAuth();
-  const { orgSlug, clearOrgSlug } = useOrg();
-
   return (
-    <div className="min-h-screen">
-      {/* Overlay shows only when needed */}
-      <OrgSwitcher />
-
-      <div className="mx-auto w-full max-w-5xl px-4 py-10">
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <div className="text-2xl font-semibold">Dashboard</div>
-            <div className="mt-1 text-sm text-zinc-400">
-              Signed in as <span className="text-zinc-200">{user?.email}</span>
-            </div>
-          </div>
-
-          <div className="flex flex-wrap gap-2">
-            <Button variant="secondary" onClick={() => clearOrgSlug()} disabled={!orgSlug}>
-              Clear Org
-            </Button>
-            <Button variant="ghost" onClick={() => logout()}>
-              Logout
-            </Button>
-          </div>
+    <div className="grid gap-4">
+      <div className="rounded-2xl border border-zinc-800 bg-zinc-950 p-5">
+        <div className="text-xl font-semibold text-zinc-100">Dashboard</div>
+        <div className="mt-2 text-sm text-zinc-400">
+          Welcome back. Use the navigation to manage tenants and leases.
         </div>
 
-        <div className="mt-8 grid gap-4 sm:grid-cols-2">
-          <div className="rounded-2xl border border-zinc-800 bg-zinc-950 p-5">
-            <div className="text-sm font-semibold text-zinc-200">Selected Org</div>
-            <div className="mt-2 text-lg">{orgSlug ?? "None selected"}</div>
-            <div className="mt-2 text-sm text-zinc-400">
-              Org-scoped API calls will include <span className="text-zinc-200">X-Org-Slug</span>{" "}
-              once selected.
-            </div>
-          </div>
+        <div className="mt-5 flex flex-wrap gap-2">
+          <Link
+            to="/dashboard/tenants"
+            className="rounded-xl border border-zinc-800 bg-zinc-900/30 px-3 py-2 text-sm text-zinc-100 hover:bg-zinc-900/50"
+          >
+            Manage Tenants
+          </Link>
 
-          <div className="rounded-2xl border border-zinc-800 bg-zinc-950 p-5">
-            <div className="text-sm font-semibold text-zinc-200">Memberships</div>
-            <div className="mt-3 space-y-2">
-              {memberships.map((m) => (
-                <div
-                  key={m.org_slug}
-                  className="rounded-xl border border-zinc-800 bg-zinc-900/20 px-4 py-3"
-                >
-                  <div className="text-sm font-semibold">{m.org_slug}</div>
-                  <div className="text-xs text-zinc-400">Role: {m.role}</div>
-                </div>
-              ))}
-              {memberships.length === 0 ? (
-                <div className="text-sm text-zinc-400">No memberships returned.</div>
-              ) : null}
-            </div>
-          </div>
+          {/* Step 1: Temporary dev link until Units browsing is built */}
+          <Link
+            to="/dashboard/units/1/leases"
+            className="rounded-xl border border-zinc-800 bg-zinc-900/30 px-3 py-2 text-sm text-zinc-100 hover:bg-zinc-900/50"
+          >
+            View Unit 1 Leases (temp)
+          </Link>
         </div>
+      </div>
 
-        <div className="mt-8 rounded-2xl border border-zinc-800 bg-zinc-950 p-5">
-          <div className="text-sm font-semibold text-zinc-200">Next</div>
-          <div className="mt-2 text-sm text-zinc-400">
-            Next we’ll add an org-scoped endpoint call here (e.g. portfolio summary). That call should
-            fail without org selection and succeed once <span className="text-zinc-200">X-Org-Slug</span>{" "}
-            is set.
-          </div>
+      <div className="rounded-2xl border border-zinc-800 bg-zinc-950 p-5">
+        <div className="text-sm font-semibold text-zinc-200">
+          What’s next (MVP path)
         </div>
+        <ul className="mt-2 list-disc pl-5 text-sm text-zinc-400">
+          <li>Create tenants</li>
+          <li>Create a lease and attach a primary tenant</li>
+          <li>Replace the temp unit link with a real Units list + selector</li>
+        </ul>
       </div>
     </div>
   );

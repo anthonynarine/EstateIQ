@@ -8,3 +8,4 @@ export function useOrg() {
   if (!ctx) throw new Error("useOrg must be used within OrgProvider");
   return ctx;
 }
+
