@@ -1,36 +1,63 @@
-# Billing Architecture
 
-## Core Philosophy
+# 🏗 Billing Architecture
 
-Billing is ledger-driven.
+## Design Principles
 
-We do NOT store balances.
-We compute them from:
-
-Charge → Payment → Allocation
-
-Balances are always derived.
+1. Deterministic ledger model
+2. No stored balances
+3. Idempotent monthly rent posting
+4. Isolation at org boundary
+5. Service-layer business logic
+6. Event-ready for AI interpretation
 
 ---
 
 ## Data Flow
 
-Lease → RentChargeService → Charge
-Payment → AllocationService → Allocation
-LedgerView → Derived Balance
-Reports → Derived Metrics
+Lease
+   ↓
+RentChargeService
+   ↓
+Charge
+   ↓
+Payment
+   ↓
+AllocationService
+   ↓
+Allocation
+   ↓
+Derived Ledger
+   ↓
+Reports / Dashboard
 
 ---
 
-## Idempotency
+## Idempotency Strategy
 
-Rent generation is idempotent per lease + month.
-Bulk rent posting is safe to run multiple times.
+Rent posting is keyed by:
+
+(lease_id, year, month)
+
+If charge exists → return existing.
+If not → create.
+
+Bulk posting safely re-runnable.
 
 ---
 
-## Multi-Tenant Boundary
+## Failure Model
 
-All queries filter by organization_id.
-All endpoints require X-Org-Slug header.
-Cross-org access returns 403 or 404.
+Bulk rent posting:
+- Each lease runs in its own transaction
+- Errors captured and returned
+- No global rollback
+
+---
+
+## Scalability Considerations
+
+- All queries filtered by organization_id
+- Aggregates use database SUM operations
+- Suitable for 1–50 units (initial target)
+- Can be optimized via indexed due_date & lease_id
+

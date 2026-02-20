@@ -1,26 +1,58 @@
-# Billing App Documentation
+# 📦 Billing Engine — Enterprise Documentation
 
-Production-Grade Documentation
-Generated: 2026-02-20T15:25:49.214122 UTC
+> PortfolioOS / EstateIQ Financial Core  
+> Generated: 2026-02-20T15:31:35.204103 UTC
 
-## Overview
+---
 
-The billing app is the financial backbone of PortfolioOS / EstateIQ.
+## Executive Summary
 
-It implements:
+The Billing app is the deterministic financial engine powering PortfolioOS.
 
-- Deterministic rent charge generation
-- Double-entry style allocation model
-- Payment processing (auto FIFO + manual)
-- Lease ledger view
-- Delinquency (A/R aging) reporting
-- Org dashboard summary KPIs
-- Bulk rent posting engine
+It is:
 
-The system is:
+- Ledger-first
 - Multi-tenant safe
-- Idempotent where required
-- Ledger-first (no stored balances)
-- Fully test-covered
+- Idempotent
+- Fully test-driven
+- AI-ready
+- Production hardened
 
-This documentation covers models, services, endpoints, and system architecture.
+This system converts leases into structured financial intelligence through:
+
+- Rent charge generation
+- Payment allocation engine (FIFO + manual)
+- Derived lease ledger
+- A/R aging (delinquency engine)
+- Dashboard KPI aggregation
+- Bulk rent posting operations
+
+---
+
+## Documentation Structure
+
+| File | Description |
+|------|-------------| ARCHITECTURE.md | System design & data flow |
+| DOMAIN_MODEL.md | Model invariants & data rules |
+| SERVICES/ | Detailed service-level specs |
+| API/ | Endpoint contracts |
+| TESTING.md | Testing strategy & guarantees |
+| SECURITY.md | Multi-tenant & financial integrity controls |
+| AI_READINESS.md | How billing supports intelligence layer |
+
+---
+
+## Core Philosophy
+
+Balances are **never stored**.
+
+All financial positions are derived from:
+
+Charge → Payment → Allocation
+
+This guarantees:
+
+- No drift
+- No hidden state
+- Auditability
+- Reproducibility

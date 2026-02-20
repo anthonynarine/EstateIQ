@@ -1,15 +1,16 @@
-# API Endpoints
+
+# API Contracts
 
 ## Lease Ledger
 GET /api/v1/leases/{lease_id}/ledger/
 
-## Generate Specific Month
+## Generate Month
 POST /api/v1/leases/{lease_id}/charges/generate-month/
 
 ## Generate Current Month
 POST /api/v1/leases/{lease_id}/charges/generate-current-month/
 
-## Create Payment
+## Payments
 POST /api/v1/payments/
 
 ## Delinquency Report
