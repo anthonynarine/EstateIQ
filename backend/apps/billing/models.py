@@ -100,6 +100,11 @@ class Charge(models.Model):
         ]
         constraints = [
             models.CheckConstraint(check=Q(amount__gt=0), name="billing_charge_amount_gt_0"),
+            # ✅ New Code: hard idempotency guard for monthly charge generation
+            models.UniqueConstraint(
+                fields=["organization", "lease", "kind", "due_date"],
+                name="billing_unique_charge_per_kind_due_date",
+            ),
         ]
 
     def clean(self) -> None:
