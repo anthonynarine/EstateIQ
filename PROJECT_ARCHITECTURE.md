@@ -1,4 +1,4 @@
-# PortfolioOS --- System Architecture
+# EstateIq --- System Architecture
 
 PortfolioOS is a multi-tenant Financial Operating System for small real
 estate portfolios (1--50 units).
