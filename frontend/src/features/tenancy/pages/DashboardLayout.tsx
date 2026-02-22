@@ -1,14 +1,13 @@
 // # Filename: src/pages/DashboardLayout.tsx
-// ✅ New Code
 
-import React, { useMemo } from "react";
+import { useMemo } from "react";
 import { Link, NavLink, Outlet } from "react-router-dom";
 
-import OrgSwitcher from "../org/OrgSwitcher";
-import { useOrg } from "../org/useOrg";
+import OrgSwitcher from "../components/OrgSwitcher";
+import { useOrg } from "../hooks/useOrg";
 
-import CreateOrgCard from "../org/components/CreateOrgCard";
-import { useOrgsQuery } from "../org/queries/useOrgsQuery";
+import CreateOrgCard from "../components/CreateOrgCard";
+import { useOrgsQuery } from "../queries/useOrgsQuery";
 
 /**
  * DashboardLayout
@@ -100,7 +99,7 @@ export default function DashboardLayout() {
             </div>
           </div>
 
-          {/* ✅ New Code: Nav row */}
+
           <div className="mt-3 flex flex-wrap items-center gap-2">
             <NavLink to="/dashboard" end className={navLinkClass}>
               Dashboard

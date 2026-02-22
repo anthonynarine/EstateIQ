@@ -12,8 +12,8 @@ import RegisterPage from "../pages/RegisterPage";
 
 import RequireAuth from "../auth/requireAuth";
 
-import DashboardLayout from "../pages/DashboardLayout";
-import DashboardPage from "../pages/DashboardPage";
+import DashboardLayout from "../features/tenancy/pages/DashboardLayout";
+import DashboardPage from "../features/tenancy/pages/DashboardPage";
 
 import TenantsPage from "../features/tenancy/pages/TenantsPage";
 import UnitLeasesPage from "../features/tenancy/pages/UnitLeasesPage";

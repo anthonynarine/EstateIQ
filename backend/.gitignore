@@ -1,10 +1,32 @@
-# Python venv in backend
+# Python virtualenv
 estateiq_venv/
+.venv/
+venv/
 
-# Django / Python artifacts
+# Python bytecode / caches
 __pycache__/
 *.py[codz]
+*.pyo
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Django artifacts
 *.log
+local_settings.py
 db.sqlite3
+db.sqlite3-journal
 media/
 staticfiles/
+static/
+
+# Environment files
+.env
+.env.*
+!.env.example
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/

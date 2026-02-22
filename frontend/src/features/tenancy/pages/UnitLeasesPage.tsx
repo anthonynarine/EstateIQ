@@ -4,7 +4,7 @@
 import React, { useCallback, useMemo, useState } from "react";
 import { useParams } from "react-router-dom";
 
-import { useOrg } from "../../../org/useOrg";
+import { useOrg } from "../hooks/useOrg";
 import { formatApiError } from "../../../api/formatApiError";
 
 import PageStateCard from "../components/PageStateCard";

@@ -1,8 +1,8 @@
 // # Filename: src/org/OrgProvider.tsx
 
-import React, { createContext, useCallback, useEffect, useMemo, useState } from "react";
+import  { createContext, useCallback, useEffect, useMemo, useState } from "react";
 
-import { useOrgsQuery } from "./queries/useOrgsQuery";
+import { useOrgsQuery } from "../queries/useOrgsQuery";
 
 type Org = {
   id: number;

@@ -1,7 +1,7 @@
 // # Filename: src/org/OrgSwitcher.tsx
 
-import React, { useCallback, useMemo } from "react";
-import { useOrg } from "./useOrg";
+import { useCallback, useMemo } from "react";
+import { useOrg } from "../hooks/useOrg";
 
 type Org = {
   id: number;

@@ -1,7 +1,7 @@
 // # Filename: src/org/useOrg.ts
 
 import { useContext } from "react";
-import { OrgContext } from "./OrgProvider";
+import { OrgContext } from "../context/OrgProvider";
 
 export function useOrg() {
   const ctx = useContext(OrgContext);

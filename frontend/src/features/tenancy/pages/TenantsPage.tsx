@@ -9,7 +9,7 @@ import TenantsTable from "../components/TenantsTable";
 import TenantCreateModal from "../components/TenantCreateModal"; 
 
 import { formatApiError } from "../../../api/formatApiError";
-import { useOrg } from "../../../org/useOrg";
+import { useOrg } from "../hooks/useOrg";
 
 export default function TenantsPage() {
   // Step 1: Resolve orgSlug from OrgProvider

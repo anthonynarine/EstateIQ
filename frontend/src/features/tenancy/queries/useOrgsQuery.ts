@@ -2,7 +2,7 @@
 
 
 import { useQuery } from "@tanstack/react-query";
-import { listMyOrgs, type Org } from "../../api/orgApi";
+import { listMyOrgs, type Org } from "../../../api/orgApi";
 
 /**
  * useOrgsQuery
