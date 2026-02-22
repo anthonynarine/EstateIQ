@@ -10,7 +10,7 @@ from django.utils import timezone
 
 class Organization(models.Model):
     """
-    Organization is the primary tenant boundary for PortfolioOS.
+    Organization is the primary tenant boundary for EstateIQ.
 
     Every domain object that belongs to a customer (buildings, units, leases,
     ledger entries, reports, AI logs) must be scoped to exactly one Organization.

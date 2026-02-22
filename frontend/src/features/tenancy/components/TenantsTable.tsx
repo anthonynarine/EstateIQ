@@ -1,126 +1,123 @@
-// # Filename: src/features/tenancy/components/LeasesTable.tsx
+// # Filename: src/features/tenancy/components/TenantsTable.tsx
+// ✅ New Code
+import React, { useMemo } from "react";
 
-import { useMemo } from "react";
-import { Link } from "react-router-dom";
-import type { Lease } from "../types";
-
-type Props = {
-  leases: Lease[];
-  isLoading: boolean;
-  isFetching: boolean;
+export type Tenant = {
+  id: number | string;
+  full_name?: string | null;
+  first_name?: string | null;
+  last_name?: string | null;
+  email?: string | null;
+  phone?: string | null;
+  status?: string | null;
+  created_at?: string | null;
 };
 
-/**
- * LeasesTable
- *
- * Presentational component:
- * - renders leases
- * - shows loading/empty states
- * - displays parties_detail
- */
-export default function LeasesTable({ leases, isLoading, isFetching }: Props) {
-  // Step 1: Format rows (stable)
+type TenantsTableProps = {
+  tenants?: Tenant[]; // may be undefined while loading
+  isLoading?: boolean;
+  error?: unknown;
+  onViewTenant?: (tenantId: Tenant["id"]) => void;
+};
+
+function getDisplayName(t: Tenant): string {
+  // Step 1: Prefer full_name if backend provides it
+  if (t.full_name && t.full_name.trim()) return t.full_name.trim();
+
+  // Step 2: Fall back to first + last
+  const first = (t.first_name || "").trim();
+  const last = (t.last_name || "").trim();
+  const combined = `${first} ${last}`.trim();
+
+  // Step 3: Final fallback
+  return combined || `Tenant #${t.id}`;
+}
+
+export default function TenantsTable({
+  tenants,
+  isLoading = false,
+  error = null,
+  onViewTenant,
+}: TenantsTableProps) {
+  // Step 1: Always map over an array (never undefined)
+  const safeTenants = tenants ?? [];
+
+  // Step 2: Compute rows once
   const rows = useMemo(() => {
-    return leases.map((l) => {
-      const parties =
-        l.parties_detail?.length
-          ? l.parties_detail
-              .map((p) => `${p.tenant.full_name} (${p.role})`)
-              .join(", ")
-          : "—";
+    return safeTenants.map((t) => ({
+      id: t.id,
+      name: getDisplayName(t),
+      email: t.email || "—",
+      phone: t.phone || "—",
+      status: t.status || "—",
+    }));
+  }, [safeTenants]);
 
-      return {
-        id: l.id,
-        status: l.status,
-        start_date: l.start_date,
-        rent_amount: l.rent_amount,
-        rent_due_day: l.rent_due_day ?? "—",
-        security_deposit_amount: l.security_deposit_amount
-          ? `$${l.security_deposit_amount}`
-          : "—",
-        parties,
-      };
-    });
-  }, [leases]);
+  if (isLoading) {
+    return (
+      <div className="rounded-xl border border-white/10 bg-black/40 p-4 text-white/80">
+        Loading tenants…
+      </div>
+    );
+  }
 
-  return (
-    <div className="rounded-2xl border border-zinc-800 bg-zinc-950">
-      <div className="border-b border-zinc-800 px-5 py-4">
-        <div className="flex items-center justify-between gap-3">
-          <div>
-            <div className="text-sm font-semibold text-zinc-200">Leases</div>
-            <div className="mt-1 text-xs text-zinc-500">
-              {isFetching && !isLoading ? "Updating…" : " "}
-            </div>
-          </div>
-
-          <div className="text-xs text-zinc-500">
-            Total: <span className="text-zinc-300">{leases.length}</span>
-          </div>
+  if (error) {
+    return (
+      <div className="rounded-xl border border-red-500/20 bg-black/40 p-4 text-red-200">
+        <div className="font-semibold">Couldn’t load tenants</div>
+        <div className="mt-1 text-sm text-red-200/80">
+          This usually happens if no org is selected (missing X-Org-Slug) or the request failed.
         </div>
       </div>
+    );
+  }
 
-      <div className="p-5">
-        <div className="overflow-x-auto">
-          <table className="w-full min-w-[1080px] text-left text-sm">
-            <thead className="text-xs text-zinc-500">
-              <tr className="border-b border-zinc-800">
-                <th className="py-3 pr-4">Status</th>
-                <th className="py-3 pr-4">Start</th>
-                <th className="py-3 pr-4">Rent</th>
-                <th className="py-3 pr-4">Due Day</th>
-                <th className="py-3 pr-4">Deposit</th>
-                <th className="py-3 pr-4">Parties</th>
-                <th className="py-3 pr-4">Lease ID</th>
+  if (rows.length === 0) {
+    return (
+      <div className="rounded-xl border border-white/10 bg-black/40 p-4 text-white/80">
+        No tenants yet.
+      </div>
+    );
+  }
 
-                {/* Step 2: Actions column */}
-                <th className="py-3 pr-4 text-right">Actions</th>
+  return (
+    <div className="overflow-hidden rounded-xl border border-white/10 bg-black/40">
+      <div className="overflow-x-auto">
+        <table className="min-w-full border-separate border-spacing-0 text-left text-sm">
+          <thead>
+            <tr className="text-white/70">
+              <th className="px-4 py-3 font-medium">Name</th>
+              <th className="px-4 py-3 font-medium">Email</th>
+              <th className="px-4 py-3 font-medium">Phone</th>
+              <th className="px-4 py-3 font-medium">Status</th>
+              <th className="px-4 py-3 font-medium text-right">Actions</th>
+            </tr>
+          </thead>
+
+          <tbody>
+            {rows.map((r) => (
+              <tr key={String(r.id)} className="border-t border-white/10 text-white/90">
+                <td className="px-4 py-3">{r.name}</td>
+                <td className="px-4 py-3 text-white/80">{r.email}</td>
+                <td className="px-4 py-3 text-white/80">{r.phone}</td>
+                <td className="px-4 py-3 text-white/80">{r.status}</td>
+                <td className="px-4 py-3 text-right">
+                  {onViewTenant ? (
+                    <button
+                      type="button"
+                      onClick={() => onViewTenant(r.id)}
+                      className="rounded-lg border border-white/10 bg-white/5 px-3 py-1.5 text-xs text-white/90 hover:bg-white/10"
+                    >
+                      View
+                    </button>
+                  ) : (
+                    <span className="text-xs text-white/40">—</span>
+                  )}
+                </td>
               </tr>
-            </thead>
-
-            <tbody>
-              {isLoading ? (
-                <tr>
-                  <td className="py-6 text-zinc-400" colSpan={8}>
-                    Loading leases…
-                  </td>
-                </tr>
-              ) : rows.length === 0 ? (
-                <tr>
-                  <td className="py-6 text-zinc-400" colSpan={8}>
-                    No leases found for this unit.
-                  </td>
-                </tr>
-              ) : (
-                rows.map((r) => (
-                  <tr key={r.id} className="border-b border-zinc-900/60">
-                    <td className="py-3 pr-4">
-                      <span className="rounded-lg border border-zinc-800 bg-zinc-900/30 px-2 py-1 text-xs text-zinc-200">
-                        {r.status}
-                      </span>
-                    </td>
-                    <td className="py-3 pr-4 text-zinc-200">{r.start_date}</td>
-                    <td className="py-3 pr-4 text-zinc-200">${r.rent_amount}</td>
-                    <td className="py-3 pr-4 text-zinc-300">{r.rent_due_day}</td>
-                    <td className="py-3 pr-4 text-zinc-300">{r.security_deposit_amount}</td>
-                    <td className="py-3 pr-4 text-zinc-300">{r.parties}</td>
-                    <td className="py-3 pr-4 text-zinc-500">{r.id}</td>
-
-                    {/* Step 3: Actions cell */}
-                    <td className="py-3 pr-4 text-right">
-                      <Link
-                        to={`/dashboard/leases/${r.id}/ledger`}
-                        className="inline-flex items-center rounded-xl border border-zinc-800 bg-zinc-900/30 px-3 py-2 text-xs font-semibold text-zinc-100 hover:bg-zinc-900/50"
-                      >
-                        View Ledger
-                      </Link>
-                    </td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
+            ))}
+          </tbody>
+        </table>
       </div>
     </div>
   );

@@ -1,247 +1,227 @@
-# EstateIq
+# EstateIQ (PortfolioOS)
 
-![Build Status](https://img.shields.io/badge/build-passing-brightgreen)
-![Architecture](https://img.shields.io/badge/architecture-modular_monolith-blue)
-![Multi-Tenant](https://img.shields.io/badge/multi--tenant-enabled-purple)
-![License](https://img.shields.io/badge/license-proprietary-red)
-
-EstateIq is a **Financial Operating System for Small Real Estate
-Portfolios (1--50 units)**.
-
-It provides landlords with **financial clarity, ledger-based rent
-tracking, lease-driven occupancy, and portfolio-level intelligence** ---
-all built on deterministic accounting principles.
+AI‑Native Financial Operating System for Small Real Estate Portfolios
 
 ------------------------------------------------------------------------
 
-# 🚀 Why EstateIq Exists
+# 1. Vision
 
-Small landlords often manage finances through:
+EstateIQ is not a rent tracker.
 
--   Spreadsheets
--   Bank apps
--   Text messages
--   Paper receipts
--   Fragmented tools
+It is a **ledger‑first, multi‑tenant financial operating system** for
+landlords managing 1--50 units.
 
-EstateIq replaces that chaos with:
+The system is built around:
 
--   Structured financial records
--   Immutable ledger accounting
--   Clear profitability tracking
--   Accurate delinquency visibility
--   Accountant-ready exports
+-   Deterministic financial logic
+-   Strict tenant isolation (SaaS multi‑tenancy)
+-   Structured data for AI interpretation
+-   Explainable financial insights
 
 ------------------------------------------------------------------------
 
-# 🏗 High-Level System Architecture
+# 2. Multi‑Tenancy: The Organization Boundary
+
+## What "Organization is the tenant boundary" means
+
+In SaaS terminology, a *tenant* is a customer account boundary.
+
+In EstateIQ:
+
+-   **Organization = SaaS tenant boundary (landlord business)**
+-   **OrganizationMember = internal user inside an organization**
+-   **Tenant (model) = renter paying rent (NOT a SaaS tenant)**
+
+This distinction is critical.
+
+------------------------------------------------------------------------
+
+## Why This Matters
+
+Multiple landlord businesses share:
+
+-   The same database
+-   The same backend
+-   The same application
+
+But they must NEVER see each other's data.
+
+The `Organization` model is the wall between customers.
+
+------------------------------------------------------------------------
+
+## How Isolation Works
 
 ``` mermaid
-flowchart LR
-    UI[React + TypeScript Frontend]
-    API[Django + DRF Backend]
-    DB[(PostgreSQL)]
-    REDIS[(Redis)]
-    WORKERS[Celery Workers]
-    STORAGE[(Object Storage)]
+sequenceDiagram
+  participant UI as React Frontend
+  participant API as Django API
+  participant DB as PostgreSQL
 
-    UI -->|HTTPS| API
-    API --> DB
-    API --> REDIS
-    API --> WORKERS
-    API --> STORAGE
+  UI->>API: Authorization: Bearer <access>\nX-Org-Slug: juju-inc
+  API->>API: Middleware resolves request.org
+  API->>API: Permission checks membership + role
+  API->>DB: Query WHERE organization_id = request.org.id
+  DB-->>API: Org-scoped results
+  API-->>UI: Response
 ```
 
 ------------------------------------------------------------------------
 
-# 🧠 Core Architectural Principles
+## Orgless vs Org‑Scoped Endpoints
 
-## 1. Multi-Tenant from Day One
+### Orgless (bootstrap)
 
-Every record is scoped to an `Organization`.
+-   Create organization
+-   List organizations
 
--   No cross-tenant data leakage
--   Strict org-based query enforcement
--   Role-based permissions
+Requires: - Bearer authentication - NO X-Org-Slug
 
-## 2. Lease-Driven Occupancy
+### Org‑Scoped
 
-A unit is occupied if it has an active lease. There are **no manual
-occupied flags**.
+-   Buildings
+-   Units
+-   Tenants (renters)
+-   Leases
+-   Ledger
+-   Reports
+-   Payments
 
-## 3. Ledger-First Accounting
-
-Money is never mutated.
-
-Balance is computed as:
-
-    Balance = SUM(Charge.amount) - SUM(Allocation.amount)
-
-This ensures:
-
--   Immutable financial history
--   Partial payment support
--   Auditability
--   Enterprise-grade accounting integrity
-
-## 4. Modular Monolith Backend
-
-Clear domain separation:
-
-    backend/
-      core/
-      properties/
-      leasing/
-      billing/
-      expenses/
-      reporting/
+Requires: - Bearer token - X-Org-Slug header - Membership validation
 
 ------------------------------------------------------------------------
 
-# 📊 Core Features (MVP)
+# 3. Data Architecture (High-Level)
 
-### Properties
-
--   Buildings CRUD
--   Bulk unit creation
--   Occupancy overview
-
-### Leasing
-
--   Tenants CRUD
--   Lease lifecycle management
--   Lease document storage
-
-### Billing (Ledger)
-
--   Monthly rent charge generation
--   Payment recording
--   Allocation engine
--   Lease-level ledger view
--   Delinquency reporting
-
-### Expenses
-
--   Categorized expense tracking
--   Receipt uploads
--   Building summaries
-
-### Reporting
-
--   Monthly cash flow
--   Portfolio profitability
--   Year-end export (CSV)
+``` mermaid
+erDiagram
+  ORGANIZATION ||--o{ ORGANIZATION_MEMBER : has
+  ORGANIZATION ||--o{ BUILDING : owns
+  BUILDING ||--o{ UNIT : contains
+  ORGANIZATION ||--o{ TENANT : tracks
+  UNIT ||--o{ LEASE : has
+  TENANT ||--o{ LEASE : participates
+  LEASE ||--o{ CHARGE : generates
+  LEASE ||--o{ PAYMENT : receives
+  PAYMENT ||--o{ ALLOCATION : applies_to
+  CHARGE ||--o{ ALLOCATION : settles
+```
 
 ------------------------------------------------------------------------
 
-# 🔐 Security Model
+# 4. Ledger‑First Financial Model
 
--   Tenant isolation enforced at queryset level
--   Role-based permission enforcement
--   Audit logging for sensitive mutations
--   HTTPS-only production
--   Secure file storage with signed URLs
+EstateIQ is ledger-first.
 
-Roles:
+Nothing is inferred without entries.
+
+## Flow of Money
+
+``` mermaid
+flowchart LR
+  RentPosting --> Charge
+  Charge --> LedgerEntry
+  Payment --> Allocation
+  Allocation --> LedgerEntry
+  LedgerEntry --> Reports
+```
+
+-   Charges create receivables
+-   Payments allocate against charges
+-   Ledger entries drive reports
+-   AI interprets structured financial data
+
+------------------------------------------------------------------------
+
+# 5. Role Model (Internal Users)
+
+OrganizationMember roles:
 
 -   owner
 -   manager
 -   accountant
--   read-only
+-   read_only
+
+Roles control: - Write access - Report access - Financial actions -
+Administrative control
 
 ------------------------------------------------------------------------
 
-# 🏗 Frontend Architecture
+# 6. System Architecture Overview
 
-Stack:
+``` mermaid
+flowchart TB
 
--   React
--   TypeScript
--   Axios (central API client)
--   TanStack Query (API state management)
+  subgraph Frontend
+    React[React + TypeScript]
+    Query[TanStack Query]
+  end
 
-Structure:
+  subgraph Backend
+    Django[Django + DRF]
+    Auth[JWT Authentication]
+    Middleware[Org Resolution Middleware]
+    Services[Service Layer]
+  end
 
-    frontend/
-      src/
-        features/
-        api/
-        auth/
-        layouts/
+  subgraph Database
+    Postgres[(PostgreSQL)]
+  end
 
-------------------------------------------------------------------------
-
-# 📈 Scalability Strategy
-
-Phase 1: - Modular monolith - Single Postgres database - Redis for
-caching + jobs
-
-Phase 2: - Extract integrations - Extract reporting if needed
-
-Phase 3: - Read replicas - Event-driven projections - Horizontal scaling
-
-------------------------------------------------------------------------
-
-# 🧩 Documentation
-
-Deep technical documentation is available:
-
--   Architecture → docs/PROJECT_ARCHITECTURE.md
--   Data Model → docs/DATA_MODEL.md
--   Security → docs/SECURITY.md
--   API Contracts → docs/API_CONTRACTS.md
--   Deployment → docs/DEPLOYMENT.md
-
-------------------------------------------------------------------------
-
-# 🛠 Getting Started (Development)
-
-### Prerequisites
-
--   Python 3.12+
--   Node 20+
--   Docker
-
-### Local Setup
-
-1.  Start infrastructure:
-
-```{=html}
-<!-- -->
+  React --> Query
+  Query --> Django
+  Django --> Middleware
+  Middleware --> Services
+  Services --> Postgres
 ```
-    docker compose up -d
-
-2.  Run backend:
-
-```{=html}
-<!-- -->
-```
-    cd backend
-    python manage.py migrate
-    python manage.py runserver
-
-3.  Run frontend:
-
-```{=html}
-<!-- -->
-```
-    cd frontend
-    npm install
-    npm run dev
 
 ------------------------------------------------------------------------
 
-# 🎯 Vision
+# 7. Security Model
 
-EstateIq aims to become:
-
-> The financial command center for small landlords.
-
-Built on structured financial data, deterministic ledger math, and
-scalable SaaS architecture.
+-   JWT-based authentication
+-   Organization membership enforcement
+-   X-Org-Slug required for org-scoped endpoints
+-   All queries filtered by organization
+-   No cross-tenant data access
 
 ------------------------------------------------------------------------
 
-# 📌 Status
+# 8. AI-First Design Philosophy
 
-Active development --- building toward a sellable, enterprise-grade MVP.
+EstateIQ is designed so that:
+
+-   All financial actions produce structured ledger data
+-   AI reads from deterministic data
+-   AI never mutates financial records
+-   AI explanations reference actual ledger entries
+
+AI is an interpretation layer --- not a replacement for financial logic.
+
+------------------------------------------------------------------------
+
+# 9. Development Principles
+
+-   Modular monolith (Django apps)
+-   Service-layer business logic
+-   Deterministic accounting
+-   Strict domain separation
+-   URL-driven org context
+-   Org-scoped TanStack query keys
+
+------------------------------------------------------------------------
+
+# 10. Roadmap
+
+Phase 1: Deterministic Intelligence - Dashboard summary - Delinquency
+report - Rent posting automation
+
+Phase 2: AI Simulation - Rent increase modeling - Vacancy stress
+scenarios - Underperforming building analysis
+
+Phase 3: Predictive Layer - Delinquency prediction - Expense anomaly
+detection - Portfolio optimization recommendations
+
+------------------------------------------------------------------------
+
+EstateIQ is being built as a production-grade, defensible SaaS product.
