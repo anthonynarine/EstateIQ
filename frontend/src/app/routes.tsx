@@ -1,7 +1,6 @@
-// # Filename: src/app/routes.tsx
-// ✅ New Code
 
-import React from "react";
+// # Filename: src/app/routes.tsx
+
 import { createBrowserRouter, Navigate } from "react-router-dom";
 
 import RootProviders from "./RootProviders";
@@ -17,6 +16,7 @@ import DashboardPage from "../features/tenancy/pages/DashboardPage";
 
 import TenantsPage from "../features/tenancy/pages/TenantsPage";
 import UnitLeasesPage from "../features/tenancy/pages/UnitLeasesPage";
+import LeaseLedgerPage from "../features/finance/pages/LeaseLedgerPage";
 
 export const routes = createBrowserRouter([
   {
@@ -46,6 +46,9 @@ export const routes = createBrowserRouter([
               // Tenancy
               { path: "tenants", element: <TenantsPage /> },
               { path: "units/:unitId/leases", element: <UnitLeasesPage /> },
+
+              // Finance
+              { path: "leases/:leaseId/ledger", element: <LeaseLedgerPage /> },
             ],
           },
         ],

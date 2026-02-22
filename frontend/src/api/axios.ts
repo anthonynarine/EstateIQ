@@ -1,6 +1,5 @@
 // # Filename: src/api/axios.ts
 
-
 import axios from "axios";
 import type {
   AxiosError,
@@ -25,7 +24,8 @@ import { tokenStorage } from "../auth/tokenStorage";
  *  - Refresh endpoint is called via a "raw" client to avoid interceptor recursion
  */
 
-const API_BASE_URL = (import.meta as any).env?.VITE_API_BASE_URL ?? "http://localhost:8000";
+const API_BASE_URL =
+  (import.meta as any).env?.VITE_API_BASE_URL ?? "http://localhost:8000";
 
 // Step 1: Primary API client (uses interceptors)
 const api: AxiosInstance = axios.create({
@@ -79,18 +79,39 @@ function flushRefreshQueue(error: unknown | null, newAccessToken: string | null)
   refreshQueue = [];
 }
 
+function normalizePath(url?: string) {
+  // Step 1: Convert relative/absolute URLs into a comparable pathname
+  if (!url) return "";
+  return url.startsWith("http") ? new URL(url).pathname : url;
+}
+
 function isPublicAuthRequest(url?: string) {
   // Step 1: Identify endpoints that must NOT attempt refresh
   // IMPORTANT:
   //   /me/ is NOT public; it should refresh when access expires.
-  if (!url) return false;
-
-  const path = url.startsWith("http") ? new URL(url).pathname : url;
+  const path = normalizePath(url);
 
   return (
     path.endsWith("/api/v1/auth/token/") ||
     path.endsWith("/api/v1/auth/token/refresh/") ||
     path.endsWith("/api/v1/auth/register/")
+  );
+}
+
+function isAuthScopedRequest(url?: string) {
+  // Step 1: Used to determine when 403 should trigger forced logout
+  const path = normalizePath(url);
+  return path.includes("/api/v1/auth/");
+}
+
+function isOrglessRequest(url?: string) {
+  // Step 1: Endpoints that must NOT include X-Org-Slug (org bootstrap)
+  // You can expand this list later (invitations, org membership accept, etc.)
+  const path = normalizePath(url);
+
+  return (
+    path === "/api/v1/orgs/" ||
+    path.startsWith("/api/v1/orgs/") // includes /api/v1/orgs/:id/
   );
 }
 
@@ -102,7 +123,9 @@ async function refreshAccessToken(): Promise<string> {
   }
 
   // Step 2: Call refresh endpoint using raw client (no interceptors)
-  const res = await raw.post<RefreshResponse>("/api/v1/auth/token/refresh/", { refresh });
+  const res = await raw.post<RefreshResponse>("/api/v1/auth/token/refresh/", {
+    refresh,
+  });
 
   // Step 3: Persist tokens (SimpleJWT may rotate refresh depending on config)
   const newAccess = res.data.access;
@@ -127,10 +150,13 @@ api.interceptors.request.use(
       config.headers.Authorization = `Bearer ${access}`;
     }
 
-    // Step 2: Attach tenant header if present
-    // Only include this if we have a selected org.
+    // Step 2: Attach tenant header ONLY when appropriate
     const orgSlug = tokenStorage.getOrgSlug();
-    if (orgSlug) {
+    const url = config.url;
+
+    // - Never attach X-Org-Slug for orgless endpoints
+    // - Only attach if orgSlug exists for org-scoped endpoints
+    if (orgSlug && !isOrglessRequest(url)) {
       config.headers = config.headers ?? {};
       config.headers["X-Org-Slug"] = orgSlug;
     }
@@ -144,69 +170,74 @@ api.interceptors.request.use(
 api.interceptors.response.use(
   (response: AxiosResponse) => response,
   async (error: AxiosError) => {
-    // Step 1: If no response object, this is likely network/timeout
     const status = error.response?.status;
-    const originalRequest = error.config as (InternalAxiosRequestConfig & { _retry?: boolean }) | undefined;
+    const originalRequest = error.config as
+      | (InternalAxiosRequestConfig & { _retry?: boolean })
+      | undefined;
 
     if (!originalRequest) {
       return Promise.reject(error);
     }
 
-    // Step 2: Optional: treat suspension as forced logout (backend returns 403)
+    // Only logout on auth-scoped forbidden (e.g. disabled user / revoked session),
+    // NOT on org tenancy forbidden (which is expected behavior for wrong org slug).
     if (status === 403) {
-      if (logoutFn) logoutFn();
+      if (isAuthScopedRequest(originalRequest.url)) {
+        tokenStorage.clearTokens();
+        if (logoutFn) logoutFn();
+      }
       return Promise.reject(error);
     }
 
-    // Step 3: Only handle 401 here
+    // Step 2: Only handle 401 here
     if (status !== 401) {
       return Promise.reject(error);
     }
 
-    // Step 4: Avoid refresh loops for token/refresh/register endpoints
+    // Step 3: Avoid refresh loops for token/refresh/register endpoints
     if (isPublicAuthRequest(originalRequest.url)) {
       return Promise.reject(error);
     }
 
-    // Step 5: Avoid infinite retry loops
+    // Step 4: Avoid infinite retry loops
     if (originalRequest._retry) {
+      tokenStorage.clearTokens();
       if (logoutFn) logoutFn();
       return Promise.reject(error);
     }
     originalRequest._retry = true;
 
-    // Step 6: If refresh is already happening, queue this request
+    // Step 5: If refresh is already happening, queue this request
     if (isRefreshing) {
       try {
         const newAccess = await new Promise<string>((resolve, reject) => {
           refreshQueue.push({ resolve, reject });
         });
 
-        // Step 7: Retry original request with new access token
         originalRequest.headers = originalRequest.headers ?? {};
         originalRequest.headers.Authorization = `Bearer ${newAccess}`;
         return api(originalRequest);
       } catch (err) {
+        tokenStorage.clearTokens();
         if (logoutFn) logoutFn();
         return Promise.reject(err);
       }
     }
 
-    // Step 8: Start refresh flow
+    // Step 6: Start refresh flow
     isRefreshing = true;
 
     try {
       const newAccess = await refreshAccessToken();
 
-      // Step 9: Release queued requests
+      // Step 7: Release queued requests
       flushRefreshQueue(null, newAccess);
 
-      // Step 10: Retry original request
+      // Step 8: Retry original request
       originalRequest.headers = originalRequest.headers ?? {};
       originalRequest.headers.Authorization = `Bearer ${newAccess}`;
       return api(originalRequest);
     } catch (err) {
-      // Step 11: Refresh failed → clear tokens + logout
       flushRefreshQueue(err, null);
       tokenStorage.clearTokens();
       if (logoutFn) logoutFn();

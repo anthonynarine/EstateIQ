@@ -5,7 +5,7 @@
 ![Multi-Tenant](https://img.shields.io/badge/multi--tenant-enabled-purple)
 ![License](https://img.shields.io/badge/license-proprietary-red)
 
-PortfolioOS is a **Financial Operating System for Small Real Estate
+EstateIq is a **Financial Operating System for Small Real Estate
 Portfolios (1--50 units)**.
 
 It provides landlords with **financial clarity, ledger-based rent
@@ -14,7 +14,7 @@ all built on deterministic accounting principles.
 
 ------------------------------------------------------------------------
 
-# 🚀 Why PortfolioOS Exists
+# 🚀 Why EstateIq Exists
 
 Small landlords often manage finances through:
 
@@ -24,7 +24,7 @@ Small landlords often manage finances through:
 -   Paper receipts
 -   Fragmented tools
 
-PortfolioOS replaces that chaos with:
+EstateIq replaces that chaos with:
 
 -   Structured financial records
 -   Immutable ledger accounting
@@ -233,7 +233,7 @@ Deep technical documentation is available:
 
 # 🎯 Vision
 
-PortfolioOS aims to become:
+EstateIq aims to become:
 
 > The financial command center for small landlords.
 

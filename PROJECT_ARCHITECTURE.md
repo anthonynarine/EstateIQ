@@ -1,6 +1,6 @@
 # EstateIq --- System Architecture
 
-PortfolioOS is a multi-tenant Financial Operating System for small real
+EstateIq is a multi-tenant Financial Operating System for small real
 estate portfolios (1--50 units).
 
 ------------------------------------------------------------------------
@@ -201,7 +201,7 @@ Phase 3: - Read replicas - Event-driven projections - Horizontal scaling
 
 # 12. Long-Term Vision
 
-PortfolioOS becomes:
+EstateIq becomes:
 
 > The financial command center for small landlords.
 

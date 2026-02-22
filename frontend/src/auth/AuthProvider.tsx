@@ -1,40 +1,42 @@
 // # Filename: src/auth/AuthProvider.tsx
-// ✅ New Code
-import React, { createContext, useCallback, useEffect, useMemo, useRef, useState } from "react";
 
-import { authApi } from "../api/authApi";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+
 import api, { setAxiosLogoutHandler } from "../api/axios";
+import { authApi } from "../api/authApi";
 import { tokenStorage } from "./tokenStorage";
+import { AuthContext } from "./AuthContext";
 import type { AuthContextValue, AuthState, MeResponse } from "./types";
-
-/**
- * AuthProvider
- *
- * Owns authenticated identity state:
- *  - login/register/logout
- *  - hydrate on boot via /api/v1/auth/me/
- *  - wires logout hook into axios interceptor
- *
- * Tenant scoping:
- *  - Org boundary is enforced by X-Org-Slug on domain endpoints.
- *  - /auth/me is identity-only (safe: returns user's memberships).
- */
-
-export const AuthContext = createContext<AuthContextValue | null>(null);
-
-const initialState: AuthState = {
-  user: null,
-  memberships: [],
-  isAuthenticated: false,
-  isHydrating: true,
-};
 
 type Props = {
   children: React.ReactNode;
 };
 
+const getInitialAuthState = (): AuthState => {
+  // Step 1: Decide initial state from persisted access token.
+  // - If access exists, we need to hydrate /me (isHydrating: true).
+  // - If no access exists, we are immediately logged out (isHydrating: false).
+  const access = tokenStorage.getAccess();
+
+  if (!access) {
+    return {
+      user: null,
+      memberships: [],
+      isAuthenticated: false,
+      isHydrating: false,
+    };
+  }
+
+  return {
+    user: null,
+    memberships: [],
+    isAuthenticated: false,
+    isHydrating: true,
+  };
+};
+
 export default function AuthProvider({ children }: Props) {
-  const [state, setState] = useState<AuthState>(initialState);
+  const [state, setState] = useState<AuthState>(getInitialAuthState);
 
   // Step 1: prevent state updates after unmount
   const isMountedRef = useRef(true);
@@ -46,15 +48,19 @@ export default function AuthProvider({ children }: Props) {
     };
   }, []);
 
-  const setSafeState = useCallback((next: AuthState) => {
+  const setSafeState = useCallback((updater: AuthState | ((prev: AuthState) => AuthState)) => {
     if (!isMountedRef.current) return;
-    setState(next);
+    setState(updater);
   }, []);
 
   const clearAuth = useCallback(() => {
-    tokenStorage.clearTokens();
+    // Step 1: Clear tokens AND org selection to avoid stale tenant scoping
+    tokenStorage.clearAll();
+
+    // Step 2: Remove default Authorization header (request interceptor also uses tokenStorage)
     delete api.defaults.headers.common.Authorization;
 
+    // Step 3: Reset auth state
     setSafeState({
       user: null,
       memberships: [],
@@ -64,25 +70,27 @@ export default function AuthProvider({ children }: Props) {
   }, [setSafeState]);
 
   const logout = useCallback(() => {
+    // Step 1: Single logout entrypoint
     clearAuth();
   }, [clearAuth]);
 
-  // Step 2: allow axios interceptor to force logout (refresh failure, 403, etc.)
   useEffect(() => {
-    setAxiosLogoutHandler(() => logout);
+    // Step 2: Wire logout handler into axios (refresh failure / auth-forbidden handling)
+    setAxiosLogoutHandler(logout);
     return () => setAxiosLogoutHandler(null);
   }, [logout]);
 
   const applyMe = useCallback(
     (me: MeResponse) => {
-      // Step 1: persist memberships + auth state
+      // Step 1: Normalize memberships
       const memberships = me.memberships ?? [];
 
-      // Step 2: Optional: if only 1 org, auto-select it
+      // Step 2: If user has exactly one org, we can auto-select it
       if (memberships.length === 1) {
         tokenStorage.setOrgSlug(memberships[0].org_slug);
       }
 
+      // Step 3: Commit authenticated state
       setSafeState({
         user: me.user,
         memberships,
@@ -94,41 +102,41 @@ export default function AuthProvider({ children }: Props) {
   );
 
   const hydrate = useCallback(async () => {
-    try {
-      // Step 1: if no access token, finish hydration logged-out
-      const access = tokenStorage.getAccess();
-      if (!access) {
-        setSafeState({ ...initialState, isHydrating: false });
-        return;
-      }
+    // Step 1: Only hydrate if we are in hydrating state
+    const access = tokenStorage.getAccess();
+    if (!access) return;
 
-      // Step 2: set default header (request interceptor also sets it)
+    try {
+      // Step 2: Set default header for consistency (interceptor also sets)
       api.defaults.headers.common.Authorization = `Bearer ${access}`;
 
-      // Step 3: load identity (axios will refresh access if expired)
+      // Step 3: Call /me. If access expired, axios should refresh + retry.
       const me = await authApi.me();
       applyMe(me);
     } catch (err) {
+      // Step 4: Hydration failure means session is not recoverable client-side
       clearAuth();
     }
-  }, [applyMe, clearAuth, setSafeState]);
+  }, [applyMe, clearAuth]);
 
   useEffect(() => {
+    // Step 1: Kick off hydration only when needed
+    if (!state.isHydrating) return;
     void hydrate();
-  }, [hydrate]);
+  }, [hydrate, state.isHydrating]);
 
   const login = useCallback(
     async (email: string, password: string) => {
-      // Step 1: get tokens (IMPORTANT: payload must be { email, password })
+      // Step 1: Exchange credentials for tokens
       const tokens = await authApi.login({ email, password });
 
-      // Step 2: store tokens
+      // Step 2: Persist tokens
       tokenStorage.setTokens(tokens.access, tokens.refresh);
 
-      // Step 3: set default header
+      // Step 3: Set default header
       api.defaults.headers.common.Authorization = `Bearer ${tokens.access}`;
 
-      // Step 4: fetch /me
+      // Step 4: Load /me to populate user + memberships
       const me = await authApi.me();
       applyMe(me);
 
@@ -139,10 +147,10 @@ export default function AuthProvider({ children }: Props) {
 
   const register = useCallback(
     async (payload: { email: string; password: string; first_name?: string; last_name?: string }) => {
-      // Step 1: register
+      // Step 1: Register user
       await authApi.register(payload);
 
-      // Step 2: auto-login for smoother UX
+      // Step 2: Auto-login for smooth onboarding
       return await login(payload.email, payload.password);
     },
     [login]
