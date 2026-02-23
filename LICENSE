@@ -1,0 +1,72 @@
+EstateIQ PROPRIETARY LICENSE
+Version 1.0 — Effective Date: 2026-02-22
+
+Copyright (c) 2026 Anthony Narine. All rights reserved.
+
+IMPORTANT: This is proprietary software. No rights are granted except as expressly stated
+in this license.
+
+1. DEFINITIONS
+“Software” means the source code, object code, documentation, and any related materials
+for the project known as “EstateIQ”, including any updates or modifications.
+“Owner” means Anthony Narine, the copyright holder.
+“You” means any individual or entity that accesses, views, receives, or uses the Software.
+“Authorized Use” means the limited permission to view the Software as described in Section 2.
+
+2. LIMITED LICENSE GRANT (VIEW-ONLY)
+Subject to full compliance with this license, Owner grants You a limited, non-exclusive,
+non-transferable, revocable license to view the Software solely for evaluation purposes.
+
+No other rights are granted.
+
+3. NO COPYING, NO DISTRIBUTION, NO DERIVATIVES, NO COMMERCIAL USE
+Except where explicitly required by law, You may NOT, without Owner’s prior written permission:
+
+a) copy, reproduce, or duplicate the Software (in whole or in part);
+b) distribute, publish, sublicense, sell, lease, lend, or otherwise make the Software available
+   to any third party;
+c) modify, adapt, translate, or create derivative works based on the Software;
+d) use the Software (or any portion of it) to provide a product or service, including a hosted/SaaS
+   offering, consultancy deliverable, internal business tool, or any commercial or non-commercial use;
+e) use the Software to train, fine-tune, or improve any machine learning or AI model, or include it
+   in any dataset for such purposes.
+
+4. NO PATENT OR TRADEMARK LICENSE
+This license does not grant any rights in Owner’s patents, trademarks, service marks, or branding.
+
+5. CONFIDENTIALITY (IF APPLICABLE)
+If the Software is provided to You under a separate NDA or confidentiality agreement, that agreement
+controls. If no NDA exists, You agree not to disclose non-public portions of the Software to any third party.
+
+6. OWNERSHIP
+The Software is licensed, not sold. Owner retains all right, title, and interest in and to the Software.
+
+7. TERMINATION
+This license is effective until terminated. It terminates automatically, without notice, if You breach
+any term. Upon termination, You must immediately stop all access and use, and permanently delete
+all copies of the Software in Your possession or control.
+
+8. DISCLAIMER OF WARRANTIES
+THE SOFTWARE IS PROVIDED “AS IS” AND “AS AVAILABLE”, WITHOUT WARRANTIES OF ANY KIND, EXPRESS OR IMPLIED,
+INCLUDING BUT NOT LIMITED TO WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE, TITLE,
+AND NON-INFRINGEMENT. YOU ASSUME ALL RISK ARISING FROM USE OR INABILITY TO USE THE SOFTWARE.
+
+9. LIMITATION OF LIABILITY
+TO THE MAXIMUM EXTENT PERMITTED BY LAW, IN NO EVENT SHALL OWNER BE LIABLE FOR ANY INDIRECT, INCIDENTAL,
+SPECIAL, CONSEQUENTIAL, OR PUNITIVE DAMAGES, OR ANY LOSS OF PROFITS, REVENUE, DATA, OR GOODWILL, ARISING
+OUT OF OR RELATED TO THE SOFTWARE OR THIS LICENSE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGES.
+OWNER’S TOTAL LIABILITY FOR ANY CLAIM SHALL NOT EXCEED USD $100.
+
+10. ENFORCEMENT; INJUNCTIVE RELIEF
+You acknowledge that unauthorized copying, use, or distribution may cause irreparable harm. Owner is
+entitled to seek injunctive relief in addition to any other remedies available at law or equity.
+
+11. GOVERNING LAW; VENUE
+This license is governed by the laws of the State of New York, USA, excluding conflict-of-law rules.
+Any dispute shall be brought exclusively in the state or federal courts located in USA, NY,
+and You consent to personal jurisdiction there.
+
+12. CONTACT
+For permissions, licensing, or commercial use inquiries:
+Anthony Narine 
+anarine83@gmail.com

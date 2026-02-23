@@ -1,4 +1,4 @@
-# EstateIQ (PortfolioOS)
+# EstateIQ 
 
 ### AI-Native Financial Operating System for Small Real Estate Portfolios
 

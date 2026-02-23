@@ -1,4 +1,4 @@
-
+// ✅ New Code
 // # Filename: src/app/routes.tsx
 
 import { createBrowserRouter, Navigate } from "react-router-dom";
@@ -11,9 +11,10 @@ import RegisterPage from "../pages/RegisterPage";
 
 import RequireAuth from "../auth/requireAuth";
 
-import DashboardLayout from "../features/tenancy/pages/DashboardLayout";
-import DashboardPage from "../features/tenancy/pages/DashboardPage";
+// ✅ New Code: layout lives in src/layout
+import DashboardLayout from "../layout/DashboardLayout";
 
+import DashboardPage from "../features/tenancy/pages/DashboardPage";
 import TenantsPage from "../features/tenancy/pages/TenantsPage";
 import UnitLeasesPage from "../features/tenancy/pages/UnitLeasesPage";
 import LeaseLedgerPage from "../features/finance/pages/LeaseLedgerPage";
