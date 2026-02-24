@@ -1,12 +1,15 @@
+
 // # Filename: src/app/RootProviders.tsx
 
-
+import type React from "react";
 import { Outlet } from "react-router-dom";
 
 import QueryProvider from "./QueryProvider";
 
-import AuthProvider  from "../auth/AuthProvider";
-import  OrgProvider  from "../features/tenancy/context/OrgProvider";
+import AuthProvider from "../auth/AuthProvider";
+
+
+import { OrgProvider } from "../features/tenancy/context/OrgProvider";
 
 type Props = {
   children?: React.ReactNode;

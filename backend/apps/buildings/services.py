@@ -1,56 +1,73 @@
-# Filename: apps/buildings/services.py
-# ✅ New Code
+# Filename: backend/apps/buildings/services.py
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, Dict
 
 from django.db import transaction
 
-from apps.buildings.exceptions import DomainValidationError
 from apps.buildings.models import Building, Unit
-from apps.core.models import Organization
+from .models import Organization
 
 
 @transaction.atomic
-def create_building(*, org: Organization, data: dict[str, Any]) -> Building:
-    # Step 1: enforce org ownership server-side
-    return Building.objects.create(organization=org, **data)
+def create_building(*, org: Organization, data: Dict[str, Any]) -> Building:
+    """Create a building in the tenant org.
+
+    Args:
+        org: Tenant boundary (request.org).
+        data: Serializer validated_data (DRF-agnostic).
+
+    Returns:
+        Created Building.
+    """
+    # Step 1: server-enforce tenant boundary
+    payload = dict(data)
+    payload.pop("organization", None)
+
+    # Step 2: create
+    return Building.objects.create(organization=org, **payload)
 
 
 @transaction.atomic
-def update_building(*, building: Building, data: dict[str, Any]) -> Building:
-    # Step 1: apply updates
-    for field, value in data.items():
-        setattr(building, field, value)
-    building.save()
-    return building
+def update_building(*, org: Organization, instance: Building, data: Dict[str, Any]) -> Building:
+    """Update a building (org-safe).
+
+    Args:
+        org: Tenant boundary.
+        instance: Building instance already filtered by org queryset.
+        data: Serializer validated_data.
+
+    Returns:
+        Updated Building.
+    """
+    payload = dict(data)
+    payload.pop("organization", None)
+
+    for field, value in payload.items():
+        setattr(instance, field, value)
+
+    instance.save()
+    return instance
 
 
 @transaction.atomic
-def create_unit(*, org: Organization, data: dict[str, Any]) -> Unit:
-    # Step 1: validate building belongs to org
-    building: Building = data["building"]
-    if building.organization_id != org.id:
-        raise DomainValidationError(
-            {"building": ["Building belongs to a different organization."]}
-        )
+def create_unit(*, org: Organization, data: Dict[str, Any]) -> Unit:
+    """Create a unit (org-safe).
 
-    # Step 2: create with enforced org
-    return Unit.objects.create(organization=org, **data)
+    Notes:
+        - building validation (cross-tenant) is handled by UnitSerializer.validate_building
+    """
+    payload = dict(data)
+    return Unit.objects.create(**payload)
 
 
 @transaction.atomic
-def update_unit(*, unit: Unit, data: dict[str, Any]) -> Unit:
-    # Step 1: prevent cross-tenant reassignment via update
-    if "building" in data:
-        building: Building = data["building"]
-        if building.organization_id != unit.organization_id:
-            raise DomainValidationError(
-                {"building": ["Building belongs to a different organization."]}
-            )
+def update_unit(*, org: Organization, instance: Unit, data: Dict[str, Any]) -> Unit:
+    """Update a unit (org-safe)."""
+    payload = dict(data)
 
-    # Step 2: apply updates
-    for field, value in data.items():
-        setattr(unit, field, value)
-    unit.save()
-    return unit
+    for field, value in payload.items():
+        setattr(instance, field, value)
+
+    instance.save()
+    return instance

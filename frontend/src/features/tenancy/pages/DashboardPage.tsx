@@ -1,16 +1,36 @@
 
 // # Filename: src/features/tenancy/pages/DashboardPage.tsx
 
-import { Link } from "react-router-dom";
+import { Link, useLocation } from "react-router-dom";
 import FinancialSummaryCard from "../../finance/components/FinancialSummaryCard";
 
+/**
+ * DashboardPage
+ *
+ * Purpose:
+ * - Portfolio overview + "launcher" for the Phase 1 onboarding pipeline
+ * - Keeps this page intentionally lightweight and deterministic:
+ *   - dashboard shows summary + links
+ *   - CRUD happens on dedicated feature pages (Buildings, Tenants, Units, Leases)
+ *
+ * Multi-tenant rule:
+ * - Org selection is URL-canonical (`?org=<slug>`)
+ * - We preserve `location.search` when navigating so org context remains stable
+ *   across refreshes and deep links.
+ */
 export default function DashboardPage() {
+  // Step 1: Preserve ?org=<slug> when linking to other dashboard routes
+  const location = useLocation();
+
+  // Step 2: Helpers to keep links consistent and avoid copy/paste mistakes
+  const withSearch = (path: string) => `${path}${location.search}`;
+
   return (
     <div className="grid gap-4">
-      {/* Step 1: Financial intelligence block */}
+      {/* Step 3: Financial intelligence block */}
       <FinancialSummaryCard />
 
-      {/* Step 2: Quick actions (mobile-first cards) */}
+      {/* Step 4: Quick actions (mobile-first cards) */}
       <section className="rounded-2xl border border-zinc-800 bg-zinc-950 p-5">
         <div className="flex items-start justify-between gap-3">
           <div>
@@ -23,7 +43,7 @@ export default function DashboardPage() {
 
         <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
           <Link
-            to="/dashboard/tenants"
+            to={withSearch("/dashboard/tenants")}
             className="rounded-2xl border border-zinc-800 bg-zinc-900/30 p-4 text-left transition hover:bg-zinc-900/50"
           >
             <div className="text-sm font-semibold text-zinc-100">Create tenants</div>
@@ -32,14 +52,18 @@ export default function DashboardPage() {
             </div>
           </Link>
 
-          {/* Step 3: Placeholder actions (we’ll enable once routes exist) */}
-          <div className="rounded-2xl border border-dashed border-zinc-800 bg-zinc-950 p-4">
-            <div className="text-sm font-semibold text-zinc-200">Add buildings</div>
+          {/* ✅ Buildings: now enabled */}
+          <Link
+            to={withSearch("/dashboard/buildings")}
+            className="rounded-2xl border border-zinc-800 bg-zinc-900/30 p-4 text-left transition hover:bg-zinc-900/50"
+          >
+            <div className="text-sm font-semibold text-zinc-100">Add buildings</div>
             <div className="mt-1 text-sm text-zinc-400">
-              Next: Buildings → Units → Leases. (Coming next module)
+              Buildings → Units → Leases. Start here.
             </div>
-          </div>
+          </Link>
 
+          {/* Step 5: Keep placeholders until Module E/F routes exist */}
           <div className="rounded-2xl border border-dashed border-zinc-800 bg-zinc-950 p-4">
             <div className="text-sm font-semibold text-zinc-200">Add units</div>
             <div className="mt-1 text-sm text-zinc-400">
@@ -56,7 +80,7 @@ export default function DashboardPage() {
         </div>
       </section>
 
-      {/* Step 4: MVP checklist (keeps you honest + deterministic) */}
+      {/* Step 6: MVP checklist (keeps you honest + deterministic) */}
       <section className="rounded-2xl border border-zinc-800 bg-zinc-950 p-5">
         <div className="text-sm font-semibold text-zinc-200">MVP pipeline checklist</div>
         <ol className="mt-2 list-decimal space-y-1 pl-5 text-sm text-zinc-400">

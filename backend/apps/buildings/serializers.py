@@ -11,7 +11,25 @@ class BuildingSerializer(serializers.ModelSerializer):
 
     Multi-tenant rules:
         - organization is derived from request.org (never client-supplied).
+
+    API contract notes:
+        - address_line2 is optional and may be omitted or set to null.
+        - country is optional.
     """
+
+    # Step 1: Explicitly allow null / optional for address_line2
+    address_line2 = serializers.CharField(
+        required=False,
+        allow_blank=True,
+        allow_null=True,
+    )
+
+    # Step 2: Optional fields (adjust based on your model constraints)
+    country = serializers.CharField(
+        required=False,
+        allow_blank=True,
+        allow_null=True,
+    )
 
     class Meta:
         model = Building

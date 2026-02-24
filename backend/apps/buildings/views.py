@@ -27,16 +27,33 @@ class BuildingViewSet(viewsets.ModelViewSet):
         return selectors.buildings_qs_for_org(org=self.request.org)
 
     def perform_create(self, serializer):
-        # Step 1: org derived from request (client never sends org)
-        services.create_building(org=self.request.org, serializer=serializer)
+        """Create a building via the service layer.
+
+        Why:
+            - Views stay thin (I/O + auth + serializer validation)
+            - Services own business rules and persistence
+            - Avoids coupling services to DRF serializer objects
+        """
+        # Step 1: create via service using validated data only
+        instance = services.create_building(
+            org=self.request.org,
+            data=serializer.validated_data,
+        )
+
+        # Step 2: attach instance so DRF returns the created record
+        serializer.instance = instance
 
     def perform_update(self, serializer):
-        # Step 1: org-safe update
-        services.update_building(
+        """Update a building via the service layer (org-safe)."""
+        # Step 1: update via service (instance is org-safe via queryset)
+        instance = services.update_building(
             org=self.request.org,
             instance=self.get_object(),
-            serializer=serializer,
+            data=serializer.validated_data,
         )
+
+        # Step 2: attach updated instance for the response
+        serializer.instance = instance
 
     @action(detail=True, methods=["get"], url_path="units")
     def units(self, request, pk=None):
@@ -67,24 +84,33 @@ class UnitViewSet(viewsets.ModelViewSet):
         return selectors.units_qs_for_org(org=self.request.org)
 
     def perform_create(self, serializer):
-        # Step 1: org derived from request (client never sends org)
-        services.create_unit(org=self.request.org, serializer=serializer)
+        """Create a unit via the service layer (org-safe)."""
+        # Step 1: create via service using validated data
+        instance = services.create_unit(
+            org=self.request.org,
+            data=serializer.validated_data,
+        )
+
+        # Step 2: attach instance so DRF returns the created record
+        serializer.instance = instance
 
     def perform_update(self, serializer):
-        # Step 1: org-safe update
-        services.update_unit(
+        """Update a unit via the service layer (org-safe)."""
+        # Step 1: update via service using validated data
+        instance = services.update_unit(
             org=self.request.org,
             instance=self.get_object(),
-            serializer=serializer,
+            data=serializer.validated_data,
         )
+
+        # Step 2: attach updated instance for the response
+        serializer.instance = instance
 
     @action(detail=True, methods=["get"], url_path="leases")
     def leases(self, request, pk=None):
         """Nice-to-have: /api/v1/units/<id>/leases/ (org-safe)."""
-        # Step 1: get_object() is org-safe because get_queryset() is org-filtered
         unit = self.get_object()
 
-        # Step 2: pull org-scoped leases for this unit
         qs = lease_selectors.leases_qs(org=request.org).filter(unit=unit)
 
         serializer = LeaseSerializer(qs, many=True, context={"request": request})

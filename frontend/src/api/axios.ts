@@ -1,3 +1,4 @@
+// ✅ New Code
 // # Filename: src/api/axios.ts
 
 import axios from "axios";
@@ -18,6 +19,7 @@ import { tokenStorage } from "../auth/tokenStorage";
  *  - Multi-tenant header injection (X-Org-Slug)
  *  - Single-flight refresh token flow (prevents refresh storms)
  *  - Automatic request retry after successful refresh
+ *  - DRF URL normalization (enforces trailing slashes to avoid APPEND_SLASH POST 500s)
  *
  * Security notes:
  *  - Never logs tokens
@@ -26,6 +28,94 @@ import { tokenStorage } from "../auth/tokenStorage";
 
 const API_BASE_URL =
   (import.meta as any).env?.VITE_API_BASE_URL ?? "http://localhost:8000";
+
+/**
+ * normalizePath
+ *
+ * Converts relative/absolute URLs into a comparable pathname.
+ * Used only for request classification (auth/orgless), not for mutation.
+ */
+function normalizePath(url?: string) {
+  // Step 1: Convert relative/absolute URLs into a comparable pathname
+  if (!url) return "";
+  return url.startsWith("http") ? new URL(url).pathname : url;
+}
+
+/**
+ * ensureTrailingSlash
+ *
+ * Django REST Framework typically expects trailing slashes. With APPEND_SLASH=True,
+ * Django cannot redirect POST/PUT/PATCH requests to the slash URL without losing body,
+ * resulting in RuntimeError and a 500.
+ *
+ * This normalizes *relative* URLs (starting with "/") to end with a trailing slash,
+ * while preserving query strings.
+ *
+ * Rules:
+ * - Only mutates relative URLs ("/api/...") to avoid touching absolute/external URLs.
+ * - Does NOT modify paths that already end with "/".
+ * - Preserves "?query=..." if present.
+ * - Avoids adding slashes to "file-like" URLs (e.g., "/files/report.pdf").
+ */
+function ensureTrailingSlash(url?: string) {
+  // Step 1: Guard
+  if (!url) return url;
+
+  // Step 2: Only normalize relative paths (our API calls)
+  if (!url.startsWith("/")) return url;
+
+  // Step 3: Split query string safely
+  const [path, query] = url.split("?");
+
+  // Step 4: If already ends with "/", do nothing
+  if (path.endsWith("/")) return url;
+
+  // Step 5: Avoid adding slash to file-like paths (basic heuristic)
+  // (DRF endpoints rarely end with ".json/.pdf/.csv", but file endpoints might.)
+  if (path.includes(".") && !path.endsWith(".well-known")) {
+    return url;
+  }
+
+  const normalized = `${path}/`;
+  return query ? `${normalized}?${query}` : normalized;
+}
+
+function isPublicAuthRequest(url?: string) {
+  // Step 1: Identify endpoints that must NOT attempt refresh
+  // IMPORTANT:
+  //   /me/ is NOT public; it should refresh when access expires.
+  const path = normalizePath(url);
+
+  return (
+    path.endsWith("/api/v1/auth/token/") ||
+    path.endsWith("/api/v1/auth/token/refresh/") ||
+    path.endsWith("/api/v1/auth/register/")
+  );
+}
+
+function isAuthScopedRequest(url?: string) {
+  // Step 1: Used to determine when 403 should trigger forced logout
+  const path = normalizePath(url);
+  return path.includes("/api/v1/auth/");
+}
+
+function isOrglessRequest(url?: string) {
+  /**
+   * Orgless endpoints:
+   * - endpoints that must NOT include X-Org-Slug (org bootstrap)
+   *
+   * IMPORTANT:
+   * - We treat both "/api/v1/orgs" and "/api/v1/orgs/" as orgless because
+   *   URL normalization may happen before classification.
+   */
+  const path = normalizePath(url);
+
+  return (
+    path === "/api/v1/orgs" ||
+    path === "/api/v1/orgs/" ||
+    path.startsWith("/api/v1/orgs/")
+  );
+}
 
 // Step 1: Primary API client (uses interceptors)
 const api: AxiosInstance = axios.create({
@@ -79,42 +169,6 @@ function flushRefreshQueue(error: unknown | null, newAccessToken: string | null)
   refreshQueue = [];
 }
 
-function normalizePath(url?: string) {
-  // Step 1: Convert relative/absolute URLs into a comparable pathname
-  if (!url) return "";
-  return url.startsWith("http") ? new URL(url).pathname : url;
-}
-
-function isPublicAuthRequest(url?: string) {
-  // Step 1: Identify endpoints that must NOT attempt refresh
-  // IMPORTANT:
-  //   /me/ is NOT public; it should refresh when access expires.
-  const path = normalizePath(url);
-
-  return (
-    path.endsWith("/api/v1/auth/token/") ||
-    path.endsWith("/api/v1/auth/token/refresh/") ||
-    path.endsWith("/api/v1/auth/register/")
-  );
-}
-
-function isAuthScopedRequest(url?: string) {
-  // Step 1: Used to determine when 403 should trigger forced logout
-  const path = normalizePath(url);
-  return path.includes("/api/v1/auth/");
-}
-
-function isOrglessRequest(url?: string) {
-  // Step 1: Endpoints that must NOT include X-Org-Slug (org bootstrap)
-  // You can expand this list later (invitations, org membership accept, etc.)
-  const path = normalizePath(url);
-
-  return (
-    path === "/api/v1/orgs/" ||
-    path.startsWith("/api/v1/orgs/") // includes /api/v1/orgs/:id/
-  );
-}
-
 async function refreshAccessToken(): Promise<string> {
   // Step 1: Read refresh token
   const refresh = tokenStorage.getRefresh();
@@ -140,17 +194,20 @@ async function refreshAccessToken(): Promise<string> {
   return newAccess;
 }
 
-// Step 5: Request interceptor (auth + org headers)
+// Step 5: Request interceptor (DRF trailing slash + auth + org headers)
 api.interceptors.request.use(
   (config: InternalAxiosRequestConfig) => {
-    // Step 1: Attach Authorization token if present
+    // Step 1: Normalize DRF endpoints (prevents APPEND_SLASH POST 500)
+    config.url = ensureTrailingSlash(config.url);
+
+    // Step 2: Attach Authorization token if present
     const access = tokenStorage.getAccess();
     if (access) {
       config.headers = config.headers ?? {};
       config.headers.Authorization = `Bearer ${access}`;
     }
 
-    // Step 2: Attach tenant header ONLY when appropriate
+    // Step 3: Attach tenant header ONLY when appropriate
     const orgSlug = tokenStorage.getOrgSlug();
     const url = config.url;
 
@@ -180,7 +237,7 @@ api.interceptors.response.use(
     }
 
     // Only logout on auth-scoped forbidden (e.g. disabled user / revoked session),
-    // NOT on org tenancy forbidden (which is expected behavior for wrong org slug).
+    // NOT on org tenancy forbidden (expected for wrong org slug).
     if (status === 403) {
       if (isAuthScopedRequest(originalRequest.url)) {
         tokenStorage.clearTokens();
@@ -233,7 +290,9 @@ api.interceptors.response.use(
       // Step 7: Release queued requests
       flushRefreshQueue(null, newAccess);
 
-      // Step 8: Retry original request
+      // Step 8: Retry original request (and normalize slash on retry too)
+      originalRequest.url = ensureTrailingSlash(originalRequest.url);
+
       originalRequest.headers = originalRequest.headers ?? {};
       originalRequest.headers.Authorization = `Bearer ${newAccess}`;
       return api(originalRequest);
