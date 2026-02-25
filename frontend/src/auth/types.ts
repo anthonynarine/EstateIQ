@@ -38,11 +38,13 @@ export type AuthContextValue = {
   memberships: Membership[];
   isAuthenticated: boolean;
   isHydrating: boolean;
+  isLoading: boolean;
 
   login: (email: string, password: string) => Promise<MeResponse>;
   register: (payload: {
     email: string;
     password: string;
+    password2: string;
     first_name?: string;
     last_name?: string;
   }) => Promise<MeResponse>;

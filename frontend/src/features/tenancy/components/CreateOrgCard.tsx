@@ -51,7 +51,7 @@ export default function CreateOrgCard() {
     setName("");
 
     // Step 10: Move user into the product flow
-    navigate("/dashboard/tenants", { replace: true });
+    navigate(`/dashboard?org=${org.slug}`, { replace: true });
   };
 
   return (

@@ -1,143 +1,141 @@
-// ✅ New Code
+
 // # Filename: src/features/tenancy/context/OrgProvider.tsx
 
 import type React from "react";
-import {
-  createContext,
-  useCallback,
-  useContext,
-  useEffect,
-  useMemo,
-} from "react";
+import { createContext, useCallback, useEffect, useMemo } from "react";
 import { useSearchParams } from "react-router-dom";
-import { useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 
+import api from "../../../api/axios";
 import { tokenStorage } from "../../../auth/tokenStorage";
 
-/**
- * OrgContextValue
- *
- * Organization selection state for multi-tenant routing and request scoping.
- *
- * Canonical rule:
- * - URL query param `?org=<slug>` is the source of truth.
- * - tokenStorage is a fallback (first load / legacy links / refresh).
- *
- * Why this exists:
- * - Keeps org selection deterministic (URL-driven).
- * - Allows axios to attach `X-Org-Slug` centrally from tokenStorage.
- * - Allows React Query keys to be tenant-safe and invalidate cleanly.
- */
-export type OrgContextValue = {
+export type Org = {
+  id: number;
+  name: string;
+  slug: string;
+  created_at?: string;
+};
+
+type OrgContextValue = {
   /**
-   * Active organization slug or null if none selected.
+   * Active organization slug.
+   *
+   * Canonical source of truth:
+   * - URL param `?org=<slug>` when present
+   * - falls back to tokenStorage (for first-load / legacy links)
    */
   orgSlug: string | null;
 
   /**
-   * Sets the active org slug.
-   *
-   * Side effects:
-   * - Writes slug to tokenStorage (so axios can attach X-Org-Slug)
-   * - Updates URL query string (?org=...)
-   * - Invalidates org-scoped React Query cache entries
+   * Orgs available to the current user (orgless endpoint).
+   * Used by OrgSwitcher + onboarding.
+   */
+  orgs: Org[];
+
+  /**
+   * Orgs loading state (for disabling switcher).
+   */
+  isLoadingOrgs: boolean;
+
+  /**
+   * Sets active org slug.
+   * Updates URL + tokenStorage and invalidates org-scoped query cache.
    */
   setOrgSlug: (slug: string | null) => void;
+
+  /**
+   * Refetch org list (after create, etc.).
+   */
+  refetchOrgs: () => void;
 };
 
 export const OrgContext = createContext<OrgContextValue | null>(null);
 
-/**
- * useOrg
- *
- * Typed accessor for OrgContext.
- *
- * Guarantees:
- * - Provides a stable, strongly-typed interface
- * - Throws a clear error if called outside <OrgProvider />
- *
- * This prevents silent "undefined context" bugs in production.
- */
-export function useOrg(): OrgContextValue {
-  // Step 1: Read context
-  const ctx = useContext(OrgContext);
-
-  // Step 2: Fail fast if provider is missing
-  if (!ctx) {
-    throw new Error("useOrg must be used within <OrgProvider />.");
-  }
-
-  return ctx;
+async function fetchOrgs(): Promise<Org[]> {
+  // Step 1: Orgless endpoint (axios should NOT attach X-Org-Slug here)
+  const res = await api.get<Org[]>("/api/v1/orgs/");
+  return res.data;
 }
 
 /**
  * OrgProvider
  *
- * URL-canonical organization selection provider.
+ * Mobile-first, URL-canonical org selection + org list for switching.
  *
- * Key design:
- * - orgSlug is *derived* from URL/search params + storage fallback.
- * - We avoid duplicating orgSlug into React state, which prevents
- *   effect-driven synchronization loops and state cascade warnings.
- *
- * Multi-tenant boundary:
- * - orgSlug is persisted to tokenStorage so axios can attach `X-Org-Slug`.
- * - Queries are invalidated when org changes to prevent cache bleed.
+ * Key principles:
+ * - orgSlug comes from URL (fallback: tokenStorage)
+ * - org-scoped query keys start with ["org", orgSlug, ...]
+ * - org list comes from orgless endpoint to power switcher + onboarding
  */
 export function OrgProvider({ children }: { children: React.ReactNode }) {
   const [searchParams, setSearchParams] = useSearchParams();
   const queryClient = useQueryClient();
 
-  // Step 1: Derive orgSlug (URL wins; tokenStorage fallback)
-  const urlOrgSlug = searchParams.get("org");
-  const storedOrgSlug = tokenStorage.getOrgSlug();
-  const orgSlug = urlOrgSlug || storedOrgSlug || null;
+  // Step 1: Derive orgSlug (URL wins, storage fallback)
+  const urlOrg = searchParams.get("org");
+  const storedOrg = tokenStorage.getOrgSlug();
+  const orgSlug = urlOrg || storedOrg || null;
 
-  // Step 2: Canonicalize URL if missing org but storage has one
+  // Step 2: Load org list (orgless endpoint)
+  const orgsQuery = useQuery({
+    queryKey: ["orgs"],
+    queryFn: fetchOrgs,
+    staleTime: 30_000,
+  });
+
+  const orgs = orgsQuery.data ?? [];
+  const isLoadingOrgs = orgsQuery.isLoading;
+
+  const refetchOrgs = useCallback(() => {
+    void orgsQuery.refetch();
+  }, [orgsQuery]);
+
+  // Step 3: If URL is missing org but storage has one, canonicalize URL once
   useEffect(() => {
-    if (!urlOrgSlug && storedOrgSlug) {
+    if (!urlOrg && storedOrg) {
       const next = new URLSearchParams(searchParams);
-      next.set("org", storedOrgSlug);
+      next.set("org", storedOrg);
       setSearchParams(next, { replace: true });
     }
-    // Intentionally omit searchParams from deps to avoid infinite URL rewrite loops.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [urlOrgSlug, storedOrgSlug, setSearchParams]);
+  }, [urlOrg, storedOrg, setSearchParams]);
 
+  // Step 4: Invalidate org-scoped cache (prevents cross-tenant bleed)
   const invalidateOrgScopedQueries = useCallback(() => {
     queryClient.invalidateQueries({
       predicate: (query) => {
         const key = query.queryKey;
-        return Array.isArray(key) && key[0] === "org";
+        return Array.isArray(key) && key.length > 0 && key[0] === "org";
       },
     });
   }, [queryClient]);
 
+  // Step 5: Setter updates URL + storage (no local state needed)
   const setOrgSlug = useCallback(
     (slug: string | null) => {
-      // Step 1: Persist for axios header attachment
       if (slug) tokenStorage.setOrgSlug(slug);
       else tokenStorage.clearOrgSlug();
 
-      // Step 2: Update URL (canonical source of truth)
       const next = new URLSearchParams(searchParams);
+
       if (slug) next.set("org", slug);
       else next.delete("org");
 
       setSearchParams(next, { replace: true });
-
-      // Step 3: Prevent cross-tenant cache bleed
       invalidateOrgScopedQueries();
     },
     [invalidateOrgScopedQueries, searchParams, setSearchParams]
   );
 
-  const value = useMemo<OrgContextValue>(
+  const value = useMemo(
     () => ({
       orgSlug,
+      orgs,
+      isLoadingOrgs,
       setOrgSlug,
+      refetchOrgs,
     }),
-    [orgSlug, setOrgSlug]
+    [orgSlug, orgs, isLoadingOrgs, setOrgSlug, refetchOrgs]
   );
 
   return <OrgContext.Provider value={value}>{children}</OrgContext.Provider>;

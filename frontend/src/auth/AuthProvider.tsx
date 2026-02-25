@@ -234,20 +234,27 @@ export default function AuthProvider({ children }: Props) {
    *
    * Registers a user, then logs them in for a smooth onboarding experience.
    */
-  const register = useCallback(
+   const register = useCallback(
     async (payload: {
       email: string;
       password: string;
+      password2: string;
       first_name?: string;
       last_name?: string;
     }) => {
-      // Step 1: Register user
-      await authApi.register(payload);
-
-      // Step 2: Auto-login
-      return await login(payload.email, payload.password);
+      // Step 1: Forward payload exactly as backend expects
+      await authApi.register({
+        email: payload.email,
+        password: payload.password,
+        password2: payload.password2,
+        first_name: payload.first_name,
+        last_name: payload.last_name,
+      });
+  
+      // Step 2: Do nothing else (no tokens set, no login)
+      return true;
     },
-    [login]
+    []
   );
 
   const value: AuthContextValue = useMemo(

@@ -53,6 +53,8 @@ class Building(models.Model):
     address_line2 = models.CharField(
         max_length=255,
         blank=True,
+        null=True,
+        default="",
         help_text="Street address line 2 (apt/suite).",
     )
     city = models.CharField(
