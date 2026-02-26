@@ -1,17 +1,23 @@
-
 // # Filename: src/app/routes.tsx
+
 import { createBrowserRouter, Navigate } from "react-router-dom";
+
 import RootProviders from "./RootProviders";
 import App from "./App";
+
 import LoginPage from "../pages/LoginPage";
 import RegisterPage from "../pages/RegisterPage";
+
 import RequireAuth from "../auth/requireAuth";
 import DashboardLayout from "../layout/DashboardLayout";
+
 import DashboardPage from "../features/tenancy/pages/DashboardPage";
 import TenantsPage from "../features/tenancy/pages/TenantsPage";
 import UnitLeasesPage from "../features/tenancy/pages/UnitLeasesPage";
 import LeaseLedgerPage from "../features/finance/pages/LeaseLedgerPage";
+
 import BuildingsPage from "../features/buildings/pages/BuildingsPage";
+import BuildingDetailPage from "../features/buildings/pages/BuildingDetailPage";
 
 export const routes = createBrowserRouter([
   {
@@ -27,7 +33,7 @@ export const routes = createBrowserRouter([
           { path: "login", element: <LoginPage /> },
           { path: "register", element: <RegisterPage /> },
 
-          // Protected Dashboard (DashboardLayout owns header/nav; children render in <Outlet />)
+          // Protected Dashboard
           {
             path: "dashboard",
             element: (
@@ -38,12 +44,13 @@ export const routes = createBrowserRouter([
             children: [
               { index: true, element: <DashboardPage /> },
 
-              // Portfolio Structure
-              { path: "buildings", element: <BuildingsPage /> },
-
               // Tenancy
               { path: "tenants", element: <TenantsPage /> },
               { path: "units/:unitId/leases", element: <UnitLeasesPage /> },
+
+              // Properties (Buildings → Units)
+              { path: "buildings", element: <BuildingsPage /> },
+              { path: "buildings/:buildingId", element: <BuildingDetailPage /> },
 
               // Finance
               { path: "leases/:leaseId/ledger", element: <LeaseLedgerPage /> },

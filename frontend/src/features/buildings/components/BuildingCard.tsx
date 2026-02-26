@@ -1,17 +1,32 @@
-// # Filename: src/features/buildings/components/BuildingCard.tsx
-// ✅ New Code
 
+// # Filename: src/features/buildings/components/BuildingCard.tsx
+
+import { useCallback } from "react";
+import { useLocation, useNavigate } from "react-router-dom";
 import type { Building } from "../api/buildingsApi";
 
 /**
  * BuildingCard
  *
- * Compact, responsive card:
- * - keeps mobile/tablet feeling “premium”
- * - avoids tall cards on desktop
- * - preserves clear hierarchy + action area
+ * Click-through card for a building record.
+ *
+ * Navigation rules:
+ * - Route: /dashboard/buildings/:buildingId
+ * - Preserve current URL query string (especially `?org=<slug>`),
+ *   since org selection is URL-canonical in this app.
  */
 export default function BuildingCard({ building }: { building: Building }) {
+  const navigate = useNavigate();
+  const location = useLocation();
+
+  // Step 1: Keep org selection stable by preserving ?org=<slug>
+  const onViewUnits = useCallback(() => {
+    navigate({
+      pathname: `/dashboard/buildings/${building.id}`,
+      search: location.search,
+    });
+  }, [building.id, location.search, navigate]);
+
   return (
     <div className="w-full rounded-2xl border border-white/10 bg-white/5 p-4 lg:p-5">
       <div className="flex items-start justify-between gap-3">
@@ -36,11 +51,10 @@ export default function BuildingCard({ building }: { building: Building }) {
       <div className="mt-3 flex justify-end">
         <button
           type="button"
-          className="rounded-xl border border-white/15 bg-transparent px-3 py-1.5 text-xs text-white/80 hover:bg-white/5 disabled:opacity-60"
-          disabled
-          title="Coming next: Building detail + units"
+          onClick={onViewUnits}
+          className="rounded-xl border border-white/15 bg-transparent px-3 py-1.5 text-xs text-white/80 hover:bg-white/5"
         >
-          View units (next)
+          View units
         </button>
       </div>
     </div>
