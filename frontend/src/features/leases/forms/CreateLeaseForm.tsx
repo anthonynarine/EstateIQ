@@ -4,9 +4,18 @@ import { useMemo, useState } from "react";
 import { useOrg } from "../../tenancy/hooks/useOrg";
 import type { LeaseStatus } from "../api/leaseApi";
 import { useCreateLeaseMutation } from "../queries/useCreateLeaseMutation";
+import FieldError from "./FieldError";
+import FormErrorSummary from "./FormErrorSummary";
 
 type Props = {
   unitId: number;
+};
+
+type ApiFieldErrors = Record<string, string[]>;
+
+type NormalizedApiErrors = {
+  formErrors: string[];
+  fieldErrors: ApiFieldErrors;
 };
 
 /**
@@ -46,20 +55,47 @@ export default function CreateLeaseForm({ unitId }: Props) {
     unitId,
   });
 
-  // Step 6: Normalize DRF/axios errors into something displayable
-  const apiErrors = useMemo(() => {
-    const data = (error as any)?.response?.data;
+  // Step 6: Normalize DRF/axios errors into:
+  // - formErrors: non_field_errors / detail / _error
+  // - fieldErrors: start_date, end_date, rent_amount, etc.
+  const normalizedErrors: NormalizedApiErrors | null = useMemo(() => {
+    if (!error) return null;
 
+    const anyErr = error as any;
+    const data = anyErr?.response?.data;
+
+    const out: NormalizedApiErrors = {
+      formErrors: [],
+      fieldErrors: {},
+    };
+
+    // Step 1: If backend gave us nothing structured, fall back to message
     if (!data || typeof data !== "object") {
       const msg =
-        (error as any)?.message ||
+        anyErr?.message ||
         (typeof data === "string" ? data : null) ||
-        null;
-      return msg ? { _error: [msg] } : null;
+        "Something went wrong. Please try again.";
+      out.formErrors.push(msg);
+      return out;
     }
 
-    // DRF usually returns: { field: ["msg"], non_field_errors: ["msg"] }
-    return data as Record<string, string[] | string>;
+    // Step 2: DRF typical object shape: { field: ["msg"], non_field_errors: ["msg"] }
+    for (const [key, val] of Object.entries(data as Record<string, unknown>)) {
+      const msgs = Array.isArray(val) ? val.map(String) : [String(val)];
+
+      if (key === "non_field_errors" || key === "detail" || key === "_error") {
+        out.formErrors.push(...msgs);
+      } else {
+        out.fieldErrors[key] = msgs;
+      }
+    }
+
+    // Step 3: If somehow empty, provide a generic message
+    if (out.formErrors.length === 0 && Object.keys(out.fieldErrors).length === 0) {
+      out.formErrors.push("Validation failed. Please review your inputs.");
+    }
+
+    return out;
   }, [error]);
 
   // Step 7: Helpers
@@ -155,6 +191,9 @@ export default function CreateLeaseForm({ unitId }: Props) {
     );
   }
 
+  const fieldErrors = normalizedErrors?.fieldErrors ?? {};
+  const formErrors = normalizedErrors?.formErrors ?? [];
+
   return (
     <div className="space-y-3">
       {/* Header */}
@@ -185,22 +224,8 @@ export default function CreateLeaseForm({ unitId }: Props) {
             </div>
           ) : null}
 
-          {/* API Errors (DRF) */}
-          {apiErrors ? (
-            <div className="rounded-lg border border-red-500/30 bg-red-500/5 p-3 text-xs text-red-200 space-y-2">
-              <div className="font-semibold text-red-100">Validation error</div>
-              <ul className="list-disc pl-5 space-y-1">
-                {Object.entries(apiErrors).map(([key, val]) => {
-                  const msgs = Array.isArray(val) ? val : [String(val)];
-                  return msgs.map((m, idx) => (
-                    <li key={`${key}-${idx}`}>
-                      <span className="text-red-100">{key}:</span> {m}
-                    </li>
-                  ));
-                })}
-              </ul>
-            </div>
-          ) : null}
+          {/* API Errors (clean) */}
+          <FormErrorSummary title="Validation error" errors={formErrors} />
 
           {/* Fields */}
           <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
@@ -211,8 +236,12 @@ export default function CreateLeaseForm({ unitId }: Props) {
                 type="date"
                 value={startDate}
                 onChange={(e) => setStartDate(e.target.value)}
-                className="w-full rounded-lg border border-neutral-800 bg-neutral-900 px-3 py-2 text-sm text-white outline-none focus:border-neutral-600"
+                className={[
+                  "w-full rounded-lg border bg-neutral-900 px-3 py-2 text-sm text-white outline-none focus:border-neutral-600",
+                  fieldErrors.start_date ? "border-red-500/60" : "border-neutral-800",
+                ].join(" ")}
               />
+              <FieldError messages={fieldErrors.start_date} />
             </label>
 
             {/* End date */}
@@ -222,8 +251,12 @@ export default function CreateLeaseForm({ unitId }: Props) {
                 type="date"
                 value={endDate}
                 onChange={(e) => setEndDate(e.target.value)}
-                className="w-full rounded-lg border border-neutral-800 bg-neutral-900 px-3 py-2 text-sm text-white outline-none focus:border-neutral-600"
+                className={[
+                  "w-full rounded-lg border bg-neutral-900 px-3 py-2 text-sm text-white outline-none focus:border-neutral-600",
+                  fieldErrors.end_date ? "border-red-500/60" : "border-neutral-800",
+                ].join(" ")}
               />
+              <FieldError messages={fieldErrors.end_date} />
             </label>
 
             {/* Rent amount */}
@@ -235,8 +268,12 @@ export default function CreateLeaseForm({ unitId }: Props) {
                 placeholder="e.g. 2500.00"
                 value={rentAmount}
                 onChange={(e) => setRentAmount(e.target.value)}
-                className="w-full rounded-lg border border-neutral-800 bg-neutral-900 px-3 py-2 text-sm text-white outline-none focus:border-neutral-600"
+                className={[
+                  "w-full rounded-lg border bg-neutral-900 px-3 py-2 text-sm text-white outline-none focus:border-neutral-600",
+                  fieldErrors.rent_amount ? "border-red-500/60" : "border-neutral-800",
+                ].join(" ")}
               />
+              <FieldError messages={fieldErrors.rent_amount} />
               <div className="text-[11px] text-neutral-500">
                 Send as a string (Decimal-safe).
               </div>
@@ -251,8 +288,12 @@ export default function CreateLeaseForm({ unitId }: Props) {
                 max={31}
                 value={rentDueDay}
                 onChange={(e) => setRentDueDay(e.target.value)}
-                className="w-full rounded-lg border border-neutral-800 bg-neutral-900 px-3 py-2 text-sm text-white outline-none focus:border-neutral-600"
+                className={[
+                  "w-full rounded-lg border bg-neutral-900 px-3 py-2 text-sm text-white outline-none focus:border-neutral-600",
+                  fieldErrors.rent_due_day ? "border-red-500/60" : "border-neutral-800",
+                ].join(" ")}
               />
+              <FieldError messages={fieldErrors.rent_due_day} />
             </label>
 
             {/* Security deposit */}
@@ -264,8 +305,12 @@ export default function CreateLeaseForm({ unitId }: Props) {
                 placeholder="e.g. 2500.00"
                 value={securityDeposit}
                 onChange={(e) => setSecurityDeposit(e.target.value)}
-                className="w-full rounded-lg border border-neutral-800 bg-neutral-900 px-3 py-2 text-sm text-white outline-none focus:border-neutral-600"
+                className={[
+                  "w-full rounded-lg border bg-neutral-900 px-3 py-2 text-sm text-white outline-none focus:border-neutral-600",
+                  fieldErrors.security_deposit_amount ? "border-red-500/60" : "border-neutral-800",
+                ].join(" ")}
               />
+              <FieldError messages={fieldErrors.security_deposit_amount} />
             </label>
 
             {/* Status */}
@@ -274,12 +319,16 @@ export default function CreateLeaseForm({ unitId }: Props) {
               <select
                 value={status}
                 onChange={(e) => setStatus(e.target.value as LeaseStatus)}
-                className="w-full rounded-lg border border-neutral-800 bg-neutral-900 px-3 py-2 text-sm text-white outline-none focus:border-neutral-600"
+                className={[
+                  "w-full rounded-lg border bg-neutral-900 px-3 py-2 text-sm text-white outline-none focus:border-neutral-600",
+                  fieldErrors.status ? "border-red-500/60" : "border-neutral-800",
+                ].join(" ")}
               >
                 <option value="active">active</option>
                 <option value="draft">draft</option>
                 <option value="ended">ended</option>
               </select>
+              <FieldError messages={fieldErrors.status} />
               <div className="text-[11px] text-neutral-500">
                 For demos, <span className="text-neutral-300">active</span> makes
                 occupancy instant.

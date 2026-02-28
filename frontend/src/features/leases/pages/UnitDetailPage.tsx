@@ -4,7 +4,7 @@ import { useMemo } from "react";
 import { useParams } from "react-router-dom";
 
 import { useOrg } from "../../tenancy/hooks/useOrg";
-import CreateLeaseForm from "../../leases/components/CreateLeaseForm";
+import CreateLeaseForm from "../forms/CreateLeaseForm";
 import LeasesList from "../components/LeaseList";
 import LeaseCard from "../../leases/components/LeaseCard"; 
 import { useLeasesByUnitQuery } from "../../leases/queries/useLeasesByUnitQuery";

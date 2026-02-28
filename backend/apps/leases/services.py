@@ -16,14 +16,6 @@ from apps.core.models import Organization
 from apps.leases.models import Lease, LeaseTenant, Tenant
 
 
-class _Missing:
-    """Sentinel used to distinguish 'not provided' from explicit None."""
-    pass
-
-
-_MISSING = _Missing()
-
-
 @dataclass(frozen=True)
 class LeasePartyInput:
     """Input for attaching a tenant to a lease."""
@@ -31,7 +23,15 @@ class LeasePartyInput:
     role: str = LeaseTenant.Role.PRIMARY
 
 
-# Step 1: Validate overlap + business invariants
+class _Missing:
+    """Sentinel for PATCH fields that were not provided."""
+    pass
+
+
+_MISSING = _Missing()
+
+
+# Step 1: Central invariant checks (shared by create + update)
 def _validate_lease_invariants(
     *,
     org: Organization,
@@ -41,41 +41,47 @@ def _validate_lease_invariants(
     status: str,
     exclude_lease_id: Optional[int] = None,
 ) -> None:
-    """Validate enterprise lease invariants.
+    """Validate enterprise invariants for a lease before saving.
 
-    Rules:
-      - end_date cannot be before start_date
-      - no overlapping lease date ranges for the same unit
-      - only one ACTIVE lease per unit at a time (status-driven)
+    Invariants:
+      - Unit must belong to org
+      - end_date cannot be earlier than start_date
+      - No overlapping lease ranges per unit
+      - Only one ACTIVE lease per unit at a time
 
     Args:
-        org: Active organization (tenant boundary).
-        unit: The unit the lease belongs to.
-        start_date: Proposed start_date.
-        end_date: Proposed end_date (None means open-ended).
+        org: Active organization.
+        unit: Lease's unit.
+        start_date: Proposed start date.
+        end_date: Proposed end date (None = open-ended).
         status: Proposed status.
-        exclude_lease_id: Exclude a lease id (used for update).
+        exclude_lease_id: Lease id to exclude (used during update).
 
     Raises:
-        ValidationError: if any invariant is violated.
+        ValidationError: If any invariant is violated.
     """
-    # Step 2: Date sanity
+    # Step 2: Org integrity
+    if unit.organization_id != org.id:
+        raise ValidationError({"unit": "Unit must belong to the active organization."})
+
+    # Step 3: Date sanity
     if end_date is not None and end_date < start_date:
         raise ValidationError({"end_date": "end_date cannot be earlier than start_date."})
 
+    # Step 4: Overlap detection (inclusive endpoints; None end_date = open-ended)
     qs = Lease.objects.filter(organization=org, unit=unit)
     if exclude_lease_id is not None:
         qs = qs.exclude(id=exclude_lease_id)
 
-    # Step 3: Overlap detection (inclusive)
-    # Overlap if:
-    # existing.start <= new.end (or new.end open-ended)
-    # AND new.start <= existing.end (or existing.end open-ended)
+    # Overlap condition:
+    # existing.start <= new.end (or new.end is open-ended)
+    # AND new.start <= existing.end (or existing.end is open-ended)
     new_end = end_date if end_date is not None else date.max
+    overlap_condition = Q(start_date__lte=new_end) & (
+        Q(end_date__isnull=True) | Q(end_date__gte=start_date)
+    )
 
-    overlap_q = Q(start_date__lte=new_end) & (Q(end_date__isnull=True) | Q(end_date__gte=start_date))
-
-    if qs.filter(overlap_q).exists():
+    if qs.filter(overlap_condition).exists():
         raise ValidationError(
             {
                 "non_field_errors": (
@@ -85,10 +91,12 @@ def _validate_lease_invariants(
             }
         )
 
-    # Step 4: Single active lease (status-driven)
-    # (You can later evolve this to derive 'active' from dates if you prefer.)
+    # Step 5: Only one ACTIVE lease per unit (status-driven)
     if status == "active":
-        active_qs = qs.filter(status="active")
+        active_qs = Lease.objects.filter(organization=org, unit=unit, status="active")
+        if exclude_lease_id is not None:
+            active_qs = active_qs.exclude(id=exclude_lease_id)
+
         if active_qs.exists():
             raise ValidationError(
                 {"status": "This unit already has an active lease. End it before activating another."}
@@ -144,11 +152,7 @@ def create_lease(
     parties: Optional[Iterable[LeasePartyInput]] = None,
 ) -> Lease:
     """Create a lease (org-safe) and optional parties."""
-    # Step 5: hard org integrity
-    if unit.organization_id != org.id:
-        raise ValidationError({"unit": "Unit must belong to the active organization."})
-
-    # Step 6: invariants
+    # Step 1: Validate invariants pre-save
     _validate_lease_invariants(
         org=org,
         unit=unit,
@@ -183,53 +187,63 @@ def update_lease(
     lease: Lease,
     unit: Optional[Unit] = None,
     start_date: Optional[date] = None,
-    end_date: object = _MISSING,  # ✅ correct sentinel default
+    end_date: object = _MISSING,  # ✅ default must be _MISSING, not None
     rent_amount: Optional[Decimal] = None,
     status: Optional[str] = None,
-    security_deposit_amount: object = _MISSING,  # ✅ correct sentinel default
+    security_deposit_amount: object = _MISSING,  # ✅ default must be _MISSING, not None
     rent_due_day: Optional[int] = None,
     parties: Optional[Iterable[LeasePartyInput]] = None,
 ) -> Lease:
-    """Update a lease (org-safe) with PATCH semantics."""
-    # Step 7: Org integrity
+    """Update a lease (org-safe) with true PATCH semantics."""
+    # Step 1: Org integrity
     if lease.organization_id != org.id:
-        raise ValidationError({"detail": "Lease must belong to the active organization."})
+        raise ValidationError({"lease": "Lease must belong to the active organization."})
 
-    # Step 8: Resolve unit
+    # Step 2: Resolve effective unit
     resolved_unit = unit or lease.unit
     if resolved_unit.organization_id != org.id:
         raise ValidationError({"unit": "Unit must belong to the active organization."})
 
-    # Step 9: Compute proposed values (PATCH semantics)
-    proposed_start = start_date if start_date is not None else lease.start_date
-    proposed_end = lease.end_date if end_date is _MISSING else end_date  # may be None
-    proposed_status = status if status is not None else lease.status
+    # Step 3: Compute effective values (PATCH semantics)
+    effective_start = start_date if start_date is not None else lease.start_date
 
-    # Step 10: invariants (exclude self)
+    if end_date is _MISSING:
+        effective_end = lease.end_date
+    else:
+        effective_end = end_date  # may be None (explicit clear)
+
+    effective_status = status if status is not None else lease.status
+
+    # Step 4: Validate invariants using effective values
     _validate_lease_invariants(
         org=org,
         unit=resolved_unit,
-        start_date=proposed_start,
-        end_date=proposed_end,
-        status=proposed_status,
+        start_date=effective_start,
+        end_date=effective_end,
+        status=effective_status,
         exclude_lease_id=lease.id,
     )
 
-    # Step 11: Apply updates
+    # Step 5: Apply updates after validation
     if unit is not None:
         lease.unit = resolved_unit
     if start_date is not None:
-        lease.start_date = proposed_start
+        lease.start_date = effective_start
+
     if end_date is not _MISSING:
-        lease.end_date = proposed_end
+        lease.end_date = effective_end
+
     if rent_amount is not None:
         lease.rent_amount = rent_amount
+
     if security_deposit_amount is not _MISSING:
         lease.security_deposit_amount = security_deposit_amount  # may be None
+
     if rent_due_day is not None:
         lease.rent_due_day = rent_due_day
+
     if status is not None:
-        lease.status = proposed_status
+        lease.status = effective_status
 
     lease.save()
 
@@ -246,8 +260,10 @@ def _set_lease_parties(
     parties: Iterable[LeasePartyInput],
 ) -> None:
     """Replace lease parties with the provided list (authoritative)."""
+    # Step 1: delete existing
     LeaseTenant.objects.filter(organization=org, lease=lease).delete()
 
+    # Step 2: ensure tenants exist in org
     tenant_ids = [p.tenant_id for p in parties]
     tenants: QuerySet[Tenant] = Tenant.objects.filter(organization=org, id__in=tenant_ids)
     tenant_map = {t.id: t for t in tenants}
@@ -267,4 +283,5 @@ def _set_lease_parties(
             )
         )
 
+    # Step 3: bulk create
     LeaseTenant.objects.bulk_create(links)
