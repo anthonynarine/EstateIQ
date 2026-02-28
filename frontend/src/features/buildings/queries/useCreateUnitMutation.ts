@@ -1,9 +1,9 @@
-
 // # Filename: src/features/buildings/queries/useCreateUnitMutation.ts
+
 
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { createUnit, type CreateUnitInput, type Unit } from "../api/unitsApi";
-import  useUnitsQuery  from "./useUnitsQuery";
+import { unitsQueryKey } from "./useUnitsQuery"; 
 
 /**
  * UseCreateUnitMutationArgs
@@ -37,7 +37,10 @@ type UseCreateUnitMutationArgs = {
  * - Backend enforces tenant boundary via request.org (derived from X-Org-Slug).
  * - If orgSlug is missing, this mutation will throw early.
  */
-export function useCreateUnitMutation({ orgSlug, buildingId }: UseCreateUnitMutationArgs) {
+export function useCreateUnitMutation({
+  orgSlug,
+  buildingId,
+}: UseCreateUnitMutationArgs) {
   const queryClient = useQueryClient();
 
   return useMutation<Unit, Error, Omit<CreateUnitInput, "building">>({
@@ -63,7 +66,7 @@ export function useCreateUnitMutation({ orgSlug, buildingId }: UseCreateUnitMuta
       };
 
       // Step 3: Execute API call
-      return createUnit(payload);
+      return await createUnit(payload);
     },
 
     /**

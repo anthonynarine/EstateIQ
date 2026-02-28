@@ -18,6 +18,7 @@ import LeaseLedgerPage from "../features/finance/pages/LeaseLedgerPage";
 
 import BuildingsPage from "../features/buildings/pages/BuildingsPage";
 import BuildingDetailPage from "../features/buildings/pages/BuildingDetailPage";
+import UnitDetailPage from "../features/leases/pages/UnitDetailPage";
 
 export const routes = createBrowserRouter([
   {
@@ -46,6 +47,11 @@ export const routes = createBrowserRouter([
 
               // Tenancy
               { path: "tenants", element: <TenantsPage /> },
+
+              // Unit detail (Lease creation + list lives here)
+              { path: "units/:unitId", element: <UnitDetailPage /> },
+
+              // Existing (you can keep this for now; we may retire later)
               { path: "units/:unitId/leases", element: <UnitLeasesPage /> },
 
               // Properties (Buildings → Units)

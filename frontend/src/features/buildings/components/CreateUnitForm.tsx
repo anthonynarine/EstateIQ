@@ -1,6 +1,6 @@
-
 // # Filename: src/features/buildings/components/CreateUnitForm.tsx
 
+import axios from "axios"; 
 import { useCallback, useMemo, useState } from "react";
 import { useOrg } from "../../tenancy/hooks/useOrg";
 import { useCreateUnitMutation } from "../queries/useCreateUnitMutation";
@@ -40,6 +40,58 @@ function parseNullableNumber(value: string): number | null {
   if (!Number.isFinite(n)) return null;
 
   return n;
+}
+
+/**
+ * extractDrfErrorMessage
+ *
+ * Extracts a human-friendly message from DRF error payloads.
+ *
+ * Common DRF payload shapes:
+ * - { non_field_errors: ["..."] }
+ * - { field_name: ["..."] }
+ * - { detail: "..." }
+ *
+ * Returns:
+ *   string | null
+ */
+function extractDrfErrorMessage(error: unknown): string | null {
+  // Step 1: Only handle Axios errors with response payloads
+  if (!axios.isAxiosError(error)) return null;
+
+  const data = error.response?.data as unknown;
+
+  // Step 2: DRF typically returns an object of arrays/strings
+  if (!data || typeof data !== "object") return null;
+
+  const maybe = data as Record<string, unknown>;
+
+  // Step 3: Prefer non_field_errors (constraint errors often land here)
+  const nonField = maybe.non_field_errors;
+  if (Array.isArray(nonField) && nonField.length > 0) {
+    const msg = String(nonField[0]);
+
+    // Step 4: Special-case the unique constraint to make it user-friendly
+    if (msg.toLowerCase().includes("must make a unique set")) {
+      return "That unit label already exists for this building. Please choose a different label (e.g., B2, 2A, Basement).";
+    }
+
+    return msg;
+  }
+
+  // Step 5: Fall back to label field errors if present
+  const labelErrors = maybe.label;
+  if (Array.isArray(labelErrors) && labelErrors.length > 0) {
+    return String(labelErrors[0]);
+  }
+
+  // Step 6: DRF sometimes uses `detail`
+  const detail = maybe.detail;
+  if (typeof detail === "string" && detail.trim()) {
+    return detail;
+  }
+
+  return null;
 }
 
 /**
@@ -144,7 +196,12 @@ export default function CreateUnitForm({ buildingId }: CreateUnitFormProps) {
         resetForm();
         setIsOpen(false);
       } catch (err) {
-        // Step 7: Let mutation error UI render; keep local error minimal
+        // Step 7: Decode DRF errors into a friendly message
+        const drfMessage = extractDrfErrorMessage(err); 
+        if (drfMessage) {
+          setLocalError(drfMessage); 
+        }
+
         // eslint-disable-next-line no-console
         console.error("createUnit failed:", err);
       }
@@ -199,6 +256,9 @@ export default function CreateUnitForm({ buildingId }: CreateUnitFormProps) {
                 placeholder="e.g., Unit 2A"
                 className="mt-1 w-full rounded-xl border border-white/10 bg-black/20 px-3 py-2 text-sm text-white placeholder:text-white/30 focus:outline-none focus:ring-2 focus:ring-white/10"
               />
+              <div className="mt-1 text-[11px] text-white/50">
+                Must be unique within this building (e.g., B1, B2, 1A, 1B).
+              </div>
             </div>
 
             <div>

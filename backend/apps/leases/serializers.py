@@ -1,4 +1,6 @@
 # Filename: backend/apps/leases/serializers.py
+
+
 from __future__ import annotations
 
 from rest_framework import serializers
@@ -7,6 +9,7 @@ from apps.buildings.models import Unit
 from apps.leases.models import Lease, LeaseTenant, Tenant
 from apps.leases.services import (
     LeasePartyInput,
+    _MISSING,
     create_lease,
     create_tenant,
     update_lease,
@@ -30,11 +33,11 @@ class TenantSerializer(serializers.ModelSerializer):
         read_only_fields = ["id", "created_at", "updated_at"]
 
     def create(self, validated_data):
-        # Step 1: org derived from request
         org = self.context["request"].org
         return create_tenant(org=org, **validated_data)
 
     def update(self, instance, validated_data):
+        # Step 1: Tenant PATCH/PUT update
         return update_tenant(tenant=instance, **validated_data)
 
 
@@ -58,14 +61,7 @@ class LeasePartyDetailSerializer(serializers.ModelSerializer):
 
 
 class LeaseSerializer(serializers.ModelSerializer):
-    """Lease serializer (organization is derived from request.org).
-
-    Write:
-      parties: [{ "tenant_id": 1, "role": "primary" }, ...]
-
-    Read:
-      parties_detail: [{ "tenant": {...}, "role": "primary" }, ...]
-    """
+    """Lease serializer (organization is derived from request.org)."""
 
     parties = LeasePartySerializer(many=True, required=False, write_only=True)
     parties_detail = serializers.SerializerMethodField(read_only=True)
@@ -81,20 +77,18 @@ class LeaseSerializer(serializers.ModelSerializer):
             "security_deposit_amount",
             "rent_due_day",
             "status",
-            "parties",         # write-only
-            "parties_detail",  # read-only
+            "parties",
+            "parties_detail",
             "created_at",
             "updated_at",
         ]
         read_only_fields = ["id", "created_at", "updated_at", "parties_detail"]
 
     def get_parties_detail(self, obj: Lease):
-        # Step 1: return joined tenants + roles (ordered: primary first, then others)
         qs = obj.parties.select_related("tenant").all().order_by("role", "id")
         return LeasePartyDetailSerializer(qs, many=True, context=self.context).data
 
     def validate_unit(self, unit: Unit) -> Unit:
-        # Step 1: ensure unit belongs to request.org
         org = self.context["request"].org
         if unit.organization_id != org.id:
             raise serializers.ValidationError("Unit must belong to the active organization.")
@@ -118,4 +112,20 @@ class LeaseSerializer(serializers.ModelSerializer):
         if parties_data is not None:
             parties = [LeasePartyInput(**p) for p in parties_data]
 
-        return update_lease(org=org, lease=instance, parties=parties, **validated_data)
+        # Step 2: Sentinel fields for explicit null support (PATCH)
+        end_date = validated_data.pop("end_date", _MISSING)
+        security_deposit_amount = validated_data.pop("security_deposit_amount", _MISSING)
+
+        # Step 3: Unit defaulting is optional here because service defaults unit,
+        # but it's fine to keep explicitness.
+        unit = validated_data.pop("unit", None)
+
+        return update_lease(
+            org=org,
+            lease=instance,
+            unit=unit,
+            end_date=end_date,
+            security_deposit_amount=security_deposit_amount,
+            parties=parties,
+            **validated_data,
+        )
