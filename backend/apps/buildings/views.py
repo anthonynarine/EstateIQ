@@ -2,13 +2,17 @@
 
 from __future__ import annotations
 
+from django.db.models import Count, F, IntegerField, OuterRef, Subquery, Value
+from django.db.models.functions import Coalesce
 from rest_framework import status, viewsets
 from rest_framework.decorators import action
 from rest_framework.filters import OrderingFilter
 from rest_framework.response import Response
-from .models import Unit
+
 from apps.buildings import selectors, services
+from apps.buildings.models import Unit
 from apps.buildings.serializers import BuildingSerializer, UnitSerializer
+from apps.leases.models import Lease  
 from apps.leases import selectors as lease_selectors
 from apps.leases.serializers import LeaseSerializer
 from shared.auth.permissions import IsOrgMember
@@ -24,8 +28,42 @@ class BuildingViewSet(viewsets.ModelViewSet):
     ordering = ["-created_at"]
 
     def get_queryset(self):
-        # Step 1: org-scoped queryset
-        return selectors.buildings_qs_for_org(org=self.request.org)
+        # Step 1: org-scoped base queryset
+        org = self.request.org
+        qs = selectors.buildings_qs_for_org(org=org)
+
+        # Step 2: units_count via subquery (no reliance on related_name)
+        units_count_sq = (
+            Unit.objects.filter(organization=org, building_id=OuterRef("pk"))
+            .values("building_id")
+            .annotate(c=Count("id"))
+            .values("c")
+        )
+
+        # Step 3: occupied_units_count = distinct units that have an ACTIVE lease
+        occupied_units_count_sq = (
+            Lease.objects.filter(
+                organization=org,
+                unit__building_id=OuterRef("pk"),
+                status="active",
+            )
+            .values("unit__building_id")
+            .annotate(c=Count("unit_id", distinct=True))
+            .values("c")
+        )
+
+        qs = qs.annotate(
+            units_count=Coalesce(Subquery(units_count_sq), Value(0), output_field=IntegerField()),
+            occupied_units_count=Coalesce(
+                Subquery(occupied_units_count_sq), Value(0), output_field=IntegerField()
+            ),
+        ).annotate(
+            vacant_units_count=Coalesce(F("units_count"), Value(0))
+            - Coalesce(F("occupied_units_count"), Value(0))
+        )
+
+        return qs
+
 
     def perform_create(self, serializer):
         """Create a building via the service layer.

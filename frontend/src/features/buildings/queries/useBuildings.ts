@@ -1,8 +1,12 @@
-
 // # Filename: src/features/buildings/queries/useBuildings.ts
 
+
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { createBuilding, listBuildings } from "../api/buildingsApi";
+import {
+  createBuilding,
+  getBuilding, 
+  listBuildings,
+} from "../api/buildingsApi";
 import type { CreateBuildingInput } from "../api/buildingsApi";
 
 /**
@@ -13,16 +17,16 @@ import type { CreateBuildingInput } from "../api/buildingsApi";
  */
 export const BUILDINGS_KEYS = {
   all: (orgSlug: string) => ["org", orgSlug, "buildings"] as const,
+
+  // detail key (deep-link safe header data)
+  detail: (orgSlug: string, buildingId: number) =>
+    ["org", orgSlug, "buildings", buildingId] as const,
 };
 
 /**
  * useBuildingsQuery
  *
  * Lists buildings for the active org.
- *
- * Multi-tenant contract:
- * - orgSlug is the canonical context (URL-driven by OrgProvider)
- * - axios attaches X-Org-Slug centrally (no per-call header hacks)
  */
 export function useBuildingsQuery(orgSlug: string | null) {
   return useQuery({
@@ -35,13 +39,47 @@ export function useBuildingsQuery(orgSlug: string | null) {
     // Step 3: Fetch
     queryFn: async () => {
       if (!orgSlug) {
-        // Guard against misuse; should not run due to enabled:false
         throw new Error("useBuildingsQuery called without orgSlug.");
       }
       return await listBuildings();
     },
 
     // Step 4: Good defaults
+    staleTime: 30_000,
+    gcTime: 5 * 60_000,
+    refetchOnWindowFocus: false,
+  });
+}
+
+/**
+ * useBuildingQuery
+ *
+ * Fetch a single building (used by BuildingDetailPage for refresh/deep-links).
+ */
+export function useBuildingQuery(
+  orgSlug: string | null,
+  buildingId: number | null,
+  enabledOverride?: boolean,
+) {
+  const enabled = Boolean(orgSlug) && Boolean(buildingId) && (enabledOverride ?? true);
+
+  return useQuery({
+    // Step 1: Org-scoped, id-scoped key
+    queryKey:
+      orgSlug && buildingId != null
+        ? BUILDINGS_KEYS.detail(orgSlug, buildingId)
+        : ["org", "none", "buildings", "none"],
+
+    // Step 2: Gate request
+    enabled,
+
+    // Step 3: Fetch
+    queryFn: async () => {
+      if (!orgSlug) throw new Error("useBuildingQuery called without orgSlug.");
+      if (buildingId == null) throw new Error("useBuildingQuery called without buildingId.");
+      return await getBuilding(buildingId);
+    },
+
     staleTime: 30_000,
     gcTime: 5 * 60_000,
     refetchOnWindowFocus: false,

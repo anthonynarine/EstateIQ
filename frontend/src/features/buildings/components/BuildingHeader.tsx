@@ -20,7 +20,7 @@ export default function BuildingHeader({
   return (
     <header className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
       <div>
-        <h1 className="text-lg font-semibold text-white">Buildings</h1>
+        <h1 className="text-lg font-semibold text-white">Portfolio</h1>
         <p className="mt-1 text-sm text-white/70">
           Manage your properties at the building level.
         </p>

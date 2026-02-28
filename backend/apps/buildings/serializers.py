@@ -15,6 +15,11 @@ class BuildingSerializer(serializers.ModelSerializer):
     API contract notes:
         - address_line2 is optional and may be omitted or set to null.
         - country is optional.
+
+    Aggregates (read-only):
+        - units_count
+        - occupied_units_count
+        - vacant_units_count
     """
 
     # Step 1: Explicitly allow null / optional for address_line2
@@ -31,6 +36,11 @@ class BuildingSerializer(serializers.ModelSerializer):
         allow_null=True,
     )
 
+    # Step 3: Aggregate counts (annotated in queryset; read-only)
+    units_count = serializers.IntegerField(read_only=True)
+    occupied_units_count = serializers.IntegerField(read_only=True)
+    vacant_units_count = serializers.IntegerField(read_only=True)
+
     class Meta:
         model = Building
         fields = [
@@ -43,6 +53,9 @@ class BuildingSerializer(serializers.ModelSerializer):
             "state",
             "postal_code",
             "country",
+            "units_count",
+            "occupied_units_count",
+            "vacant_units_count",
             "created_at",
             "updated_at",
         ]

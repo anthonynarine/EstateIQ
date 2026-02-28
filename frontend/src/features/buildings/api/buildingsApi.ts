@@ -1,4 +1,3 @@
-
 // # Filename: src/features/buildings/api/buildingsApi.ts
 
 import api from "../../../api/axios";
@@ -20,6 +19,11 @@ export type Building = {
   notes?: string | null;
   created_at?: string;
   updated_at?: string;
+
+  // Optional summary fields (if your API returns them on list/retrieve)
+  units_count?: number;
+  occupied_units_count?: number;
+  vacant_units_count?: number;
 };
 
 /**
@@ -54,10 +58,6 @@ type DRFPaginated<T> = {
  * normalizeListResponse
  *
  * Ensures list endpoints always return arrays to the UI layer.
- *
- * Supports:
- * - Building[]
- * - DRF paginated: { results: Building[] }
  */
 function normalizeListResponse<T>(data: unknown): T[] {
   // Step 1: Plain list response
@@ -73,7 +73,7 @@ function normalizeListResponse<T>(data: unknown): T[] {
     return (data as DRFPaginated<T>).results;
   }
 
-  // Step 3: Fail-safe (prevents crashes, but surfaces a clear console signal)
+  // Step 3: Fail-safe
   // eslint-disable-next-line no-console
   console.error("Unexpected list response shape:", data);
   return [];
@@ -82,20 +82,37 @@ function normalizeListResponse<T>(data: unknown): T[] {
 /**
  * listBuildings
  *
- * GET /api/v1/buildings
+ * GET /api/v1/buildings/
  */
 export async function listBuildings(): Promise<Building[]> {
   // Step 1: Request
-  const res = await api.get<Building[] | DRFPaginated<Building>>("/api/v1/buildings/");
+  const res = await api.get<Building[] | DRFPaginated<Building>>(
+    "/api/v1/buildings/",
+  );
 
-  // Step 2: Normalize into a predictable array for UI consumption
+  // Step 2: Normalize into a predictable array
   return normalizeListResponse<Building>(res.data);
+}
+
+/**
+ * getBuilding
+ *
+ * GET /api/v1/buildings/:id/
+ *
+ * Used by BuildingDetailPage so address/name render even on refresh/deep link.
+ */
+export async function getBuilding(buildingId: number): Promise<Building> {
+  // Step 1: Request
+  const res = await api.get<Building>(`/api/v1/buildings/${buildingId}/`);
+
+  // Step 2: Return entity
+  return res.data;
 }
 
 /**
  * createBuilding
  *
- * POST /api/v1/buildings
+ * POST /api/v1/buildings/
  */
 export async function createBuilding(
   payload: CreateBuildingInput,

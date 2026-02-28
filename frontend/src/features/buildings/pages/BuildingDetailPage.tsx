@@ -1,13 +1,16 @@
 // # Filename: src/features/buildings/pages/BuildingDetailPage.tsx
 
+
 import { useMemo } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
-import { useQueries } from "@tanstack/react-query"; 
+import { useQueries } from "@tanstack/react-query";
 
 import { useOrg } from "../../tenancy/hooks/useOrg";
 import CreateUnitForm from "../components/CreateUnitForm";
 import { useUnitsQuery } from "../queries/useUnitsQuery";
+import { useBuildingQuery } from "../queries/useBuildings"; 
 
+import type { Building } from "../api/buildingsApi";
 
 import { listLeasesByUnit } from "../../leases/api/leaseApi";
 import { leasesByUnitQueryKey } from "../../leases/queries/useLeasesByUnitQuery";
@@ -36,6 +39,10 @@ export default function BuildingDetailPage() {
   const navigate = useNavigate();
   const location = useLocation();
 
+  // Step 0b: Optional building snapshot from navigation state (for instant header rendering)
+  const buildingSnapshot = (location.state as { building?: Building } | null)
+    ?.building;
+
   // Step 1: Read buildingId from route
   const { buildingId } = useParams<{ buildingId: string }>();
 
@@ -51,6 +58,20 @@ export default function BuildingDetailPage() {
 
   // Step 4: Determine whether queries/actions are allowed (no conditional hooks)
   const canQuery = Boolean(orgSlug) && Boolean(buildingIdNumber);
+
+  // Step 4b: Deep-link safe building fetch (ONLY when snapshot is missing)
+  const {
+    data: buildingFetched,
+    isLoading: isBuildingLoading,
+    error: buildingError,
+  } = useBuildingQuery(
+    orgSlug ?? null,
+    buildingIdNumber ?? null,
+    canQuery && !buildingSnapshot, // ✅ only fetch if we don't already have snapshot
+  );
+
+  // Step 4c: Single source for header rendering
+  const buildingForHeader = buildingSnapshot ?? buildingFetched;
 
   // Step 5: Units query (ALWAYS call hook; use enabled gate)
   const {
@@ -160,6 +181,35 @@ export default function BuildingDetailPage() {
   }, 0);
   const vacantCount = units.length - occupiedCount;
 
+  // Step 13: Shared Chip (matches BuildingCard style; no ":" in labels)
+  const Chip = ({
+    label,
+    value,
+    variant = "neutral",
+  }: {
+    label: string;
+    value?: number | string;
+    variant?: "neutral" | "occupied" | "vacant";
+  }) => {
+    const base =
+      "inline-flex items-center rounded-full px-3 py-1 text-xs font-medium border";
+
+    const styles: Record<typeof variant, string> = {
+      neutral: "border-white/10 bg-white/5 text-white/80",
+      occupied: "border-emerald-400/25 bg-emerald-500/10 text-emerald-200",
+      vacant: "border-red-400/25 bg-red-500/10 text-red-200",
+    };
+
+    return (
+      <span className={`${base} ${styles[variant]}`}>
+        <span>{label}</span>
+        {value !== undefined ? (
+          <span className="ml-2 text-white">{value}</span>
+        ) : null}
+      </span>
+    );
+  };
+
   return (
     <div className="p-6">
       <div className="mx-auto w-full max-w-5xl space-y-6">
@@ -168,33 +218,53 @@ export default function BuildingDetailPage() {
           <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
             <div className="space-y-1">
               <h1 className="text-xl font-semibold text-white">
-                Building #{buildingIdNumber}
+                {buildingForHeader?.name ?? "Building"}
               </h1>
-              <p className="text-sm text-neutral-400">Org: {orgSlug}</p>
+
+              {/* Step 12a: Prefer address; fall back while loading */}
+              {buildingForHeader ? (
+                <div className="space-y-0.5">
+                  <p className="text-sm text-neutral-400">
+                    {buildingForHeader.address_line1}
+                    {buildingForHeader.address_line2
+                      ? `, ${buildingForHeader.address_line2}`
+                      : ""}
+                  </p>
+
+                  <p className="text-sm text-neutral-500">
+                    {buildingForHeader.city}, {buildingForHeader.state}{" "}
+                    {buildingForHeader.postal_code}
+                  </p>
+                </div>
+              ) : (
+                <p className="text-sm text-neutral-400">
+                  {isBuildingLoading
+                    ? "Loading building…"
+                    : `Building ID #${buildingIdNumber}`}
+                </p>
+              )}
+
+              {buildingError ? (
+                <p className="text-xs text-red-300">
+                  Failed to load building details.
+                  <span className="ml-2 text-red-200/80">
+                    {buildingError instanceof Error
+                      ? buildingError.message
+                      : "Unknown error"}
+                  </span>
+                </p>
+              ) : null}
+
               <p className="text-xs text-neutral-500">
                 Occupancy computed from active leases on {todayISO}.
               </p>
             </div>
 
-            <div className="flex flex-wrap items-center gap-2">
-              <span className="rounded-full border border-neutral-800 bg-neutral-950 px-3 py-1 text-xs text-neutral-300">
-                Units: {isLoading ? "…" : units.length}
-              </span>
-
-              {!isLoading ? (
-                <>
-                  <span className="rounded-full border border-emerald-500/30 bg-emerald-500/10 px-3 py-1 text-xs text-emerald-200">
-                    Occupied: {occupiedCount}
-                  </span>
-                  <span className="rounded-full border border-red-500/30 bg-red-500/10 px-3 py-1 text-xs text-red-200">
-                    Vacant: {vacantCount}
-                  </span>
-                </>
-              ) : null}
-
-              {(isFetching || isLoading) && (
-                <span className="text-xs text-neutral-400">Updating…</span>
-              )}
+            {/* Step 12b: Summary chips (same style as BuildingCard) */}
+            <div className="flex flex-wrap gap-2 sm:justify-end">
+              <Chip label="Units" value={units.length} variant="neutral" />
+              <Chip label="Occupied" value={occupiedCount} variant="occupied" />
+              <Chip label="Vacant" value={vacantCount} variant="vacant" />
             </div>
           </div>
         </div>
@@ -249,22 +319,12 @@ export default function BuildingDetailPage() {
           {!isLoading && !error && units.length > 0 ? (
             <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
               {units.map((u, idx) => {
-                const details =
-                  [
-                    formatBeds(u.bedrooms),
-                    formatBaths(u.bathrooms),
-                    formatSqft(u.sqft),
-                  ]
-                    .filter(Boolean)
-                    .join(" • ") || "No details yet";
-
                 const occ = occupancyByUnitId.get(u.id) ?? "vacant";
-                const occBadge =
-                  occ === "occupied"
-                    ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-200"
-                    : "border-red-500/30 bg-red-500/10 text-red-200";
-
                 const leasesLoading = leasesResults[idx]?.isLoading;
+
+                const beds = formatBeds(u.bedrooms);
+                const baths = formatBaths(u.bathrooms);
+                const sqft = formatSqft(u.sqft);
 
                 return (
                   <button
@@ -274,29 +334,29 @@ export default function BuildingDetailPage() {
                     className="text-left rounded-xl border border-neutral-800 bg-neutral-950 p-4 transition hover:border-neutral-700 hover:bg-neutral-900/40 focus:outline-none focus:ring-2 focus:ring-neutral-600"
                     title="Open unit details"
                   >
-                    <div className="min-w-0 space-y-2">
+                    <div className="min-w-0 space-y-3">
                       <div className="flex items-start justify-between gap-3">
                         <div className="truncate text-sm font-semibold text-white">
                           {u.label || `Unit #${u.id}`}
                         </div>
 
-                        <div className="flex items-center gap-2">
-                          {leasesLoading ? (
-                            <span className="text-[11px] text-neutral-400">
-                              Checking…
-                            </span>
-                          ) : null}
-
-                          <span
-                            className={`shrink-0 rounded-full border px-2.5 py-1 text-[11px] font-semibold ${occBadge}`}
-                            title="Computed from active lease + date range"
-                          >
-                            {occ}
+                        {leasesLoading ? (
+                          <span className="text-[11px] text-neutral-400">
+                            Checking…
                           </span>
-                        </div>
+                        ) : null}
                       </div>
 
-                      <div className="text-xs text-neutral-400">{details}</div>
+                      {/* Step 14: Unit pills (same visual language as BuildingCard) */}
+                      <div className="flex flex-wrap gap-2">
+                        <Chip
+                          label={occ === "occupied" ? "Occupied" : "Vacant"}
+                          variant={occ === "occupied" ? "occupied" : "vacant"}
+                        />
+                        {beds ? <Chip label={beds} variant="neutral" /> : null}
+                        {baths ? <Chip label={baths} variant="neutral" /> : null}
+                        {sqft ? <Chip label={sqft} variant="neutral" /> : null}
+                      </div>
 
                       <div className="text-[11px] text-neutral-500">
                         Manage leases →
