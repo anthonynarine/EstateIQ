@@ -1,148 +1,229 @@
-# TenantSection Component Orchestration
+# TenantSection Orchestration (Entity-Style Diagram)
 
-EstateIQ -- Lease Form Architecture Documentation
+EstateIQ — Create Lease Flow (Tenant selection + inline tenant create)
 
-------------------------------------------------------------------------
+---
 
-## Overview
+## What this module does
 
-The TenantSection module is responsible for managing tenant selection
-within the CreateLeaseForm workflow.
+`TenantSection` is the **tenant selection boundary** inside `CreateLeaseForm`.
 
-It supports two modes:
+It supports:
 
--   **Select existing tenant**
--   **Create new tenant inline**
+- **Select existing tenant** (pick a tenant already in the org)
+- **Create new tenant inline** (enter draft info, later orchestrated into a create-then-lease flow)
 
-The design is intentionally modular and orchestration-driven to ensure:
+**Rule:** UI components never sequence API calls. Sequencing lives in a hook/service.
 
--   Clean separation of responsibilities
--   Predictable state flow
--   No API logic inside UI components
--   Easy future expansion (edit lease, renew lease, modal variants)
+---
 
-------------------------------------------------------------------------
+## Component Entities (ER-style)
 
-# Component Tree
+> Think of each component like an “entity”: it has **inputs (props)**, **outputs (events)**, and **owned state (if any)**.
 
-CreateLeaseForm └── TenantSection (orchestrator) ├── TenantModeToggle
-├── TenantSelectPanel │ └── TenantSelect (uses useTenantsQuery) └──
-TenantCreatePanel
+```mermaid
+erDiagram
+  CREATE_LEASE_FORM ||--|| USE_CREATE_LEASE_FORM : "uses"
+  CREATE_LEASE_FORM ||--|| TENANT_SECTION : "renders"
+  TENANT_SECTION ||--|| TENANT_MODE_TOGGLE : "renders"
+  TENANT_SECTION ||--o{ TENANT_SELECT_PANEL : "renders when mode=select"
+  TENANT_SECTION ||--o{ TENANT_CREATE_PANEL : "renders when mode=create"
 
-------------------------------------------------------------------------
+  TENANT_SELECT_PANEL ||--|| TENANT_SELECT : "wraps"
+  TENANT_SELECT ||--|| USE_TENANTS_QUERY : "calls"
 
-# Responsibility Boundaries
+  USE_CREATE_LEASE_FORM ||--|| TENANT_STATE : "owns"
+  USE_CREATE_LEASE_FORM ||--|| LEASE_STATE : "owns"
+  USE_CREATE_LEASE_FORM ||--|| VALIDATION_STATE : "owns"
 
-## CreateLeaseForm
+  TENANT_STATE {
+    string tenantMode "select | create"
+    string primaryTenantId "nullable"
+    object tenantCreateDraft "name/email/phone"
+  }
 
--   Owns overall lease form submission
--   Owns orchestration (future: create-tenant-then-lease)
--   Owns mutation execution
--   Owns normalized API error routing
+  LEASE_STATE {
+    string unitId
+    string startDate
+    string endDate "nullable"
+    number rentAmount
+    number depositAmount "nullable"
+    number dueDay
+  }
 
-## TenantSection (Orchestrator)
+  VALIDATION_STATE {
+    object tenantCreateFieldErrors
+    object leaseFieldErrors
+    string formError "non-field"
+  }
 
--   Owns visual tenant card shell
--   Switches between select/create panels
--   Does NOT perform API calls
--   Does NOT mutate leases or tenants
+  USE_TENANTS_QUERY {
+    string orgSlug
+    list tenants
+    bool isLoading
+    bool isFetching
+    error error
+  }
 
-## TenantModeToggle
+  CREATE_LEASE_FORM {
+    string orgSlug
+    string unitId
+    fn onSubmit()
+  }
 
--   Pure presentational toggle
--   Emits mode change upward
+  TENANT_SECTION {
+    string orgSlug
+    string tenantMode
+    string primaryTenantId
+    object tenantCreateDraft
+    fn onChangeMode(mode)
+    fn onSelectTenant(id)
+    fn onChangeDraft(patch)
+  }
 
-## TenantSelectPanel
+  TENANT_MODE_TOGGLE {
+    string value "select | create"
+    fn onChange(mode)
+  }
 
--   Wraps TenantSelect
--   Handles existing tenant selection
--   Uses org-scoped tenant directory
+  TENANT_SELECT {
+    string orgSlug
+    string value "tenantId"
+    fn onChange(tenantId)
+  }
 
-## TenantCreatePanel
+  TENANT_CREATE_PANEL {
+    object value "draft"
+    object errors
+    fn onChange(patch)
+  }
+```
 
--   Manages draft tenant input UI
--   Displays field-level validation errors
--   No submission logic
+---
 
-------------------------------------------------------------------------
+## Responsibility Boundaries (who owns what)
 
-# State Ownership Model
+### `CreateLeaseForm` (orchestrator of the whole lease workflow)
+Owns:
 
-State is owned by useCreateLeaseForm hook.
+- the **submit button**
+- the **lease mutation**
+- error mapping (API → field errors)
+- the *future* “create tenant then create lease” sequencing
 
-Tenant-related state:
+Does **not**:
+- render tenant inputs directly (delegates to `TenantSection`)
 
--   tenantMode: "select" \| "create"
--   primaryTenantId
--   tenantCreateDraft
--   tenantCreateFieldErrors
+### `TenantSection` (tenant UI orchestrator)
+Owns:
 
-This ensures:
+- mode switching UI
+- choosing which panel to render
+- pushing events upward (`onSelectTenant`, `onChangeDraft`, `onChangeMode`)
 
--   UI remains stateless
--   Business logic remains centralized
--   Unit tests can target hook independently
+Does **not**:
+- call APIs
+- create tenants
+- create leases
 
-------------------------------------------------------------------------
+### Panels (presentational + small glue)
+- `TenantModeToggle`: pure UI
+- `TenantSelectPanel` / `TenantSelect`: fetch + select behavior (org scoped)
+- `TenantCreatePanel`: draft field UI + error display
 
-# Data Flow (Phase B -- Future)
+---
 
-User clicks "Create lease"
+## Data flow: selection + draft updates
 
-If mode === "select": POST /leases with existing tenant_id
+```mermaid
+sequenceDiagram
+  participant U as User
+  participant TS as TenantSection
+  participant F as useCreateLeaseForm (state)
+  participant Q as useTenantsQuery (server)
 
-If mode === "create": POST /tenants → receive tenant.id → POST /leases
-with tenant.id
+  U->>TS: toggle mode (select/create)
+  TS->>F: setTenantMode(mode)
 
-All of this orchestration will live inside:
+  alt mode = select
+    TS->>Q: fetch tenants (orgSlug)
+    Q-->>TS: tenants[]
+    U->>TS: pick tenant
+    TS->>F: setPrimaryTenantId(tenantId)
+  else mode = create
+    U->>TS: type tenant fields
+    TS->>F: patchTenantCreateDraft({ ... })
+  end
+```
 
-useCreateLeaseWithTenant()
+---
 
-UI remains unaware of API sequencing.
+## Submit orchestration (Phase B: create-then-lease)
 
-------------------------------------------------------------------------
+Right now, your UI is set up for this cleanly.
 
-# Why This Architecture Scales
+When you implement `useCreateLeaseWithTenant()`, the submit sequence becomes:
 
-1.  UI components are small and testable
-2.  No business logic leaks into presentation
-3.  Multi-tenant safety preserved via orgSlug
-4.  Easy to swap inline create for modal in future
-5.  Enables future lease editing with same panels
+```mermaid
+sequenceDiagram
+  participant U as User
+  participant CLF as CreateLeaseForm
+  participant S as useCreateLeaseWithTenant (service hook)
+  participant API as Backend API
 
-------------------------------------------------------------------------
+  U->>CLF: click "Create lease"
+  CLF->>S: submit({ tenantMode, primaryTenantId, tenantCreateDraft, leaseFields })
 
-# Testing Strategy
+  alt tenantMode = select
+    S->>API: POST /leases (tenant_id)
+    API-->>S: lease
+  else tenantMode = create
+    S->>API: POST /tenants (draft)
+    API-->>S: tenant.id
+    S->>API: POST /leases (tenant.id)
+    API-->>S: lease
+  end
 
-Unit Test Targets:
+  S-->>CLF: success (navigate / show toast)
+```
 
--   useCreateLeaseForm (validation + payload building)
--   useCreateLeaseWithTenant (orchestration logic)
+**Key point:** `TenantSection` stays ignorant of sequencing.
 
-Component Test Targets:
+---
 
--   TenantModeToggle rendering
--   TenantCreatePanel field error display
--   TenantSection mode switching behavior
+## Why this is “enterprise-grade”
 
-------------------------------------------------------------------------
+- **Deterministic orchestration:** submit sequencing is centralized in a service hook.
+- **Hard presentation boundary:** tenant UI cannot accidentally create records.
+- **Multi-tenant safe by design:** tenant queries require `orgSlug`, and mutations are executed only at the form boundary.
+- **Testability:** you can unit-test orchestration without rendering UI.
 
-# Extension Roadmap
+---
 
-Future improvements:
+## Testing targets
 
--   Autocomplete tenant search
--   Create tenant modal instead of inline
--   Duplicate detection (email match)
--   AI-assisted tenant profile suggestions
+### Unit tests (most valuable)
+- `useCreateLeaseForm`: validation + payload building
+- `useCreateLeaseWithTenant`: sequencing rules + error handling
 
-------------------------------------------------------------------------
+### Component tests
+- `TenantSection` switches panels correctly
+- `TenantCreatePanel` displays field errors
+- `TenantSelect` shows loading / empty states
 
-# Architectural Principle
+---
 
-TenantSection is a presentation boundary.
+## Extension roadmap
 
-All financial correctness, mutation ordering, and org isolation must
-remain in service-layer hooks.
+- tenant autocomplete (debounced search)
+- duplicate detection (email/phone)
+- “Create tenant” modal variant (swap UI only)
+- multi-party leases (add co-tenant selection)
 
-UI is declarative. Business logic is deterministic.
+---
+
+## Architectural mantra
+
+**TenantSection is a presentation boundary.**  
+**CreateLeaseForm owns sequencing.**  
+**Ledger correctness stays deterministic elsewhere.**

@@ -1,22 +1,16 @@
 // # Filename: src/features/leases/forms/useCreateLeaseForm.ts
 
-
 import { useState } from "react";
 import type { LeaseStatus } from "../api/leaseApi";
-
-type TenantMode = "select" | "create";
-
-type TenantCreateDraft = {
-  full_name: string;
-  email: string;
-  phone: string;
-};
+import type { TenantCreateDraft, TenantMode } from "./TenantSection/tenantTypes";
 
 const EMPTY_TENANT_DRAFT: TenantCreateDraft = {
   full_name: "",
   email: "",
   phone: "",
 };
+
+type LeaseParty = { tenant_id: number; role: "primary" };
 
 type BuildPayloadResult = {
   payload: {
@@ -26,7 +20,7 @@ type BuildPayloadResult = {
     security_deposit_amount: string | null;
     rent_due_day: number;
     status: LeaseStatus;
-    parties?: Array<{ tenant_id: number; role: "primary" }>;
+    parties?: LeaseParty[];
   };
 };
 
@@ -40,22 +34,30 @@ type ValidateResult =
 /**
  * useCreateLeaseForm
  *
- * Form-state and client-side validation hook for CreateLeaseForm.
+ * Form-state + validation + payload builder for CreateLeaseForm.
  *
  * Responsibilities:
- * - Owns controlled input state (string-first for inputs)
- * - Performs lightweight client validation (required fields, due day range)
- * - Builds a DRF-ready payload (Decimal-safe strings; nullable fields normalized)
- * - Owns tenant UX state (select vs create) + create-draft values (UI only for now)
- * - Exposes reset() for crisp UX on success/cancel
+ * - Owns controlled lease term state (string-first for inputs)
+ * - Owns tenant UX state:
+ *   - tenantMode: "select" (existing) or "create" (inline new)
+ *   - primaryTenantId (select mode)
+ *   - tenantCreateDraft (create mode)
+ * - Client-side validation for:
+ *   - required lease fields (start date, rent amount)
+ *   - due day range (1–28)
+ *   - create-mode requirement: tenant full_name
+ * - Builds a DRF-ready lease payload:
+ *   - Decimal-safe strings
+ *   - nullable fields normalized
+ *   - parties included only when selecting an existing tenant
  *
  * Non-responsibilities:
- * - No API calls or mutations (handled by CreateLeaseForm + TanStack Query)
- * - No org scoping (orgSlug lives in the orchestrator)
- * - No server error normalization (formatApiFormErrors handles that)
+ * - No API calls (tenant creation + lease creation orchestration comes later)
+ * - No server error normalization (handled by formatApiFormErrors)
+ * - No org scoping (orgSlug lives in CreateLeaseForm)
  */
 export function useCreateLeaseForm() {
-  // Step 1: Lease term controlled form state (string-based)
+  // Step 1: Lease term controlled state (string-based)
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
   const [rentAmount, setRentAmount] = useState("");
@@ -63,16 +65,48 @@ export function useCreateLeaseForm() {
   const [securityDeposit, setSecurityDeposit] = useState("");
   const [status, setStatus] = useState<LeaseStatus>("active");
 
-  // Step 2: Tenant selection (optional)
+  // Step 2: Tenant selection state (select-mode only)
   const [primaryTenantId, setPrimaryTenantId] = useState<number | null>(null);
 
-  // Step 3: Tenant UX state (Phase B UI)
+  // Step 3: Tenant UX state (best UX path)
   const [tenantMode, setTenantMode] = useState<TenantMode>("select");
   const [tenantCreateDraft, setTenantCreateDraft] =
     useState<TenantCreateDraft>(EMPTY_TENANT_DRAFT);
 
-  // Step 4: Local validation message (fast feedback; separate from API errors)
+  // Step 4: Local validation message
   const [localError, setLocalError] = useState<string | null>(null);
+
+  /**
+   * enterCreateTenantMode
+   *
+   * Switch UI into "create tenant" mode.
+   * - Clears any selected tenant because select/create are mutually exclusive.
+   */
+  const enterCreateTenantMode = () => {
+    // Step 1: Switch to create mode
+    setTenantMode("create");
+
+    // Step 2: Clear selected tenant id
+    setPrimaryTenantId(null);
+  };
+
+  /**
+   * selectExistingTenant
+   *
+   * Switch UI into "select tenant" mode and set tenant id.
+   * - Passing null means "no tenant selected".
+   * - Clears create draft to avoid stale values when toggling back and forth.
+   */
+  const selectExistingTenant = (tenantId: number | null) => {
+    // Step 1: Switch to select mode
+    setTenantMode("select");
+
+    // Step 2: Set selected tenant id (nullable)
+    setPrimaryTenantId(tenantId);
+
+    // Step 3: Clear create draft (optional but keeps UX clean)
+    setTenantCreateDraft(EMPTY_TENANT_DRAFT);
+  };
 
   const reset = () => {
     // Step 1: Reset lease fields
@@ -83,7 +117,7 @@ export function useCreateLeaseForm() {
     setSecurityDeposit("");
     setStatus("active");
 
-    // Step 2: Reset tenant state
+    // Step 2: Reset tenant fields
     setPrimaryTenantId(null);
     setTenantMode("select");
     setTenantCreateDraft(EMPTY_TENANT_DRAFT);
@@ -96,7 +130,7 @@ export function useCreateLeaseForm() {
     // Step 1: Clear old local error
     setLocalError(null);
 
-    // Step 2: Required fields
+    // Step 2: Lease required fields
     if (!startDate.trim()) {
       const msg = "Start date is required.";
       setLocalError(msg);
@@ -123,6 +157,15 @@ export function useCreateLeaseForm() {
       return { ok: false, message: msg };
     }
 
+    // Step 4: Tenant create-mode validation
+    if (tenantMode === "create") {
+      if (!tenantCreateDraft.full_name.trim()) {
+        const msg = "Tenant full name is required.";
+        setLocalError(msg);
+        return { ok: false, message: msg };
+      }
+    }
+
     return { ok: true };
   };
 
@@ -139,11 +182,11 @@ export function useCreateLeaseForm() {
     // Step 3: Normalize due day
     const dueDayNum = Number(rentDueDay);
 
-    // Step 4: Parties (only if tenant selected)
-    const parties =
-      primaryTenantId === null
-        ? undefined
-        : [{ tenant_id: primaryTenantId, role: "primary" as const }];
+    // Step 4: Parties only when selecting an existing tenant
+    const parties: LeaseParty[] | undefined =
+      tenantMode === "select" && primaryTenantId !== null
+        ? [{ tenant_id: primaryTenantId, role: "primary" }]
+        : undefined;
 
     // Step 5: Build payload
     const payload = {
@@ -168,17 +211,15 @@ export function useCreateLeaseForm() {
     securityDeposit,
     status,
 
-    // Step 2: Tenant selection
+    // Step 2: Tenant values
     primaryTenantId,
-
-    // Step 3: Tenant UI state (select vs create)
     tenantMode,
     tenantCreateDraft,
 
-    // Step 4: Local error
+    // Step 3: Local error
     localError,
 
-    // Step 5: Setters
+    // Step 4: Setters (keep available for flexibility)
     setStartDate,
     setEndDate,
     setRentAmount,
@@ -189,6 +230,10 @@ export function useCreateLeaseForm() {
     setTenantMode,
     setTenantCreateDraft,
     setLocalError,
+
+    // Step 5: Preferred tenant actions for the new UX
+    enterCreateTenantMode,
+    selectExistingTenant,
 
     // Step 6: Helpers
     reset,

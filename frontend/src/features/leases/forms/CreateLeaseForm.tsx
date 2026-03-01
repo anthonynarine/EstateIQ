@@ -21,19 +21,13 @@ type Props = {
  *
  * Responsibilities:
  * - Orchestrate the UI flow (open/close) and submission pipeline
- * - Use `useCreateLeaseForm` for state, validation, and payload building
- * - Call the TanStack Query mutation for lease creation
- * - Render local + normalized API validation errors
+ * - Delegate state/validation/payload building to `useCreateLeaseForm`
+ * - Call the lease creation mutation (TanStack Query)
+ * - Render normalized DRF errors and fast client validation feedback
  *
  * Non-responsibilities:
- * - Tenant directory fetching (TenantSelect owns this via useTenantsQuery)
- * - Tenant creation API calls (coming next via orchestration hook)
- * - Server-side error parsing (formatApiFormErrors is canonical)
- *
- * Next milestone:
- * - Add inline tenant creation orchestration:
- *   if tenantMode === "create" -> POST /tenants -> POST /leases with parties
- *   while preserving one submit button UX.
+ * - Tenant directory fetching (TenantSelect owns this)
+ * - Tenant creation orchestration (POST tenant → POST lease) — coming next
  */
 export default function CreateLeaseForm({ unitId }: Props) {
   const { orgSlug } = useOrg();
@@ -50,6 +44,8 @@ export default function CreateLeaseForm({ unitId }: Props) {
     securityDeposit,
     status,
     primaryTenantId,
+    tenantMode,
+    tenantCreateDraft,
     localError,
     setStartDate,
     setEndDate,
@@ -57,17 +53,13 @@ export default function CreateLeaseForm({ unitId }: Props) {
     setRentDueDay,
     setSecurityDeposit,
     setStatus,
-    setPrimaryTenantId,
+    setTenantCreateDraft,
     setLocalError,
     reset,
     validate,
     buildPayload,
-
-    // tenant mode + create draft (must be exported by hook)
-    tenantMode,
-    setTenantMode,
-    tenantCreateDraft,
-    setTenantCreateDraft,
+    enterCreateTenantMode,
+    selectExistingTenant,
   } = useCreateLeaseForm();
 
   // Step 3: Guardrails
@@ -104,28 +96,20 @@ export default function CreateLeaseForm({ unitId }: Props) {
       return;
     }
 
-    // Step 3: Tenant create mode is UI-only for now (prevents confusing partial submits)
-    if (tenantMode === "create") {
-      setLocalError(
-        "Inline tenant creation UI is enabled, but the create-tenant-then-lease submit flow is not wired yet."
-      );
-      return;
-    }
-
-    // Step 4: Client-side validation
+    // Step 3: Client-side validation (includes create-tenant name check)
     const result = validate();
     if (!result.ok) return;
 
-    // Step 5: Build payload from hook state
+    // Step 4: Build lease payload (parties included only for select mode)
     const { payload } = buildPayload();
 
-    // Step 6: Execute mutation
+    // Step 5: Execute mutation (tenant creation orchestration is next milestone)
     try {
       await mutateAsync(payload);
       reset();
       setIsOpen(false);
     } catch {
-      // Step 7: No-op (errors are rendered via `error`)
+      // Step 6: No-op (errors are rendered via `error`)
     }
   };
 
@@ -170,14 +154,14 @@ export default function CreateLeaseForm({ unitId }: Props) {
           {/* API Errors */}
           <FormErrorSummary title="Validation error" errors={formErrors} />
 
-          {/* ✅ New Code: Tenant section (select OR create UI; create submit not wired yet) */}
+          {/* ✅ New Code: Tenant section wired to hook */}
           <TenantSection
             orgSlug={orgSlug ?? ""}
-            mode={tenantMode}
-            onModeChange={setTenantMode}
+            tenantMode={tenantMode}
             tenantId={primaryTenantId}
-            onChangeTenantId={setPrimaryTenantId}
-            createDraft={tenantCreateDraft}
+            tenantCreateDraft={tenantCreateDraft}
+            enterCreateTenantMode={enterCreateTenantMode}
+            selectExistingTenant={selectExistingTenant}
             onCreateDraftChange={setTenantCreateDraft}
           />
 
@@ -203,8 +187,6 @@ export default function CreateLeaseForm({ unitId }: Props) {
             isPending={isPending}
             onCancel={handleCancel}
             onSubmit={handleSubmit}
-            submitLabel="Create lease"
-            pendingLabel="Saving…"
           />
         </div>
       ) : null}
