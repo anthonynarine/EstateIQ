@@ -1,185 +1,116 @@
-// # Filename: src/features/leases/components/CreateLeaseForm.tsx
+// # Filename: src/features/leases/forms/CreateLeaseForm.tsx
 
-import { useMemo, useState } from "react";
+
+import { useState } from "react";
 import { useOrg } from "../../tenancy/hooks/useOrg";
-import type { LeaseStatus } from "../api/leaseApi";
 import { useCreateLeaseMutation } from "../queries/useCreateLeaseMutation";
-import FieldError from "./FieldError";
+import { formatApiFormErrors } from "../../../api/formatApiFormerrors";
 import FormErrorSummary from "./FormErrorSummary";
+import FormActions from "./FormActions";
+import LeaseTermsFields from "./LeaseTermsFields";
+import TenantSection from "./TenantSection";
+import { useCreateLeaseForm } from "./useCreateLeaseForm";
 
 type Props = {
   unitId: number;
 };
 
-type ApiFieldErrors = Record<string, string[]>;
-
-type NormalizedApiErrors = {
-  formErrors: string[];
-  fieldErrors: ApiFieldErrors;
-};
-
 /**
  * CreateLeaseForm
  *
- * Mobile-first, expandable form to create a Lease under a Unit.
+ * Expandable, org-scoped form that creates a lease for a specific unit.
  *
- * Enterprise behaviors:
- * - Uses canonical orgSlug from OrgProvider (URL → tokenStorage sync).
- * - Uses TanStack Query mutation + deterministic invalidation (no manual refetch).
- * - Never allows spoofing `unit` from the UI layer (unit enforced inside mutation).
- * - Displays DRF validation errors clearly (field + non-field).
+ * Responsibilities:
+ * - Orchestrate the UI flow (open/close) and submission pipeline
+ * - Use `useCreateLeaseForm` for state, validation, and payload building
+ * - Call the TanStack Query mutation for lease creation
+ * - Render local + normalized API validation errors
+ *
+ * Non-responsibilities:
+ * - Tenant directory fetching (TenantSelect owns this via useTenantsQuery)
+ * - Server-side error parsing (formatApiFormErrors is canonical)
+ *
+ * Next milestone:
+ * - Add inline "Create new tenant" mode and orchestration (POST tenant → POST lease)
+ *   while preserving the one-click submit UX.
  */
 export default function CreateLeaseForm({ unitId }: Props) {
   const { orgSlug } = useOrg();
 
-  // Step 1: Expand/collapse state (keeps Building/Unit pages clean)
+  // Step 1: Expand/collapse state
   const [isOpen, setIsOpen] = useState(false);
 
-  // Step 2: UI form state is string-based (safe for inputs)
-  const [startDate, setStartDate] = useState("");
-  const [endDate, setEndDate] = useState("");
-  const [rentAmount, setRentAmount] = useState("");
-  const [rentDueDay, setRentDueDay] = useState("1");
-  const [securityDeposit, setSecurityDeposit] = useState("");
-  const [status, setStatus] = useState<LeaseStatus>("active");
+  // Step 2: Form state + validation + payload builder
+  const {
+    startDate,
+    endDate,
+    rentAmount,
+    rentDueDay,
+    securityDeposit,
+    status,
+    primaryTenantId,
+    localError,
+    setStartDate,
+    setEndDate,
+    setRentAmount,
+    setRentDueDay,
+    setSecurityDeposit,
+    setStatus,
+    setPrimaryTenantId,
+    setLocalError,
+    reset,
+    validate,
+    buildPayload,
+  } = useCreateLeaseForm();
 
-  // Step 3: Local UI error (in addition to API errors)
-  const [localError, setLocalError] = useState<string | null>(null);
+  // Step 3: Guardrails
+  const canRender =
+    Boolean(orgSlug && orgSlug.trim().length > 0) && Number.isFinite(unitId);
 
-  // Step 4: Guardrails
-  const canRender = Boolean(orgSlug && orgSlug.trim().length > 0) && Number.isFinite(unitId);
-
-  // Step 5: Mutation hook (org-scoped invalidation happens internally)
+  // Step 4: Mutation hook (org-scoped invalidation happens inside the hook)
   const { mutateAsync, isPending, error } = useCreateLeaseMutation({
     orgSlug: orgSlug ?? "",
     unitId,
   });
 
-  // Step 6: Normalize DRF/axios errors into:
-  // - formErrors: non_field_errors / detail / _error
-  // - fieldErrors: start_date, end_date, rent_amount, etc.
-  const normalizedErrors: NormalizedApiErrors | null = useMemo(() => {
-    if (!error) return null;
+  // Step 5: Canonical API error normalization
+  const { fieldErrors, formErrors } = error
+    ? formatApiFormErrors(error)
+    : { fieldErrors: {}, formErrors: [] };
 
-    const anyErr = error as any;
-    const data = anyErr?.response?.data;
-
-    const out: NormalizedApiErrors = {
-      formErrors: [],
-      fieldErrors: {},
-    };
-
-    // Step 1: If backend gave us nothing structured, fall back to message
-    if (!data || typeof data !== "object") {
-      const msg =
-        anyErr?.message ||
-        (typeof data === "string" ? data : null) ||
-        "Something went wrong. Please try again.";
-      out.formErrors.push(msg);
-      return out;
-    }
-
-    // Step 2: DRF typical object shape: { field: ["msg"], non_field_errors: ["msg"] }
-    for (const [key, val] of Object.entries(data as Record<string, unknown>)) {
-      const msgs = Array.isArray(val) ? val.map(String) : [String(val)];
-
-      if (key === "non_field_errors" || key === "detail" || key === "_error") {
-        out.formErrors.push(...msgs);
-      } else {
-        out.fieldErrors[key] = msgs;
-      }
-    }
-
-    // Step 3: If somehow empty, provide a generic message
-    if (out.formErrors.length === 0 && Object.keys(out.fieldErrors).length === 0) {
-      out.formErrors.push("Validation failed. Please review your inputs.");
-    }
-
-    return out;
-  }, [error]);
-
-  // Step 7: Helpers
-  const resetForm = () => {
-    setStartDate("");
-    setEndDate("");
-    setRentAmount("");
-    setRentDueDay("1");
-    setSecurityDeposit("");
-    setStatus("active");
-    setLocalError(null);
-  };
-
-  const parseOptionalNumberOrNull = (raw: string): number | null => {
-    // Step 1: treat empty as null
-    if (!raw || raw.trim() === "") return null;
-
-    // Step 2: parse numeric input
-    const n = Number(raw);
-    if (!Number.isFinite(n)) return null;
-    return n;
-  };
-
-  const normalizeMoneyString = (raw: string): string => {
-    // Step 1: trim and keep as a decimal-safe string for DRF DecimalField
-    return raw.trim();
+  const handleCancel = () => {
+    // Step 1: reset and close
+    reset();
+    setIsOpen(false);
   };
 
   const handleSubmit = async () => {
-    // Step 1: Clear prior local errors
-    setLocalError(null);
-
-    // Step 2: Validate org + unit
+    // Step 1: Validate org boundary (avoid confusing 401s)
     if (!orgSlug) {
       setLocalError("Organization not selected. Add ?org=<slug> to the URL.");
       return;
     }
+
+    // Step 2: Validate unit boundary
     if (!Number.isFinite(unitId)) {
       setLocalError("Invalid unit id.");
       return;
     }
 
-    // Step 3: Validate required fields
-    if (!startDate.trim()) {
-      setLocalError("Start date is required.");
-      return;
-    }
-    if (!rentAmount.trim()) {
-      setLocalError("Rent amount is required.");
-      return;
-    }
+    // Step 3: Client-side validation
+    const result = validate();
+    if (!result.ok) return;
 
-    // Step 4: Convert inputs to API payload (strings/nullable numbers)
-    const dueDayNum = parseOptionalNumberOrNull(rentDueDay);
-    if (dueDayNum == null) {
-      setLocalError("Rent due day must be a valid number (1–31).");
-      return;
-    }
-    if (dueDayNum < 1 || dueDayNum > 31) {
-      setLocalError("Rent due day must be between 1 and 31.");
-      return;
-    }
-
-    const payload = {
-      start_date: startDate.trim(),
-      end_date: endDate.trim() ? endDate.trim() : null,
-      rent_amount: normalizeMoneyString(rentAmount),
-      security_deposit_amount: securityDeposit.trim()
-        ? normalizeMoneyString(securityDeposit)
-        : null,
-      rent_due_day: dueDayNum,
-      status,
-    };
+    // Step 4: Build payload from hook state
+    const { payload } = buildPayload();
 
     // Step 5: Execute mutation
     try {
       await mutateAsync(payload);
-
-      // Step 6: Reset + collapse for a crisp UX
-      resetForm();
+      reset();
       setIsOpen(false);
     } catch {
-      // Step 7: No-op (errors are handled via `error` from mutation)
-      // This keeps the flow deterministic and avoids double-handling.
+      // Step 6: No-op (errors are rendered via `error`)
     }
   };
 
@@ -190,9 +121,6 @@ export default function CreateLeaseForm({ unitId }: Props) {
       </div>
     );
   }
-
-  const fieldErrors = normalizedErrors?.fieldErrors ?? {};
-  const formErrors = normalizedErrors?.formErrors ?? [];
 
   return (
     <div className="space-y-3">
@@ -216,7 +144,7 @@ export default function CreateLeaseForm({ unitId }: Props) {
 
       {/* Expandable form */}
       {isOpen ? (
-        <div className="rounded-xl border border-neutral-800 bg-neutral-950 p-4 space-y-4">
+        <div className="space-y-4 rounded-xl border border-neutral-800 bg-neutral-950 p-4">
           {/* Local Error */}
           {localError ? (
             <div className="rounded-lg border border-red-500/30 bg-red-500/5 p-3 text-xs text-red-200">
@@ -224,141 +152,39 @@ export default function CreateLeaseForm({ unitId }: Props) {
             </div>
           ) : null}
 
-          {/* API Errors (clean) */}
+          {/* API Errors */}
           <FormErrorSummary title="Validation error" errors={formErrors} />
 
-          {/* Fields */}
-          <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-            {/* Start date */}
-            <label className="space-y-1">
-              <div className="text-xs text-neutral-300">Start date *</div>
-              <input
-                type="date"
-                value={startDate}
-                onChange={(e) => setStartDate(e.target.value)}
-                className={[
-                  "w-full rounded-lg border bg-neutral-900 px-3 py-2 text-sm text-white outline-none focus:border-neutral-600",
-                  fieldErrors.start_date ? "border-red-500/60" : "border-neutral-800",
-                ].join(" ")}
-              />
-              <FieldError messages={fieldErrors.start_date} />
-            </label>
+          {/* Tenant section (select-only for now) */}
+          <TenantSection
+            orgSlug={orgSlug ?? ""}
+            tenantId={primaryTenantId}
+            onChange={setPrimaryTenantId}
+          />
 
-            {/* End date */}
-            <label className="space-y-1">
-              <div className="text-xs text-neutral-300">End date (optional)</div>
-              <input
-                type="date"
-                value={endDate}
-                onChange={(e) => setEndDate(e.target.value)}
-                className={[
-                  "w-full rounded-lg border bg-neutral-900 px-3 py-2 text-sm text-white outline-none focus:border-neutral-600",
-                  fieldErrors.end_date ? "border-red-500/60" : "border-neutral-800",
-                ].join(" ")}
-              />
-              <FieldError messages={fieldErrors.end_date} />
-            </label>
-
-            {/* Rent amount */}
-            <label className="space-y-1">
-              <div className="text-xs text-neutral-300">Rent amount *</div>
-              <input
-                type="text"
-                inputMode="decimal"
-                placeholder="e.g. 2500.00"
-                value={rentAmount}
-                onChange={(e) => setRentAmount(e.target.value)}
-                className={[
-                  "w-full rounded-lg border bg-neutral-900 px-3 py-2 text-sm text-white outline-none focus:border-neutral-600",
-                  fieldErrors.rent_amount ? "border-red-500/60" : "border-neutral-800",
-                ].join(" ")}
-              />
-              <FieldError messages={fieldErrors.rent_amount} />
-              <div className="text-[11px] text-neutral-500">
-                Send as a string (Decimal-safe).
-              </div>
-            </label>
-
-            {/* Due day */}
-            <label className="space-y-1">
-              <div className="text-xs text-neutral-300">Rent due day</div>
-              <input
-                type="number"
-                min={1}
-                max={31}
-                value={rentDueDay}
-                onChange={(e) => setRentDueDay(e.target.value)}
-                className={[
-                  "w-full rounded-lg border bg-neutral-900 px-3 py-2 text-sm text-white outline-none focus:border-neutral-600",
-                  fieldErrors.rent_due_day ? "border-red-500/60" : "border-neutral-800",
-                ].join(" ")}
-              />
-              <FieldError messages={fieldErrors.rent_due_day} />
-            </label>
-
-            {/* Security deposit */}
-            <label className="space-y-1">
-              <div className="text-xs text-neutral-300">Security deposit (optional)</div>
-              <input
-                type="text"
-                inputMode="decimal"
-                placeholder="e.g. 2500.00"
-                value={securityDeposit}
-                onChange={(e) => setSecurityDeposit(e.target.value)}
-                className={[
-                  "w-full rounded-lg border bg-neutral-900 px-3 py-2 text-sm text-white outline-none focus:border-neutral-600",
-                  fieldErrors.security_deposit_amount ? "border-red-500/60" : "border-neutral-800",
-                ].join(" ")}
-              />
-              <FieldError messages={fieldErrors.security_deposit_amount} />
-            </label>
-
-            {/* Status */}
-            <label className="space-y-1">
-              <div className="text-xs text-neutral-300">Status</div>
-              <select
-                value={status}
-                onChange={(e) => setStatus(e.target.value as LeaseStatus)}
-                className={[
-                  "w-full rounded-lg border bg-neutral-900 px-3 py-2 text-sm text-white outline-none focus:border-neutral-600",
-                  fieldErrors.status ? "border-red-500/60" : "border-neutral-800",
-                ].join(" ")}
-              >
-                <option value="active">active</option>
-                <option value="draft">draft</option>
-                <option value="ended">ended</option>
-              </select>
-              <FieldError messages={fieldErrors.status} />
-              <div className="text-[11px] text-neutral-500">
-                For demos, <span className="text-neutral-300">active</span> makes
-                occupancy instant.
-              </div>
-            </label>
-          </div>
+          {/* Lease term fields */}
+          <LeaseTermsFields
+            startDate={startDate}
+            endDate={endDate}
+            rentAmount={rentAmount}
+            rentDueDay={rentDueDay}
+            securityDeposit={securityDeposit}
+            status={status}
+            onStartDateChange={setStartDate}
+            onEndDateChange={setEndDate}
+            onRentAmountChange={setRentAmount}
+            onRentDueDayChange={setRentDueDay}
+            onSecurityDepositChange={setSecurityDeposit}
+            onStatusChange={setStatus}
+            fieldErrors={fieldErrors}
+          />
 
           {/* Actions */}
-          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-end">
-            <button
-              type="button"
-              onClick={() => {
-                resetForm();
-                setIsOpen(false);
-              }}
-              className="rounded-lg border border-neutral-700 bg-neutral-950 px-4 py-2 text-sm text-neutral-200 hover:bg-neutral-900"
-              disabled={isPending}
-            >
-              Cancel
-            </button>
-
-            <button
-              type="button"
-              onClick={handleSubmit}
-              className="rounded-lg border border-neutral-700 bg-white/10 px-4 py-2 text-sm text-white hover:bg-white/15 disabled:opacity-60"
-              disabled={isPending}
-            >
-              {isPending ? "Saving…" : "Create lease"}
-            </button>
-          </div>
+          <FormActions
+            isPending={isPending}
+            onCancel={handleCancel}
+            onSubmit={handleSubmit}
+          />
         </div>
       ) : null}
     </div>
