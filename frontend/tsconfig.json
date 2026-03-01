@@ -1,7 +1,10 @@
 {
-  "files": [],
-  "references": [
-    { "path": "./tsconfig.app.json" },
-    { "path": "./tsconfig.node.json" }
-  ]
+  "compilerOptions": {
+    // Step 1: React 17+ JSX transform (no need to import React everywhere)
+    "jsx": "react-jsx",
+
+    // Step 2: Fix default-import issues from @types/react
+    "esModuleInterop": true,
+    "allowSyntheticDefaultImports": true
+  }
 }

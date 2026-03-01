@@ -10,6 +10,19 @@ type Props = {
   orgSlug: string;
   unitId: number;
   compact?: boolean;
+
+  /**
+   * Enterprise UI control:
+   * - By default we do NOT show DB primary keys in the UI.
+   * - If you need them for debugging/admin parity, set showDbId={true}.
+   */
+  showDbId?: boolean;
+
+  /**
+   * Optional user-facing label override (unit-scoped numbering, date-based naming, etc.).
+   * Example: "Lease 2" or "Lease (Mar 2026)".
+   */
+  displayLabel?: string;
 };
 
 type FormState = {
@@ -56,19 +69,35 @@ function getDefaultFormState(lease: Lease): FormState {
   };
 }
 
+function formatDateRange(start: string | null | undefined, end: string | null | undefined) {
+  const s = start || "—";
+  const e = end ? end : "Open-ended";
+  return `${s} → ${e}`;
+}
+
 /**
  * LeaseCard
  *
- * Shows lease summary + provides an "Edit" modal that PATCHes the lease.
+ * Presentational card for a single lease with an "Edit" modal.
+ *
+ * Enterprise behavior:
+ * - Avoid exposing global DB IDs in the UI by default.
+ *   DB IDs are implementation detail and can look like "skipped" leases.
+ *
+ * Props:
+ * - showDbId: enables DB id display for debugging/admin parity.
+ * - displayLabel: allows unit-scoped naming (e.g. "Lease 2") without relying on DB id.
  *
  * compact=true:
- * - Renders minimal row with Edit button (good for "Current lease" section)
+ * - Renders minimal row with Edit button (good for "Current lease" section).
  */
 export default function LeaseCard({
   lease,
   orgSlug,
   unitId,
   compact = false,
+  showDbId = false,
+  displayLabel,
 }: Props) {
   // Step 1: Local modal state
   const [isOpen, setIsOpen] = useState(false);
@@ -132,13 +161,20 @@ export default function LeaseCard({
     }
   };
 
+  // Step 5: Enterprise-friendly title (no DB ids by default)
+  const title = (() => {
+    if (displayLabel) return displayLabel;
+    if (showDbId) return `Lease #${lease.id}`;
+    return "Lease";
+  })();
+
   return (
     <div className="rounded-xl border border-neutral-800 bg-neutral-950 p-4">
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <div className="flex items-center gap-2">
             <div className="truncate text-sm font-semibold text-white">
-              Lease #{lease.id}
+              {title}
             </div>
             <span
               className={`rounded-full border px-2 py-0.5 text-[11px] ${statusPill}`}
@@ -147,17 +183,17 @@ export default function LeaseCard({
             </span>
           </div>
 
-          {/* ✅ New Code: compact mode hides the big details grid */}
+          {/* Subtitle: date range is user-meaningful and scoped */}
+          <div className="mt-1 text-xs text-neutral-400">
+            {formatDateRange(lease.start_date, lease.end_date)}
+            {showDbId ? (
+              <span className="ml-2 text-neutral-600">(id: {lease.id})</span>
+            ) : null}
+          </div>
+
+          {/* Details grid */}
           {!compact ? (
             <div className="mt-2 grid grid-cols-2 gap-x-6 gap-y-2 text-xs text-neutral-300">
-              <div>
-                <div className="text-neutral-500">Start</div>
-                <div className="text-neutral-200">{lease.start_date || "—"}</div>
-              </div>
-              <div>
-                <div className="text-neutral-500">End</div>
-                <div className="text-neutral-200">{lease.end_date ?? "—"}</div>
-              </div>
               <div>
                 <div className="text-neutral-500">Rent</div>
                 <div className="text-neutral-200">
@@ -199,8 +235,11 @@ export default function LeaseCard({
             <div className="flex items-start justify-between gap-3">
               <div>
                 <h3 className="text-sm font-semibold text-white">Edit lease</h3>
+
+                {/* Enterprise: keep subtitle human-meaningful; DB id only if showDbId */}
                 <p className="mt-1 text-xs text-neutral-400">
-                  Unit #{unitId} • Lease #{lease.id}
+                  Unit #{unitId} • {formatDateRange(lease.start_date, lease.end_date)}
+                  {showDbId ? ` • Lease #${lease.id}` : ""}
                 </p>
               </div>
 

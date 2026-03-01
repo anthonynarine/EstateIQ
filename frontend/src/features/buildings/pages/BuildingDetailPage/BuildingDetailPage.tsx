@@ -5,16 +5,16 @@ import { useMemo } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { useQueries } from "@tanstack/react-query";
 
-import { useOrg } from "../../tenancy/hooks/useOrg";
-import CreateUnitForm from "../components/CreateUnitForm";
-import { useUnitsQuery } from "../queries/useUnitsQuery";
-import { useBuildingQuery } from "../queries/useBuildings"; 
+import { useOrg } from "../../../tenancy/hooks/useOrg";
+import CreateUnitForm from "../../components/CreateUnitForm";
+import { useUnitsQuery } from "../../queries/useUnitsQuery";
+import { useBuildingQuery } from "../../queries/useBuildings"; 
 
-import type { Building } from "../api/buildingsApi";
+import type { Building } from "../../api/buildingsApi";
 
-import { listLeasesByUnit } from "../../leases/api/leaseApi";
-import { leasesByUnitQueryKey } from "../../leases/queries/useLeasesByUnitQuery";
-import { getTodayISO, getUnitOccupancyStatus } from "../../leases/utils/occupancy";
+import { listLeasesByUnit } from "../../../leases/api/leaseApi";
+import { leasesByUnitQueryKey } from "../../../leases/queries/useLeasesByUnitQuery";
+import { getTodayISO, getUnitOccupancyStatus } from "../../../leases/utils/occupancy";
 
 /**
  * BuildingDetailPage

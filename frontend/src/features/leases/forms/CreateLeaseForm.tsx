@@ -1,6 +1,5 @@
 // # Filename: src/features/leases/forms/CreateLeaseForm.tsx
 
-
 import { useState } from "react";
 import { useOrg } from "../../tenancy/hooks/useOrg";
 import { useCreateLeaseMutation } from "../queries/useCreateLeaseMutation";
@@ -8,7 +7,7 @@ import { formatApiFormErrors } from "../../../api/formatApiFormerrors";
 import FormErrorSummary from "./FormErrorSummary";
 import FormActions from "./FormActions";
 import LeaseTermsFields from "./LeaseTermsFields";
-import TenantSection from "./TenantSection";
+import TenantSection from "./TenantSection/TenantSection";
 import { useCreateLeaseForm } from "./useCreateLeaseForm";
 
 type Props = {
@@ -28,11 +27,13 @@ type Props = {
  *
  * Non-responsibilities:
  * - Tenant directory fetching (TenantSelect owns this via useTenantsQuery)
+ * - Tenant creation API calls (coming next via orchestration hook)
  * - Server-side error parsing (formatApiFormErrors is canonical)
  *
  * Next milestone:
- * - Add inline "Create new tenant" mode and orchestration (POST tenant → POST lease)
- *   while preserving the one-click submit UX.
+ * - Add inline tenant creation orchestration:
+ *   if tenantMode === "create" -> POST /tenants -> POST /leases with parties
+ *   while preserving one submit button UX.
  */
 export default function CreateLeaseForm({ unitId }: Props) {
   const { orgSlug } = useOrg();
@@ -61,6 +62,12 @@ export default function CreateLeaseForm({ unitId }: Props) {
     reset,
     validate,
     buildPayload,
+
+    // tenant mode + create draft (must be exported by hook)
+    tenantMode,
+    setTenantMode,
+    tenantCreateDraft,
+    setTenantCreateDraft,
   } = useCreateLeaseForm();
 
   // Step 3: Guardrails
@@ -97,20 +104,28 @@ export default function CreateLeaseForm({ unitId }: Props) {
       return;
     }
 
-    // Step 3: Client-side validation
+    // Step 3: Tenant create mode is UI-only for now (prevents confusing partial submits)
+    if (tenantMode === "create") {
+      setLocalError(
+        "Inline tenant creation UI is enabled, but the create-tenant-then-lease submit flow is not wired yet."
+      );
+      return;
+    }
+
+    // Step 4: Client-side validation
     const result = validate();
     if (!result.ok) return;
 
-    // Step 4: Build payload from hook state
+    // Step 5: Build payload from hook state
     const { payload } = buildPayload();
 
-    // Step 5: Execute mutation
+    // Step 6: Execute mutation
     try {
       await mutateAsync(payload);
       reset();
       setIsOpen(false);
     } catch {
-      // Step 6: No-op (errors are rendered via `error`)
+      // Step 7: No-op (errors are rendered via `error`)
     }
   };
 
@@ -155,11 +170,15 @@ export default function CreateLeaseForm({ unitId }: Props) {
           {/* API Errors */}
           <FormErrorSummary title="Validation error" errors={formErrors} />
 
-          {/* Tenant section (select-only for now) */}
+          {/* ✅ New Code: Tenant section (select OR create UI; create submit not wired yet) */}
           <TenantSection
             orgSlug={orgSlug ?? ""}
+            mode={tenantMode}
+            onModeChange={setTenantMode}
             tenantId={primaryTenantId}
-            onChange={setPrimaryTenantId}
+            onChangeTenantId={setPrimaryTenantId}
+            createDraft={tenantCreateDraft}
+            onCreateDraftChange={setTenantCreateDraft}
           />
 
           {/* Lease term fields */}
@@ -184,6 +203,8 @@ export default function CreateLeaseForm({ unitId }: Props) {
             isPending={isPending}
             onCancel={handleCancel}
             onSubmit={handleSubmit}
+            submitLabel="Create lease"
+            pendingLabel="Saving…"
           />
         </div>
       ) : null}

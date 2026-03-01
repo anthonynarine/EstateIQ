@@ -1,12 +1,13 @@
 // # Filename: src/features/units/pages/UnitDetailPage.tsx
 
+
 import { useMemo } from "react";
 import { useParams } from "react-router-dom";
 
 import { useOrg } from "../../tenancy/hooks/useOrg";
 import CreateLeaseForm from "../forms/CreateLeaseForm";
 import LeasesList from "../components/LeaseList";
-import LeaseCard from "../../leases/components/LeaseCard"; 
+import LeaseCard from "../../leases/components/LeaseCard";
 import { useLeasesByUnitQuery } from "../../leases/queries/useLeasesByUnitQuery";
 import {
   getCurrentLease,
@@ -18,14 +19,18 @@ import {
  * UnitDetailPage
  *
  * UX rules (enterprise-grade):
- * - A Unit may have many leases over time (history)
- * - A Unit may have only ONE active lease at a time (DB constraint)
- * - If there is a current lease (active-in-range OR draft), we HIDE CreateLeaseForm
- *   and focus the user on editing/ending the current lease.
+ * - A Unit may have many leases over time (history).
+ * - A Unit may have only ONE "blocking" lease at a time (active-in-range or draft).
+ * - If a blocking lease exists, we hide CreateLeaseForm and focus the user on
+ *   editing/ending the current lease.
  *
  * Determinism:
- * - Occupancy is derived solely from lease data + todayISO (no UI guesses)
- * - Query is org-scoped (["org", orgSlug, ...]) upstream
+ * - Occupancy is derived solely from lease data + todayISO (no UI guesses).
+ * - Lease list query is org-scoped upstream (["org", orgSlug, ...]).
+ *
+ * Enterprise UI hardening:
+ * - Avoid showing global DB IDs (e.g. "Lease #4") because they are not unit-scoped.
+ * - Show unit-scoped counts and human-meaningful labels instead.
  */
 export default function UnitDetailPage() {
   // Step 1: Resolve params + org
@@ -118,6 +123,9 @@ export default function UnitDetailPage() {
 
   const showHistory = historyLeases.length > 0;
 
+  // Step 11: Unit-scoped count label (explicit scope to avoid confusion)
+  const unitLeaseCount = leases.length;
+
   return (
     <div className="p-6">
       <div className="mx-auto w-full max-w-5xl space-y-6">
@@ -140,8 +148,11 @@ export default function UnitDetailPage() {
               </span>
 
               {!leasesQuery.isLoading && !leasesQuery.error ? (
-                <span className="rounded-full border border-neutral-800 bg-neutral-950 px-3 py-1 text-xs text-neutral-300">
-                  Leases: {leases.length}
+                <span
+                  className="rounded-full border border-neutral-800 bg-neutral-950 px-3 py-1 text-xs text-neutral-300"
+                  title="Count of leases for this unit (unit-scoped)"
+                >
+                  Unit leases: {unitLeaseCount}
                 </span>
               ) : null}
 
@@ -163,8 +174,11 @@ export default function UnitDetailPage() {
             </div>
 
             {blockingLease ? (
-              <span className="rounded-full border border-neutral-800 bg-neutral-950 px-3 py-1 text-xs text-neutral-300">
-                Lease #{blockingLease.id}
+              <span
+                className="rounded-full border border-neutral-800 bg-neutral-950 px-3 py-1 text-xs text-neutral-300"
+                title="This is the current (blocking) lease for this unit. DB IDs are intentionally not shown."
+              >
+                {blockingLease.status === "draft" ? "Draft lease" : "Active lease"}
               </span>
             ) : (
               <span className="rounded-full border border-neutral-800 bg-neutral-950 px-3 py-1 text-xs text-neutral-400">
@@ -196,7 +210,7 @@ export default function UnitDetailPage() {
             </div>
           </div>
 
-          {/* ✅ New Code: render edit-capable LeaseCard right here */}
+          {/* Render edit-capable LeaseCard here */}
           {blockingLease ? (
             <div className="mt-4">
               <LeaseCard

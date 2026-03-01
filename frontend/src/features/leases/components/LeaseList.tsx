@@ -1,4 +1,6 @@
 // # Filename: src/features/units/components/LeaseList.tsx
+
+
 import type { Lease } from "../../leases/api/leaseApi";
 import LeaseCard from "../../leases/components/LeaseCard";
 
@@ -21,7 +23,7 @@ type Props = {
  * Enterprise behaviors:
  * - Handles loading / fetching / error / empty states consistently.
  * - Sorts leases so ACTIVE appears first, then DRAFT, then ENDED.
- * - Keeps output deterministic and stable.
+ * - Labels counts with explicit scope to avoid UX confusion.
  */
 export default function LeasesList({
   leases,
@@ -62,12 +64,21 @@ export default function LeasesList({
         <h2 className="text-sm font-semibold text-white">{title}</h2>
 
         <div className="flex items-center gap-2">
-          {isLoading ? <span className="text-xs text-neutral-400">Loading…</span> : null}
+          {isLoading ? (
+            <span className="text-xs text-neutral-400">Loading…</span>
+          ) : null}
+
           {!isLoading && isFetching ? (
             <span className="text-xs text-neutral-400">Updating…</span>
           ) : null}
+
           {!isLoading && !isFetching ? (
-            <span className="text-xs text-neutral-500">{sorted.length} total</span>
+            <span
+              className="text-xs text-neutral-500"
+              title="Count of leases for this unit (unit-scoped)"
+            >
+              Unit leases: {sorted.length}
+            </span>
           ) : null}
         </div>
       </div>
@@ -102,6 +113,7 @@ export default function LeasesList({
               lease={lease}
               orgSlug={orgSlug}
               unitId={unitId}
+              showDbId={false} // ✅ New Code: harden UX by default
             />
           ))}
         </div>

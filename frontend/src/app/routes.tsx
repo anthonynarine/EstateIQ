@@ -17,7 +17,7 @@ import UnitLeasesPage from "../features/tenancy/pages/UnitLeasesPage";
 import LeaseLedgerPage from "../features/finance/pages/LeaseLedgerPage";
 
 import BuildingsPage from "../features/buildings/pages/BuildingsPage";
-import BuildingDetailPage from "../features/buildings/pages/BuildingDetailPage";
+import BuildingDetailPage from "../features/buildings/pages/BuildingDetailPage/BuildingDetailPage";
 import UnitDetailPage from "../features/leases/pages/UnitDetailPage";
 
 export const routes = createBrowserRouter([

@@ -1,7 +1,22 @@
 // # Filename: src/features/leases/forms/useCreateLeaseForm.ts
 
+
 import { useState } from "react";
 import type { LeaseStatus } from "../api/leaseApi";
+
+type TenantMode = "select" | "create";
+
+type TenantCreateDraft = {
+  full_name: string;
+  email: string;
+  phone: string;
+};
+
+const EMPTY_TENANT_DRAFT: TenantCreateDraft = {
+  full_name: "",
+  email: "",
+  phone: "",
+};
 
 type BuildPayloadResult = {
   payload: {
@@ -31,6 +46,7 @@ type ValidateResult =
  * - Owns controlled input state (string-first for inputs)
  * - Performs lightweight client validation (required fields, due day range)
  * - Builds a DRF-ready payload (Decimal-safe strings; nullable fields normalized)
+ * - Owns tenant UX state (select vs create) + create-draft values (UI only for now)
  * - Exposes reset() for crisp UX on success/cancel
  *
  * Non-responsibilities:
@@ -39,7 +55,7 @@ type ValidateResult =
  * - No server error normalization (formatApiFormErrors handles that)
  */
 export function useCreateLeaseForm() {
-  // Step 1: Controlled form state (string-based)
+  // Step 1: Lease term controlled form state (string-based)
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
   const [rentAmount, setRentAmount] = useState("");
@@ -50,18 +66,29 @@ export function useCreateLeaseForm() {
   // Step 2: Tenant selection (optional)
   const [primaryTenantId, setPrimaryTenantId] = useState<number | null>(null);
 
-  // Step 3: Local validation message (fast feedback; separate from API errors)
+  // Step 3: Tenant UX state (Phase B UI)
+  const [tenantMode, setTenantMode] = useState<TenantMode>("select");
+  const [tenantCreateDraft, setTenantCreateDraft] =
+    useState<TenantCreateDraft>(EMPTY_TENANT_DRAFT);
+
+  // Step 4: Local validation message (fast feedback; separate from API errors)
   const [localError, setLocalError] = useState<string | null>(null);
 
   const reset = () => {
-    // Step 1: Reset fields
+    // Step 1: Reset lease fields
     setStartDate("");
     setEndDate("");
     setRentAmount("");
     setRentDueDay("1");
     setSecurityDeposit("");
     setStatus("active");
+
+    // Step 2: Reset tenant state
     setPrimaryTenantId(null);
+    setTenantMode("select");
+    setTenantCreateDraft(EMPTY_TENANT_DRAFT);
+
+    // Step 3: Reset local error
     setLocalError(null);
   };
 
@@ -133,17 +160,25 @@ export function useCreateLeaseForm() {
   };
 
   return {
-    // Step 1: Values
+    // Step 1: Lease values
     startDate,
     endDate,
     rentAmount,
     rentDueDay,
     securityDeposit,
     status,
+
+    // Step 2: Tenant selection
     primaryTenantId,
+
+    // Step 3: Tenant UI state (select vs create)
+    tenantMode,
+    tenantCreateDraft,
+
+    // Step 4: Local error
     localError,
 
-    // Step 2: Setters
+    // Step 5: Setters
     setStartDate,
     setEndDate,
     setRentAmount,
@@ -151,9 +186,11 @@ export function useCreateLeaseForm() {
     setSecurityDeposit,
     setStatus,
     setPrimaryTenantId,
+    setTenantMode,
+    setTenantCreateDraft,
     setLocalError,
 
-    // Step 3: API-friendly helpers
+    // Step 6: Helpers
     reset,
     validate,
     buildPayload,
