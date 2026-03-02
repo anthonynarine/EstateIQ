@@ -1,4 +1,4 @@
-// # Filename: src/features/buildings/components/BuildingHeader.tsx
+// # Filename: src/features/buildings/pages/BuildingPage/components/BuildingHeader.tsx
 
 type Props = {
   orgSlug: string | null;

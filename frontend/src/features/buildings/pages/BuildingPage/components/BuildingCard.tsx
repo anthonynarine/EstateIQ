@@ -1,8 +1,8 @@
-// # Filename: src/features/buildings/components/BuildingCard.tsx
+// # Filename: src/features/buildings/pages/BuildingPage/components/BuildingCard.tsx
 
 import { useCallback } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
-import type { Building } from "../api/buildingsApi";
+import type { Building } from "../../../api/buildingsApi";
 
 /**
  * BuildingCard

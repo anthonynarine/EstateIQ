@@ -1,11 +1,11 @@
-// # Filename: src/features/buildings/components/BuildingsList.tsx
-// ✅ New Code
+// # Filename: src/features/buildings/pages/BuildingPage/components/BuildingsList.tsx
 
-import type { Building } from "../api/buildingsApi";
+
+import type { Building } from "../../../api/buildingsApi"; 
 import BuildingCard from "./BuildingCard";
 
 type Props = {
-  buildings?: Building[]; // ✅ allow undefined safely
+  buildings?: Building[]; 
   isLoading: boolean;
   isFetching: boolean;
 };

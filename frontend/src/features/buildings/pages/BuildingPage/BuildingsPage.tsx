@@ -2,21 +2,15 @@
 
 import type React from "react";
 import { useMemo, useState } from "react";
-import { formatApiError } from "../../../api/formatApiError";
+import { formatApiError } from "../../../../api/formatApiError";
+import { useOrg } from "../../../tenancy/hooks/useOrg";
 
-import { useOrg } from "../../tenancy/hooks/useOrg";
-import {
-  useBuildingsQuery,
-  useCreateBuildingMutation,
-} from "../queries/useBuildings";
+import { useBuildingsQuery, useCreateBuildingMutation } from "../../queries/useBuildings";
+import { Building, CreateBuildingInput } from "../../api/buildingsApi";
+import BuildingHeader from "./components/BuildingHeader";
+import BuildingsList from "./components/BuildingsList";
+import CreateBuildingForm, { type BuildingFormValue} from "../BuildingPage/forms/CreateBuildingForm";
 
-import type { Building, CreateBuildingInput } from "../api/buildingsApi";
-
-import BuildingHeader from "../components/BuildingHeader";
-import BuildingsList from "../components/BuildingsList";
-import CreateBuildingForm, {
-  type BuildingFormValue,
-} from "../components/CreateBuildingForm";
 
 type DRFPaginated<T> = {
   results: T[];

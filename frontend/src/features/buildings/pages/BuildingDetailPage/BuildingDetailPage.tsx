@@ -1,49 +1,45 @@
 // # Filename: src/features/buildings/pages/BuildingDetailPage/BuildingDetailPage.tsx
 
-
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { useOrg } from "../../../tenancy/hooks/useOrg";
 
 import { useBuildingQuery } from "../../queries/useBuildings";
 import { useUnitsQuery } from "../../queries/useUnitsQuery";
-import { useBuildingOccupancyByUnitId}  from "../BuildingDetailPage/hooks/useBuildingOccupancyByUnitID"
+import { useBuildingOccupancyByUnitId } from "./hooks/useBuildingOccupancyByUnitID";
+
 import BuildingDetailHeader from "./components/BuildingDetailHeader";
-import BuildingUnitSection from "./components/BuildingUnitsSection";
+import BuildingUnitsSection from "./components/BuildingUnitsSection";
 import UnitCard from "./components/UnitCard";
+
+import CreateUnitForm from "./forms/CreateUnitForm";
 
 /**
  * BuildingDetailPage
  *
  * Orchestrator for the building detail view.
- *
- * Responsibilities:
- * - Resolve route + org context
- * - Fetch building + units
- * - Compose occupancy data via hook
- * - Pass all computed data into child components
- *
- * Non-responsibilities:
- * - No heavy UI rendering
- * - No inline unit cards
- * - No formatting logic
  */
 export default function BuildingDetailPage() {
-  // Step 1: Routing + Org
+  // Step 1: Routing + org
   const { buildingId } = useParams<{ buildingId: string }>();
   const { orgSlug } = useOrg();
   const navigate = useNavigate();
   const location = useLocation();
 
+  // ✅ New Code: single dropdown state
+  const [isAddUnitOpen, setIsAddUnitOpen] = useState(false);
+
   const buildingIdNumber = Number(buildingId);
+  const canQuery = Number.isFinite(buildingIdNumber) && !!orgSlug;
 
-  // Step 2: Queries
-const {
-  data: building,
-  isLoading: buildingLoading,
-  isError: buildingError,
-} = useBuildingQuery(orgSlug, buildingIdNumber, Number.isFinite(buildingIdNumber));
+  // Step 2: Fetch building
+  const {
+    data: building,
+    isLoading: buildingLoading,
+    isError: buildingError,
+  } = useBuildingQuery(orgSlug, buildingIdNumber, canQuery);
 
+  // Step 3: Fetch units
   const {
     data: units = [],
     isLoading: unitsLoading,
@@ -51,85 +47,91 @@ const {
   } = useUnitsQuery({
     orgSlug,
     buildingId: buildingIdNumber,
+    enabled: canQuery,
   });
 
-  // Step 3: Occupancy composition
-  const {
-    occupancyByUnitId,
-    leasesResults,
-  } = useBuildingOccupancyByUnitId({
+  // Step 4: Header snapshot
+  const buildingForHeader = useMemo(() => {
+    if (!building) return null;
+
+    return {
+      name: building.name,
+      address_line1: building.address_line1,
+      address_line2: building.address_line2 ?? null,
+      city: building.city,
+      state: building.state,
+      postal_code: building.postal_code,
+    };
+  }, [building]);
+
+  // Step 5: Occupancy map
+  const { occupancyByUnitId, leasesResults } = useBuildingOccupancyByUnitId({
     orgSlug,
     units,
   });
 
-  // Step 4: Derived counts
+  // Step 6: Derived counts
   const occupiedUnitsCount = useMemo(() => {
     return units.filter((u) => occupancyByUnitId[u.id]).length;
   }, [units, occupancyByUnitId]);
 
-  // Step 5: Safe header model
-  const buildingForHeader = building
-    ? {
-        name: building.name,
-        address_line1: building.address_line1,
-        address_line2: building.address_line2 ?? null,
-        city: building.city,
-        state: building.state,
-        postal_code: building.postal_code,
-      }
-    : null;
-
-  // Step 6: Navigation (passes snapshot for Unit header fix)
+  // Step 7: Navigation
   const goToUnit = (unit: { id: number; label: string | null }) => {
     const search = location.search || "";
 
     navigate(`/dashboard/units/${unit.id}${search}`, {
       state: {
         building: buildingForHeader,
-        unit: {
-          id: unit.id,
-          label: unit.label,
-        },
+        unit: { id: unit.id, label: unit.label },
       },
     });
   };
 
-  // Step 7: Early guards
-  if (buildingLoading) {
-    return <div className="p-6 text-neutral-300">Loading building…</div>;
-  }
-
-  if (buildingError || !building) {
+  // Step 8: Guards
+  if (!canQuery) {
     return (
       <div className="p-6 text-rose-300">
-        Failed to load building.
+        Missing org or invalid building id.
       </div>
     );
   }
 
+  if (buildingLoading) {
+    return <div className="p-6 text-neutral-300">Loading building…</div>;
+  }
+
+  if (buildingError || !building || !buildingForHeader) {
+    return <div className="p-6 text-rose-300">Failed to load building.</div>;
+  }
+
+  // Step 9: Render
   return (
     <div className="space-y-6">
-      {/* Header */}
       <BuildingDetailHeader
         orgSlug={orgSlug}
-        building={buildingForHeader!}
+        building={buildingForHeader}
         occupiedUnitsCount={occupiedUnitsCount}
         totalUnitsCount={units.length}
-        isLoading={buildingLoading}
       />
 
-      {/* Units Section */}
-      <BuildingUnitSection
+      <BuildingUnitsSection
         isLoading={unitsLoading}
         isError={unitsError}
         unitsCount={units.length}
+        isAddOpen={isAddUnitOpen}
+        onToggleAdd={() => setIsAddUnitOpen((p) => !p)}
+        addForm={
+          <CreateUnitForm
+            orgSlug={orgSlug}
+            buildingId={buildingIdNumber}
+            variant="inline" // ✅ CRITICAL: removes the second panel + second Add button
+            onSuccess={() => setIsAddUnitOpen(false)}
+            onCancel={() => setIsAddUnitOpen(false)}
+          />
+        }
         renderUnits={() =>
           units.map((u) => {
-            const leasesResult = leasesResults.find(
-              (r) => r.unitId === u.id
-            );
-
-            const isOccupied = occupancyByUnitId[u.id] ?? false;
+            const leasesResult = leasesResults.find((r) => r.unitId === u.id);
 
             return (
               <UnitCard
@@ -141,7 +143,7 @@ const {
                   bathrooms: u.bathrooms ?? null,
                   sqft: u.sqft ?? null,
                 }}
-                isOccupied={isOccupied}
+                isOccupied={occupancyByUnitId[u.id] ?? false}
                 leasesLoading={leasesResult?.isLoading ?? false}
                 onOpen={(unit) => goToUnit(unit)}
               />

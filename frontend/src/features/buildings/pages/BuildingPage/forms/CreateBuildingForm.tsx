@@ -1,7 +1,7 @@
-// # Filename: src/features/buildings/components/CreateBuildingForm.tsx
+// # Filename: src/features/buildings/pages/BuildingPage/forms/CreateBuildingForm.tsx
 
 import type React from "react";
-import Field from "./Field";
+import Field from "../components/Field";
 
 export type BuildingFormValue = {
   name: string;

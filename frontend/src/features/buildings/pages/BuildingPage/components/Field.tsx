@@ -1,4 +1,4 @@
-// # Filename: src/features/buildings/components/Field.tsx
+// # Filename: src/features/buildings/pages/BuildingPage/components/Field.tsx
 
 type Props = {
     label: string;
