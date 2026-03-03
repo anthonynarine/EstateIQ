@@ -1,5 +1,5 @@
-
 // # Filename: src/features/buildings/api/unitsApi.ts
+
 
 import api from "../../../api/axios";
 
@@ -32,10 +32,6 @@ export type Unit = {
  * CreateUnitInput
  *
  * Payload required to create a Unit under a specific Building.
- *
- * `building` is mandatory so the backend can enforce:
- * - parent relationship integrity
- * - org tenancy boundary via request.org
  */
 export type CreateUnitInput = {
   building: number;
@@ -49,17 +45,26 @@ export type CreateUnitInput = {
 };
 
 /**
+ * UpdateUnitInput
+ *
+ * PATCH payload for updating a unit.
+ *
+ * IMPORTANT:
+ * - `building` is intentionally excluded because the backend blocks changing
+ *   a unit's building after creation (prevents silent "unit transfer").
+ */
+export type UpdateUnitInput = Partial<{
+  label: string;
+  bedrooms: number | null;
+  bathrooms: number | null;
+  square_feet: number | null;
+  notes: string | null;
+}>;
+
+/**
  * DRFPaginated
  *
  * Minimal shape of Django REST Framework paginated responses.
- *
- * Many DRF list endpoints return:
- * {
- *   count: number,
- *   next: string | null,
- *   previous: string | null,
- *   results: T[]
- * }
  */
 type DRFPaginated<T> = {
   count: number;
@@ -72,18 +77,6 @@ type DRFPaginated<T> = {
  * normalizeListResponse
  *
  * Normalizes list endpoint responses into an array.
- *
- * Why:
- * - Some DRF endpoints return `T[]`
- * - Others return `{ results: T[] }` when pagination is enabled
- *
- * This keeps UI/query layers deterministic by always returning `T[]`.
- *
- * Args:
- *   data: unknown API response payload
- *
- * Returns:
- *   T[] (safe default = [])
  */
 function normalizeListResponse<T>(data: unknown): T[] {
   // Step 1: Plain list response
@@ -108,23 +101,11 @@ function normalizeListResponse<T>(data: unknown): T[] {
 /**
  * listUnitsByBuilding
  *
- * Fetches units scoped to a single building.
- *
  * Endpoint:
  * - GET /api/v1/units/?building=<buildingId>
- *
- * Multi-tenant boundary:
- * - axios attaches X-Org-Slug centrally
- * - backend resolves request.org and filters accordingly
- *
- * Args:
- *   buildingId: parent building id to filter units
- *
- * Returns:
- *   Unit[] (normalized from paginated or array responses)
  */
 export async function listUnitsByBuilding(buildingId: number): Promise<Unit[]> {
-  // Step 1: Request (axios normalizes trailing slash for DRF safety)
+  // Step 1: Request
   const res = await api.get<Unit[] | DRFPaginated<Unit>>("/api/v1/units/", {
     params: { building: buildingId },
   });
@@ -136,20 +117,8 @@ export async function listUnitsByBuilding(buildingId: number): Promise<Unit[]> {
 /**
  * createUnit
  *
- * Creates a new unit under a building.
- *
  * Endpoint:
  * - POST /api/v1/units/
- *
- * Multi-tenant boundary:
- * - axios attaches X-Org-Slug centrally
- * - backend uses request.org + payload.building to validate ownership
- *
- * Args:
- *   payload: CreateUnitInput
- *
- * Returns:
- *   Unit (created unit record)
  */
 export async function createUnit(payload: CreateUnitInput): Promise<Unit> {
   // Step 1: Request
@@ -157,4 +126,43 @@ export async function createUnit(payload: CreateUnitInput): Promise<Unit> {
 
   // Step 2: Return created unit
   return res.data;
+}
+
+/**
+ * updateUnit
+ *
+ * Partial update of a unit (PATCH).
+ *
+ * Endpoint:
+ * - PATCH /api/v1/units/<unitId>/
+ *
+ * Notes:
+ * - Do NOT send `building` here. Backend will reject building reassignment.
+ */
+export async function updateUnit(
+  unitId: number,
+  payload: UpdateUnitInput
+): Promise<Unit> {
+  // Step 1: Request
+  const res = await api.patch<Unit>(`/api/v1/units/${unitId}/`, payload);
+
+  // Step 2: Return updated record
+  return res.data;
+}
+
+/**
+ * deleteUnit
+ *
+ * Deletes a unit.
+ *
+ * Endpoint:
+ * - DELETE /api/v1/units/<unitId>/
+ *
+ * Notes:
+ * - Backend may respond 409 if unit has active lease or lease history.
+ *   Surface `error.response.data.detail` in the UI confirm modal.
+ */
+export async function deleteUnit(unitId: number): Promise<void> {
+  // Step 1: Request
+  await api.delete(`/api/v1/units/${unitId}/`);
 }

@@ -6,14 +6,15 @@ from django.db.models import Count, F, IntegerField, OuterRef, Subquery, Value
 from django.db.models.functions import Coalesce
 from rest_framework import status, viewsets
 from rest_framework.decorators import action
+from rest_framework.exceptions import ValidationError
 from rest_framework.filters import OrderingFilter
 from rest_framework.response import Response
 
 from apps.buildings import selectors, services
 from apps.buildings.models import Unit
 from apps.buildings.serializers import BuildingSerializer, UnitSerializer
-from apps.leases.models import Lease  
 from apps.leases import selectors as lease_selectors
+from apps.leases.models import Lease
 from apps.leases.serializers import LeaseSerializer
 from shared.auth.permissions import IsOrgMember
 
@@ -64,15 +65,8 @@ class BuildingViewSet(viewsets.ModelViewSet):
 
         return qs
 
-
     def perform_create(self, serializer):
-        """Create a building via the service layer.
-
-        Why:
-            - Views stay thin (I/O + auth + serializer validation)
-            - Services own business rules and persistence
-            - Avoids coupling services to DRF serializer objects
-        """
+        """Create a building via the service layer."""
         # Step 1: create via service using validated data only
         instance = services.create_building(
             org=self.request.org,
@@ -94,20 +88,6 @@ class BuildingViewSet(viewsets.ModelViewSet):
         # Step 2: attach updated instance for the response
         serializer.instance = instance
 
-    @action(detail=True, methods=["get"], url_path="units")
-    def units(self, request, pk=None):
-        """Nice-to-have: /api/v1/buildings/<id>/units/"""
-        building = self.get_object()
-
-        # Step 1: org-scoped units for this building
-        qs = selectors.building_units_qs_for_org(
-            org=request.org,
-            building_id=building.id,
-        )
-
-        serializer = UnitSerializer(qs, many=True, context={"request": request})
-        return Response(serializer.data, status=status.HTTP_200_OK)
-
 
 class UnitViewSet(viewsets.ModelViewSet):
     """CRUD for units (org-scoped)."""
@@ -115,6 +95,8 @@ class UnitViewSet(viewsets.ModelViewSet):
     permission_classes = [IsOrgMember]
     serializer_class = UnitSerializer
     filter_backends = [OrderingFilter]
+
+    # Step 0: Allow client-side ordering, but keep a stable default.
     ordering_fields = [
         "label",
         "bedrooms",
@@ -122,10 +104,20 @@ class UnitViewSet(viewsets.ModelViewSet):
         "sqft",
         "created_at",
         "updated_at",
+        "id",
     ]
-    ordering = ["-created_at"]
+    ordering = ["id"]
 
     def get_queryset(self):
+        """Return an org-scoped queryset for units.
+
+        Supports optional filtering:
+        - ?building=<building_id>
+
+        Notes:
+        - Always scoped to request.org (tenant boundary).
+        - Default ordering is stable by `id`.
+        """
         # Step 1: Always scope to the active org (tenant boundary)
         qs = Unit.objects.filter(organization=self.request.org)
 
@@ -140,12 +132,12 @@ class UnitViewSet(viewsets.ModelViewSet):
 
             qs = qs.filter(building_id=building_id)
 
-        # Step 3: Stable ordering
+        # Step 3: Stable ordering (OrderingFilter may override this if `?ordering=` is provided)
         return qs.order_by("id")
 
     def perform_create(self, serializer):
-        """
-        Enforce org from request.org on create.
+        """Enforce org from request.org on create.
+
         This prevents cross-tenant assignment attempts.
         """
         # Step 1: Org is always derived from request
@@ -153,15 +145,63 @@ class UnitViewSet(viewsets.ModelViewSet):
 
     def perform_update(self, serializer):
         """Update a unit via the service layer (org-safe)."""
-        # Step 1: update via service using validated data
+        # Step 1: Guard against moving units across buildings via PATCH.
+        # This keeps "unit belongs to building" stable unless you intentionally build a transfer flow.
+        if "building" in serializer.validated_data:
+            incoming_building = serializer.validated_data.get("building")
+            current_unit = self.get_object()
+            if incoming_building and incoming_building.id != current_unit.building_id:
+                raise ValidationError(
+                    {"building": "Building cannot be changed after unit creation."}
+                )
+
+        # Step 2: Update via service using validated data
         instance = services.update_unit(
             org=self.request.org,
             instance=self.get_object(),
             data=serializer.validated_data,
         )
 
-        # Step 2: attach updated instance for the response
+        # Step 3: Attach updated instance for the response
         serializer.instance = instance
+
+    def destroy(self, request, *args, **kwargs):
+        """Delete a unit if it is safe to do so.
+
+        Rules:
+            - Block delete if there is an ACTIVE lease on this unit.
+            - Block delete if ANY lease history exists (ledger integrity).
+              If you want to allow deletes after a lease ends, remove the lease-history check.
+        """
+        # Step 1: Get org-scoped unit
+        unit = self.get_object()
+        org = request.org
+
+        # Step 2: Block delete if active lease exists
+        has_active_lease = Lease.objects.filter(
+            organization=org,
+            unit=unit,
+            status="active",
+        ).exists()
+        if has_active_lease:
+            return Response(
+                {"detail": "Cannot delete a unit with an active lease. End the lease first."},
+                status=status.HTTP_409_CONFLICT,
+            )
+
+        # Step 3: Block delete if any lease history exists (recommended)
+        has_any_lease_history = Lease.objects.filter(
+            organization=org,
+            unit=unit,
+        ).exists()
+        if has_any_lease_history:
+            return Response(
+                {"detail": "Cannot delete a unit that has lease history. Archive it instead."},
+                status=status.HTTP_409_CONFLICT,
+            )
+
+        # Step 4: Safe to delete
+        return super().destroy(request, *args, **kwargs)
 
     @action(detail=True, methods=["get"], url_path="leases")
     def leases(self, request, pk=None):

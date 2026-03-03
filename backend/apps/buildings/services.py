@@ -12,7 +12,7 @@ from apps.buildings.models import Building, Unit
 
 if TYPE_CHECKING:
     # Step 1: Type-only import to keep runtime imports clean
-    from apps.core.models import Organization 
+    from apps.core.models import Organization
 
 
 @transaction.atomic
@@ -35,7 +35,7 @@ def update_building(*, org: "Organization", instance: Building, data: Dict[str, 
     for field, value in payload.items():
         setattr(instance, field, value)
 
-    # Step 3: Persist (Building.save() can enforce any invariants you have)
+    # Step 3: Persist
     instance.save()
     return instance
 
@@ -44,23 +44,14 @@ def update_building(*, org: "Organization", instance: Building, data: Dict[str, 
 def create_unit(*, org: "Organization", data: Dict[str, Any]) -> Unit:
     """Create a unit (org-safe).
 
-    This prevents the 500 you saw:
-    ValidationError: {'organization': ['This field cannot be null.']}
-
-    Why it happened:
-        - Unit.save() calls full_clean()
-        - organization is required
-        - serializer.validated_data did not include organization
-        - model validation raised and bubbled up
-
-    What we do here:
-        - Force organization from request.org (never trust client)
-        - Enforce tenant boundary: building must belong to org
-        - Convert Django ValidationError into DRF 400 ValidationError
+    Enforces:
+    - organization derived from request.org
+    - building belongs to org
+    - model validation errors -> DRF 400
     """
     # Step 1: Copy + sanitize incoming data
     payload = dict(data)
-    payload.pop("organization", None)  # never accept tenant fields from client
+    payload.pop("organization", None)
 
     # Step 2: Force org (canonical tenant source)
     payload["organization"] = org
@@ -79,16 +70,28 @@ def create_unit(*, org: "Organization", data: Dict[str, Any]) -> Unit:
 
 @transaction.atomic
 def update_unit(*, org: "Organization", instance: Unit, data: Dict[str, Any]) -> Unit:
-    """Update a unit (org-safe)."""
+    """Update a unit (org-safe).
+
+    Security/integrity rules:
+    - Never allow tenant mutation via payload.
+    - Never allow moving a unit across buildings via this service.
+      (If you ever want "transfer unit", implement a dedicated, audited endpoint.)
+    """
     # Step 1: Copy + sanitize incoming data
     payload = dict(data)
-    payload.pop("organization", None)  # never allow tenant mutation
+    payload.pop("organization", None)
 
-    # Step 2: Apply updates
+    # Step 2: Prevent building reassignment (defense in depth)
+    if "building" in payload and payload["building"] is not None:
+        incoming_building = payload["building"]
+        if incoming_building.id != instance.building_id:
+            raise DRFValidationError({"building": "Building cannot be changed after unit creation."})
+
+    # Step 3: Apply updates
     for field, value in payload.items():
         setattr(instance, field, value)
 
-    # Step 3: Persist (Unit.save() will run full_clean)
+    # Step 4: Persist (Unit.save() will run full_clean)
     try:
         instance.save()
     except ValidationError as exc:

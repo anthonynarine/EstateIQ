@@ -1,12 +1,14 @@
 // # Filename: src/features/buildings/pages/BuildingDetailPage/components/UnitCard.tsx
 
+import React from "react";
+import { Pencil, Trash2 } from "lucide-react";
 
 type UnitCardUnit = {
   id: number;
   label: string | null;
-  bedrooms: number | null;
-  bathrooms: number | null;
-  sqft: number | null;
+  bedrooms: number | string | null;
+  bathrooms: number | string | null;
+  sqft: number | string | null;
 };
 
 type Props = {
@@ -14,7 +16,36 @@ type Props = {
   isOccupied: boolean;
   leasesLoading: boolean;
   onOpen: (unit: UnitCardUnit) => void;
+  onEdit?: (unit: UnitCardUnit) => void;
+  onDelete?: (unit: UnitCardUnit) => void;
+  disableDeleteWhenOccupied?: boolean;
 };
+
+/**
+ * formatDecimalLikeUser
+ *
+ * Formats values like:
+ * - "2.00" -> "2"
+ * - "2.50" -> "2.5"
+ * - 2 -> "2"
+ * - 2.5 -> "2.5"
+ */
+function formatDecimalLikeUser(value: number | string): string {
+  // Step 1: Normalize to a number when possible
+  const n = typeof value === "string" ? Number(value) : value;
+
+  // Step 2: If parsing fails, fall back to raw string
+  if (!Number.isFinite(n)) return String(value);
+
+  // Step 3: Stringify
+  const s = String(n);
+
+  // Step 4: If JS already produced clean output (2, 2.5) return it
+  if (!s.includes(".")) return s;
+
+  // Step 5: Trim trailing zeros defensively (in case value came in as string)
+  return s.replace(/0+$/, "").replace(/\.$/, "");
+}
 
 /**
  * UnitCard
@@ -22,36 +53,48 @@ type Props = {
  * Presentational component for a single Unit row/card in BuildingDetailPage.
  *
  * Responsibilities:
- * - Render unit label and basic facts (beds/baths/sqft).
- * - Render occupancy chip using the caller-provided `isOccupied`.
- * - Provide a single "Manage leases →" action via `onOpen(unit)`.
- *
- * Non-responsibilities:
- * - Does NOT fetch data (no queries).
- * - Does NOT compute occupancy (caller does).
- * - Does NOT read router/org context (caller does).
+ * - Render unit label and basic facts (beds/baths/sqft) WITHOUT placeholder chips.
+ * - Render occupancy chip using `isOccupied`.
+ * - Provide "Manage leases →" via `onOpen(unit)`.
+ * - Provide optional edit/delete icon actions via callbacks.
  */
 export default function UnitCard({
   unit,
   isOccupied,
   leasesLoading,
   onOpen,
+  onEdit,
+  onDelete,
+  disableDeleteWhenOccupied = true,
 }: Props) {
-  // Step 1: Create display helpers (keep UI resilient)
+  // Step 1: Display helpers
   const unitLabel = unit.label?.trim() ? unit.label.trim() : `#${unit.id}`;
 
-  const beds =
-    unit.bedrooms === null ? "—" : `${unit.bedrooms} bd`;
+  const bedsText =
+    unit.bedrooms === null ? null : `${formatDecimalLikeUser(unit.bedrooms)} bd`;
 
-  const baths =
-    unit.bathrooms === null ? "—" : `${unit.bathrooms} ba`;
+  const bathsText =
+    unit.bathrooms === null
+      ? null
+      : `${formatDecimalLikeUser(unit.bathrooms)} ba`;
 
-  const sqft =
-    unit.sqft === null ? "—" : `${unit.sqft.toLocaleString()} sqft`;
+  const sqftText =
+    unit.sqft === null ? null : `${formatDecimalLikeUser(unit.sqft)} sqft`;
 
-  // Step 2: Handle click (single responsibility)
-  const handleOpen = () => {
-    onOpen(unit);
+  const canDelete = !(disableDeleteWhenOccupied && isOccupied);
+
+  // Step 2: Handlers
+  const handleOpen = () => onOpen(unit);
+
+  const handleEdit = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    onEdit?.(unit);
+  };
+
+  const handleDelete = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!canDelete) return;
+    onDelete?.(unit);
   };
 
   return (
@@ -71,18 +114,23 @@ export default function UnitCard({
             >
               {leasesLoading ? "Checking…" : isOccupied ? "Occupied" : "Vacant"}
             </span>
+            {bedsText ? (
+              <span className="inline-flex items-center rounded-full bg-white/5 px-3 py-1 text-xs text-neutral-200 ring-1 ring-white/10">
+                {bedsText}
+              </span>
+            ) : null}
 
-            <span className="inline-flex items-center rounded-full bg-white/5 px-3 py-1 text-xs text-neutral-200 ring-1 ring-white/10">
-              {beds}
-            </span>
+            {bathsText ? (
+              <span className="inline-flex items-center rounded-full bg-white/5 px-3 py-1 text-xs text-neutral-200 ring-1 ring-white/10">
+                {bathsText}
+              </span>
+            ) : null}
 
-            <span className="inline-flex items-center rounded-full bg-white/5 px-3 py-1 text-xs text-neutral-200 ring-1 ring-white/10">
-              {baths}
-            </span>
-
-            <span className="inline-flex items-center rounded-full bg-white/5 px-3 py-1 text-xs text-neutral-200 ring-1 ring-white/10">
-              {sqft}
-            </span>
+            {sqftText ? (
+              <span className="inline-flex items-center rounded-full bg-white/5 px-3 py-1 text-xs text-neutral-200 ring-1 ring-white/10">
+                {sqftText}
+              </span>
+            ) : null}
           </div>
 
           <button
@@ -93,6 +141,40 @@ export default function UnitCard({
             Manage leases →
           </button>
         </div>
+        {onEdit || onDelete ? (
+          <div className="flex items-center gap-2">
+            {onEdit ? (
+              <button
+                type="button"
+                onClick={handleEdit}
+                className="inline-flex h-9 w-9 items-center justify-center rounded-full bg-white/5 ring-1 ring-white/10 hover:bg-white/10"
+                title="Edit unit"
+              >
+                <Pencil className="h-4 w-4 text-neutral-200" />
+              </button>
+            ) : null}
+
+            {onDelete ? (
+              <button
+                type="button"
+                onClick={handleDelete}
+                disabled={!canDelete}
+                className={[
+                  "inline-flex h-9 w-9 items-center justify-center rounded-full",
+                  "bg-white/5 ring-1 ring-white/10 hover:bg-white/10",
+                  "disabled:cursor-not-allowed disabled:opacity-40",
+                ].join(" ")}
+                title={
+                  !canDelete
+                    ? "Cannot delete an occupied unit. End the active lease first."
+                    : "Delete unit"
+                }
+              >
+                <Trash2 className="h-4 w-4 text-neutral-200" />
+              </button>
+            ) : null}
+          </div>
+        ) : null}
       </div>
     </div>
   );
