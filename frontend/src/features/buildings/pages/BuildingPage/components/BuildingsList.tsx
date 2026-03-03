@@ -1,16 +1,23 @@
 // # Filename: src/features/buildings/pages/BuildingPage/components/BuildingsList.tsx
 
-
-import type { Building } from "../../../api/buildingsApi"; 
+import type { Building } from "../../../api/buildingsApi";
 import BuildingCard from "./BuildingCard";
 
 type Props = {
-  buildings?: Building[]; 
+  buildings?: Building[];
   isLoading: boolean;
   isFetching: boolean;
+  onEdit?: (building: Building) => void;
+  onDelete?: (building: Building) => void;
 };
 
-export default function BuildingsList({ buildings, isLoading, isFetching }: Props) {
+export default function BuildingsList({
+  buildings,
+  isLoading,
+  isFetching,
+  onEdit,
+  onDelete,
+}: Props) {
   // Step 1: Normalize to safe array
   const safeBuildings = buildings ?? [];
 
@@ -34,7 +41,7 @@ export default function BuildingsList({ buildings, isLoading, isFetching }: Prop
     );
   }
 
-  // Step 4: List state (auto-fit grid so cards expand on large screens)
+  // Step 4: List state
   return (
     <section className="space-y-4">
       <div className="flex items-center justify-between">
@@ -42,20 +49,18 @@ export default function BuildingsList({ buildings, isLoading, isFetching }: Prop
           {safeBuildings.length} building{safeBuildings.length === 1 ? "" : "s"}
         </p>
 
-        {isFetching ? (
-          <span className="text-xs text-white/40">Refreshing…</span>
-        ) : null}
+        {isFetching ? <span className="text-xs text-white/40">Refreshing…</span> : null}
       </div>
 
-      {/* 
-        ✅ Auto-fit + minmax:
-        - Cards are at least 420px wide
-        - They grow to fill space
-        - Columns increase naturally on wider screens
-      */}
       <div className="grid gap-6 [grid-template-columns:repeat(auto-fit,minmax(420px,1fr))]">
         {safeBuildings.map((b) => (
-          <BuildingCard key={b.id} building={b} />
+          <BuildingCard
+            key={b.id}
+            building={b}
+            // ✅ New Code
+            onEdit={onEdit}
+            onDelete={onDelete}
+          />
         ))}
       </div>
     </section>

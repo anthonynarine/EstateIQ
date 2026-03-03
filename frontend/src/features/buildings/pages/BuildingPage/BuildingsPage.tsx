@@ -1,22 +1,25 @@
-// # Filename: src/features/buildings/pages/BuildingsPage.tsx
+// # Filename: src/features/buildings/pages/BuildingPage/BuildingsPage.tsx
+// ✅ New Code
 
 import type React from "react";
 import { useMemo, useState } from "react";
 import { formatApiError } from "../../../../api/formatApiError";
 import { useOrg } from "../../../tenancy/hooks/useOrg";
 
-import { useBuildingsQuery, useCreateBuildingMutation } from "../../queries/useBuildings";
-import { Building, CreateBuildingInput } from "../../api/buildingsApi";
+import { useBuildingsQuery, useCreateBuildingMutation } from "./hooks/useBuildings";
+import type { Building, CreateBuildingInput } from "../../api/buildingsApi";
 import BuildingHeader from "./components/BuildingHeader";
 import BuildingsList from "./components/BuildingsList";
-import CreateBuildingForm, { type BuildingFormValue} from "../BuildingPage/forms/CreateBuildingForm";
+import CreateBuildingForm, { type BuildingFormValue } from "./forms/CreateBuildingForm";
 
+import useBuildingActions from "./hooks/useBuildingActions";
+import BuildingEditModal from "./forms/BuildingEditModal";
+import BuildingDeleteConfirmModal from "./forms/BuildingDeleteConfirmModal";
 
 type DRFPaginated<T> = {
   results: T[];
 };
 
-// Step 1: Responsive container (fixes large-screen negative space without changing mobile/tablet)
 const PAGE_CONTAINER_CLASS =
   "mx-auto w-full px-4 py-6 max-w-[980px] lg:max-w-[1200px] lg:px-6 2xl:max-w-[1400px]";
 
@@ -42,8 +45,7 @@ function validateForm(
   const errors: Partial<Record<keyof BuildingFormValue, string>> = {};
 
   if (!v.name.trim()) errors.name = "Building name is required.";
-  if (!v.address_line1.trim())
-    errors.address_line1 = "Address line 1 is required.";
+  if (!v.address_line1.trim()) errors.address_line1 = "Address line 1 is required.";
   if (!v.city.trim()) errors.city = "City is required.";
   if (!v.state.trim()) errors.state = "State is required.";
   if (!v.postal_code.trim()) errors.postal_code = "Postal code is required.";
@@ -69,22 +71,33 @@ function normalizeCreatePayload(v: BuildingFormValue): CreateBuildingInput {
   };
 }
 
+/**
+ * BuildingsPage
+ *
+ * Orchestrator-only page:
+ * - Fetch buildings
+ * - Create building (inline form)
+ * - Delegate edit/delete to `useBuildingActions`
+ */
 export default function BuildingsPage() {
   const { orgSlug } = useOrg();
   const hasOrg = Boolean(orgSlug);
 
-  // Step 2: Server state (org-scoped)
+  // Step 1: Server state (org-scoped)
   const buildingsQuery = useBuildingsQuery(orgSlug);
   const createMutation = useCreateBuildingMutation(orgSlug);
 
-  // Step 3: UI state
+  // ✅ New Code: page-level building actions (edit/delete)
+  const { openEdit, openDelete, editModalProps, deleteModalProps } = useBuildingActions(orgSlug);
+
+  // Step 2: UI state (create only)
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [form, setForm] = useState<BuildingFormValue>(EMPTY_FORM);
   const [formErrors, setFormErrors] = useState<
     Partial<Record<keyof BuildingFormValue, string>>
   >({});
 
-  // Step 4: Normalize DRF response shape (array vs {results})
+  // Step 3: Normalize DRF response shape (array vs {results})
   const buildingsRaw =
     buildingsQuery.data as Building[] | DRFPaginated<Building> | undefined;
 
@@ -98,16 +111,11 @@ export default function BuildingsPage() {
     return [...list].sort((a, b) => a.name.localeCompare(b.name));
   }, [buildingsRaw]);
 
-  // Step 5: Error formatting
-  const listErrorText = buildingsQuery.error
-    ? formatApiError(buildingsQuery.error)
-    : null;
+  // Step 4: Error formatting
+  const listErrorText = buildingsQuery.error ? formatApiError(buildingsQuery.error) : null;
+  const createErrorText = createMutation.error ? formatApiError(createMutation.error) : null;
 
-  const createErrorText = createMutation.error
-    ? formatApiError(createMutation.error)
-    : null;
-
-  // Step 6: Field setter (matches CreateBuildingForm contract)
+  // Step 5: Field setter (matches CreateBuildingForm contract)
   function updateField<K extends keyof BuildingFormValue>(
     key: K,
     value: BuildingFormValue[K]
@@ -122,7 +130,7 @@ export default function BuildingsPage() {
     });
   }
 
-  // Step 7: Submit
+  // Step 6: Submit
   const handleSubmit: React.FormEventHandler<HTMLFormElement> = async (e) => {
     e.preventDefault();
 
@@ -138,7 +146,7 @@ export default function BuildingsPage() {
     setIsCreateOpen(false);
   };
 
-  // Step 8: Org guard UI
+  // Step 7: Org guard
   if (!hasOrg) {
     return (
       <div className={PAGE_CONTAINER_CLASS}>
@@ -154,14 +162,12 @@ export default function BuildingsPage() {
 
   return (
     <div className={PAGE_CONTAINER_CLASS}>
-      {/* Header */}
       <BuildingHeader
         orgSlug={orgSlug}
         isCreateOpen={isCreateOpen}
         onToggleCreate={() => setIsCreateOpen((v) => !v)}
       />
 
-      {/* Create */}
       {isCreateOpen ? (
         <div className="mt-5">
           <CreateBuildingForm
@@ -180,7 +186,6 @@ export default function BuildingsPage() {
         </div>
       ) : null}
 
-      {/* List */}
       <div className="mt-5 space-y-3">
         {listErrorText ? (
           <div className="rounded-2xl border border-red-500/30 bg-red-500/10 p-4 text-sm text-red-200">
@@ -192,8 +197,15 @@ export default function BuildingsPage() {
           buildings={buildings}
           isLoading={buildingsQuery.isLoading}
           isFetching={buildingsQuery.isFetching}
+          // ✅ New Code
+          onEdit={openEdit}
+          onDelete={openDelete}
         />
       </div>
+
+      {/* ✅ New Code: modals (pure presentational) */}
+      <BuildingEditModal {...editModalProps} />
+      <BuildingDeleteConfirmModal {...deleteModalProps} />
     </div>
   );
 }

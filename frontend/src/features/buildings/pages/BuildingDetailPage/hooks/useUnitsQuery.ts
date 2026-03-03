@@ -2,7 +2,7 @@
 // # Filename: src/features/buildings/queries/useUnitsQuery.ts
 
 import { useQuery } from "@tanstack/react-query";
-import { listUnitsByBuilding, type Unit } from "../api/unitsApi";
+import { listUnitsByBuilding, type Unit } from "../../../api/unitsApi";
 
 /**
  * UseUnitsQueryArgs

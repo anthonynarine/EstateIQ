@@ -1,15 +1,43 @@
 // # Filename: src/features/buildings/pages/BuildingPage/components/BuildingCard.tsx
 
+
 import { useCallback } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
+import { Pencil, Trash2 } from "lucide-react";
 import type { Building } from "../../../api/buildingsApi";
+
+type Props = {
+  building: Building;
+
+  //optional actions
+  onEdit?: (building: Building) => void;
+  onDelete?: (building: Building) => void;
+
+  // allow parent to disable delete if needed
+  disableDelete?: boolean;
+};
 
 /**
  * BuildingCard
  *
- * Click-through card for a building record.
+ * Presentational + navigation card for a Building record.
+ *
+ * Responsibilities:
+ * - Display building address + summary counts (units/occupied/vacant)
+ * - Provide "View units" navigation
+ * - Provide optional edit/delete icon actions (delegated to parent orchestration)
+ *
+ * Non-responsibilities:
+ * - No data fetching
+ * - No mutation calls
+ * - No org scoping logic
  */
-export default function BuildingCard({ building }: { building: Building }) {
+export default function BuildingCard({
+  building,
+  onEdit,
+  onDelete,
+  disableDelete = false,
+}: Props) {
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -35,6 +63,24 @@ export default function BuildingCard({ building }: { building: Building }) {
       state: { building },
     });
   }, [building, location.search, navigate]);
+
+  // icon handlers
+  const handleEdit = useCallback(
+    (e: React.MouseEvent) => {
+      e.stopPropagation();
+      onEdit?.(building);
+    },
+    [building, onEdit]
+  );
+
+  const handleDelete = useCallback(
+    (e: React.MouseEvent) => {
+      e.stopPropagation();
+      if (disableDelete) return;
+      onDelete?.(building);
+    },
+    [building, disableDelete, onDelete]
+  );
 
   // Step 3: Chip component (matches Unit chips more closely)
   const Chip = ({
@@ -94,6 +140,42 @@ export default function BuildingCard({ building }: { building: Building }) {
             )}
           </div>
         </div>
+
+        {/* icon actions (top-right) */}
+        {onEdit || onDelete ? (
+          <div className="flex items-center gap-2">
+            {onEdit ? (
+              <button
+                type="button"
+                onClick={handleEdit}
+                className="inline-flex h-9 w-9 items-center justify-center rounded-full bg-white/5 ring-1 ring-white/10 hover:bg-white/10"
+                title="Edit building"
+              >
+                <Pencil className="h-4 w-4 text-neutral-200" />
+              </button>
+            ) : null}
+
+            {onDelete ? (
+              <button
+                type="button"
+                onClick={handleDelete}
+                disabled={disableDelete}
+                className={[
+                  "inline-flex h-9 w-9 items-center justify-center rounded-full",
+                  "bg-white/5 ring-1 ring-white/10 hover:bg-white/10",
+                  "disabled:cursor-not-allowed disabled:opacity-40",
+                ].join(" ")}
+                title={
+                  disableDelete
+                    ? "Cannot delete this building right now."
+                    : "Delete building"
+                }
+              >
+                <Trash2 className="h-4 w-4 text-neutral-200" />
+              </button>
+            ) : null}
+          </div>
+        ) : null}
       </div>
 
       <div className="mt-3 flex justify-end">

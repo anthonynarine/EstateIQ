@@ -2,7 +2,7 @@
 // ✅ New Code
 
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { updateUnit, type UpdateUnitInput, type Unit } from "../api/unitsApi";
+import { updateUnit, type UpdateUnitInput, type Unit } from "../../../api/unitsApi";
 
 /**
  * useUpdateUnitMutation

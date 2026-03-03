@@ -1,5 +1,6 @@
 // # Filename: src/features/buildings/pages/BuildingDetailPage/components/UnitCard.tsx
 
+
 import React from "react";
 import { Pencil, Trash2 } from "lucide-react";
 
@@ -14,8 +15,10 @@ type UnitCardUnit = {
 type Props = {
   unit: UnitCardUnit;
   isOccupied: boolean;
-  leasesLoading: boolean;
+
+  // ❌ Removed: leasesLoading (we never show "Checking...")
   onOpen: (unit: UnitCardUnit) => void;
+
   onEdit?: (unit: UnitCardUnit) => void;
   onDelete?: (unit: UnitCardUnit) => void;
   disableDeleteWhenOccupied?: boolean;
@@ -31,37 +34,31 @@ type Props = {
  * - 2.5 -> "2.5"
  */
 function formatDecimalLikeUser(value: number | string): string {
-  // Step 1: Normalize to a number when possible
+  // Step 1: Normalize to number when possible
   const n = typeof value === "string" ? Number(value) : value;
 
-  // Step 2: If parsing fails, fall back to raw string
+  // Step 2: If parsing fails, fall back to raw
   if (!Number.isFinite(n)) return String(value);
 
-  // Step 3: Stringify
+  // Step 3: Stringify + trim trailing zeros defensively
   const s = String(n);
-
-  // Step 4: If JS already produced clean output (2, 2.5) return it
-  if (!s.includes(".")) return s;
-
-  // Step 5: Trim trailing zeros defensively (in case value came in as string)
-  return s.replace(/0+$/, "").replace(/\.$/, "");
+  return s.includes(".") ? s.replace(/0+$/, "").replace(/\.$/, "") : s;
 }
 
 /**
  * UnitCard
  *
- * Presentational component for a single Unit row/card in BuildingDetailPage.
+ * Presentational unit card.
  *
- * Responsibilities:
- * - Render unit label and basic facts (beds/baths/sqft) WITHOUT placeholder chips.
- * - Render occupancy chip using `isOccupied`.
- * - Provide "Manage leases →" via `onOpen(unit)`.
- * - Provide optional edit/delete icon actions via callbacks.
+ * Key UX choice:
+ * - We DO NOT show "Checking..." state.
+ * - We always render either Occupied or Vacant based on `isOccupied`.
+ *
+ * This keeps the UI deterministic and avoids “loading-pill” fatigue.
  */
 export default function UnitCard({
   unit,
   isOccupied,
-  leasesLoading,
   onOpen,
   onEdit,
   onDelete,
@@ -110,10 +107,10 @@ export default function UnitCard({
                   ? "bg-emerald-500/10 text-emerald-300 ring-1 ring-emerald-400/20"
                   : "bg-rose-500/10 text-rose-300 ring-1 ring-rose-400/20"
               }`}
-              title={leasesLoading ? "Checking occupancy…" : undefined}
             >
-              {leasesLoading ? "Checking…" : isOccupied ? "Occupied" : "Vacant"}
+              {isOccupied ? "Occupied" : "Vacant"}
             </span>
+
             {bedsText ? (
               <span className="inline-flex items-center rounded-full bg-white/5 px-3 py-1 text-xs text-neutral-200 ring-1 ring-white/10">
                 {bedsText}
@@ -141,6 +138,7 @@ export default function UnitCard({
             Manage leases →
           </button>
         </div>
+
         {onEdit || onDelete ? (
           <div className="flex items-center gap-2">
             {onEdit ? (

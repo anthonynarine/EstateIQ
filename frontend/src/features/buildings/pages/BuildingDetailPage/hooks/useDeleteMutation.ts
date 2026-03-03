@@ -1,8 +1,8 @@
-// # Filename: src/features/buildings/queries/useDeleteUnitMutation.ts
+// # Filename: src/features/buildings/pages/BuildingDetailpage/hooks/useDeleteUnitMutation.ts
 
 
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { deleteUnit, type Unit } from "../api/unitsApi";
+import { deleteUnit, type Unit } from "../../../api/unitsApi";
 
 /**
  * useDeleteUnitMutation

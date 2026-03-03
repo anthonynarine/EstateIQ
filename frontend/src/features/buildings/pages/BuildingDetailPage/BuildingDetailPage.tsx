@@ -3,8 +3,8 @@
 import { useMemo, useState } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { useOrg } from "../../../tenancy/hooks/useOrg";
-import { useBuildingQuery } from "../../queries/useBuildings";
-import { useUnitsQuery } from "../../queries/useUnitsQuery";
+import { useBuildingQuery } from "../BuildingPage/hooks/useBuildings";
+import { useUnitsQuery } from "./hooks/useUnitsQuery";
 import { useBuildingOccupancyByUnitId } from "./hooks/useBuildingOccupancyByUnitID";
 import BuildingDetailHeader from "./components/BuildingDetailHeader";
 import BuildingUnitsSection from "./components/BuildingUnitsSection";

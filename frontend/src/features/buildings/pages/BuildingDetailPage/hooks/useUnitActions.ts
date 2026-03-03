@@ -4,8 +4,8 @@
 import { useCallback, useMemo, useState } from "react";
 import axios from "axios";
 
-import { useUpdateUnitMutation } from "../../../queries/useUpdateUnitMutation";
-import { useDeleteUnitMutation } from "../../../queries/useDeleteMutation";
+import { useUpdateUnitMutation } from "../hooks/useUpdateUnitMutation";
+import { useDeleteUnitMutation } from "../hooks/useDeleteMutation";
 import type { UpdateUnitInput } from "../../../api/unitsApi";
 
 export type UnitForUi = {
