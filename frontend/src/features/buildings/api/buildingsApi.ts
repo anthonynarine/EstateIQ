@@ -41,14 +41,52 @@ export type CreateBuildingInput = {
 
 export type UpdateBuildingInput = Partial<CreateBuildingInput>;
 
+type DRFPaginated<T> = {
+  results: T[];
+  count?: number;
+  next?: string | null;
+  previous?: string | null;
+};
+
+function normalizeListResponse<T>(data: unknown): T[] {
+  // Step 1: Plain list
+  if (Array.isArray(data)) return data as T[];
+
+  // Step 2: DRF pagination
+  if (
+    data &&
+    typeof data === "object" &&
+    "results" in data &&
+    Array.isArray((data as any).results)
+  ) {
+    return (data as DRFPaginated<T>).results;
+  }
+
+  // Step 3: Fail-safe
+  return [];
+}
+
 /**
  * listBuildings
  *
  * Returns all buildings for the active org.
+ * Supports DRF pagination (results) and plain lists.
  */
 export async function listBuildings(orgSlug: string): Promise<Building[]> {
-  // Step 1: Org-scoped request
-  const res = await api.get<Building[]>("/api/v1/buildings/", {
+  const res = await api.get<Building[] | DRFPaginated<Building>>("/api/v1/buildings/", {
+    headers: { "X-Org-Slug": orgSlug },
+  });
+
+  return normalizeListResponse<Building>(res.data);
+}
+
+/**
+ * getBuilding
+ *
+ * Retrieve a single building (org-scoped).
+ */
+export async function getBuilding(orgSlug: string, buildingId: number): Promise<Building> {
+  const res = await api.get<Building>(`/api/v1/buildings/${buildingId}/`, {
     headers: { "X-Org-Slug": orgSlug },
   });
 
@@ -77,31 +115,24 @@ export async function createBuilding(
  * PATCH update (org-scoped).
  */
 export async function updateBuilding(
+  orgSlug: string,
   buildingId: number,
   payload: UpdateBuildingInput
 ): Promise<Building> {
-  const res = await api.patch<Building>(`/api/v1/buildings/${buildingId}/`, payload);
+  const res = await api.patch<Building>(`/api/v1/buildings/${buildingId}/`, payload, {
+    headers: { "X-Org-Slug": orgSlug },
+  });
+
   return res.data;
 }
 
 /**
  * deleteBuilding
  *
- * Hard delete (org-scoped via auth + org middleware).
+ * Hard delete (org-scoped).
  */
-export async function deleteBuilding(buildingId: number): Promise<void> {
-  await api.delete(`/api/v1/buildings/${buildingId}/`);
-}
-
-
-export async function getBuilding(
-  orgSlug: string,
-  buildingId: number
-): Promise<Building> {
-  // Step 1: Org-scoped request
-  const res = await api.get<Building>(`/api/v1/buildings/${buildingId}/`, {
+export async function deleteBuilding(orgSlug: string, buildingId: number): Promise<void> {
+  await api.delete(`/api/v1/buildings/${buildingId}/`, {
     headers: { "X-Org-Slug": orgSlug },
   });
-
-  return res.data;
 }

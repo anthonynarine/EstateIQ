@@ -3,17 +3,33 @@
 from __future__ import annotations
 
 from typing import Any, Dict, TYPE_CHECKING
-
+from typing import Any, Mapping
 from django.core.exceptions import ValidationError
 from django.db import transaction
 from rest_framework.exceptions import ValidationError as DRFValidationError
-
 from apps.buildings.models import Building, Unit
 
 if TYPE_CHECKING:
     # Step 1: Type-only import to keep runtime imports clean
     from apps.core.models import Organization
 
+@transaction.atomic
+def create_building(*, org: Organization, data: Mapping[str, Any]) -> Building:
+    """Create a building (org-scoped) from serializer-validated data.
+
+    Args:
+        org: Organization for tenant scoping.
+        data: Serializer validated_data.
+
+    Returns:
+        The created Building instance.
+    """
+    # Step 1: Enforce org boundary at service layer
+    payload = dict(data)
+    payload["organization"] = org
+
+    # Step 2: Create
+    return Building.objects.create(**payload)
 
 @transaction.atomic
 def update_building(*, org: "Organization", instance: Building, data: Dict[str, Any]) -> Building:
