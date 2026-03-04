@@ -1,13 +1,15 @@
-# Filename: backend/apps/leases/views.py
-from __future__ import annotations
 
+from __future__ import annotations
 from rest_framework import status, viewsets
 from rest_framework.decorators import action
 from rest_framework.filters import OrderingFilter
 from rest_framework.response import Response
-
 from apps.leases import selectors
-from apps.leases.serializers import LeaseSerializer, TenantSerializer
+from apps.leases.serializers import (
+    LeaseEndSerializer,
+    LeaseSerializer,
+    TenantSerializer,
+)
 from shared.auth.permissions import IsOrgMember
 
 
@@ -21,7 +23,6 @@ class TenantViewSet(viewsets.ModelViewSet):
     ordering = ["-created_at"]
 
     def get_queryset(self):
-        # Step 1: org-scoped queryset
         return selectors.tenants_qs(org=self.request.org)
 
 
@@ -52,3 +53,17 @@ class LeaseViewSet(viewsets.ModelViewSet):
         qs = self.get_queryset().filter(unit_id=unit_id)
         serializer = self.get_serializer(qs, many=True)
         return Response(serializer.data, status=status.HTTP_200_OK)
+
+    @action(detail=True, methods=["post"], url_path="end")
+    def end(self, request, pk=None):
+        """End a lease by setting a concrete move-out date (end-exclusive)."""
+        lease = self.get_object()
+
+        serializer = LeaseEndSerializer(
+            data=request.data,
+            context={"request": request, "lease": lease},
+        )
+        serializer.is_valid(raise_exception=True)
+        updated = serializer.save()
+
+        return Response(LeaseSerializer(updated, context={"request": request}).data, status=status.HTTP_200_OK)

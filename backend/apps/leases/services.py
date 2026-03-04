@@ -1,4 +1,3 @@
-# Filename: backend/apps/leases/services.py
 
 from __future__ import annotations
 
@@ -31,7 +30,72 @@ class _Missing:
 _MISSING = _Missing()
 
 
-# Step 1: Central invariant checks (shared by create + update)
+def _is_overlapping_end_exclusive(
+    *,
+    existing_start: date,
+    existing_end: Optional[date],
+    new_start: date,
+    new_end: Optional[date],
+) -> bool:
+    """Return True if two [start, end) intervals overlap (end-exclusive).
+
+    Rules:
+      - end_date is exclusive
+      - None end_date means open-ended (+∞)
+
+    Overlap iff:
+      new_start < existing_end_or_inf  AND  new_end_or_inf > existing_start
+    """
+    # Step 1: Handle infinity semantics
+    existing_end_inf = existing_end
+    new_end_inf = new_end
+
+    # Step 2: Evaluate the canonical overlap formula with null-as-infinity
+    left = True if existing_end_inf is None else (new_start < existing_end_inf)
+    right = True if new_end_inf is None else (new_end_inf > existing_start)
+
+    return left and right
+
+
+def _find_conflicting_lease(
+    *,
+    org: Organization,
+    unit: Unit,
+    start_date: date,
+    end_date: Optional[date],
+    exclude_lease_id: Optional[int] = None,
+) -> Optional[Lease]:
+    """Return the first conflicting lease for this unit under end-exclusive semantics."""
+    qs = Lease.objects.filter(organization=org, unit=unit).order_by("start_date", "id")
+    if exclude_lease_id is not None:
+        qs = qs.exclude(id=exclude_lease_id)
+
+    # Step 1: Fetch candidates that *could* overlap (cheap DB filter, strict check in Python)
+    #
+    # For end-exclusive overlap, a safe candidate filter is:
+    #   existing.start < new_end (if new_end is not null)
+    #   AND (existing.end is null OR existing.end > new_start)
+    #
+    # If new_end is null (open-ended), we only need:
+    #   existing.end is null OR existing.end > new_start
+    candidates = qs.filter(Q(end_date__isnull=True) | Q(end_date__gt=start_date))
+
+    if end_date is not None:
+        candidates = candidates.filter(start_date__lt=end_date)
+
+    # Step 2: Confirm overlap precisely (including adjacency allowance) in Python
+    for existing in candidates:
+        if _is_overlapping_end_exclusive(
+            existing_start=existing.start_date,
+            existing_end=existing.end_date,
+            new_start=start_date,
+            new_end=end_date,
+        ):
+            return existing
+
+    return None
+
+
 def _validate_lease_invariants(
     *,
     org: Organization,
@@ -41,65 +105,90 @@ def _validate_lease_invariants(
     status: str,
     exclude_lease_id: Optional[int] = None,
 ) -> None:
-    """Validate enterprise invariants for a lease before saving.
+    """Validate enterprise invariants for a lease before saving (end-exclusive).
 
     Invariants:
       - Unit must belong to org
-      - end_date cannot be earlier than start_date
-      - No overlapping lease ranges per unit
+      - If end_date provided, it must be strictly AFTER start_date (end-exclusive)
+      - No overlapping lease ranges per unit under [start, end)
       - Only one ACTIVE lease per unit at a time
 
-    Args:
-        org: Active organization.
-        unit: Lease's unit.
-        start_date: Proposed start date.
-        end_date: Proposed end date (None = open-ended).
-        status: Proposed status.
-        exclude_lease_id: Lease id to exclude (used during update).
-
     Raises:
-        ValidationError: If any invariant is violated.
+        ValidationError: If any invariant is violated (with structured details).
     """
-    # Step 2: Org integrity
+    # Step 1: Org integrity
     if unit.organization_id != org.id:
-        raise ValidationError({"unit": "Unit must belong to the active organization."})
-
-    # Step 3: Date sanity
-    if end_date is not None and end_date < start_date:
-        raise ValidationError({"end_date": "end_date cannot be earlier than start_date."})
-
-    # Step 4: Overlap detection (inclusive endpoints; None end_date = open-ended)
-    qs = Lease.objects.filter(organization=org, unit=unit)
-    if exclude_lease_id is not None:
-        qs = qs.exclude(id=exclude_lease_id)
-
-    # Overlap condition:
-    # existing.start <= new.end (or new.end is open-ended)
-    # AND new.start <= existing.end (or existing.end is open-ended)
-    new_end = end_date if end_date is not None else date.max
-    overlap_condition = Q(start_date__lte=new_end) & (
-        Q(end_date__isnull=True) | Q(end_date__gte=start_date)
-    )
-
-    if qs.filter(overlap_condition).exists():
         raise ValidationError(
             {
-                "non_field_errors": (
-                    "Lease dates overlap with an existing lease for this unit. "
-                    "A unit cannot have overlapping leases."
-                )
+                "error": {
+                    "code": "org_mismatch",
+                    "message": "Unit must belong to the active organization.",
+                    "details": {"unit_id": unit.id, "org_id": org.id},
+                }
             }
         )
 
-    # Step 5: Only one ACTIVE lease per unit (status-driven)
-    if status == "active":
-        active_qs = Lease.objects.filter(organization=org, unit=unit, status="active")
+    # Step 2: Date sanity (end-exclusive)
+    # end_date is the first day NOT occupied → must be > start_date if present.
+    if end_date is not None and end_date <= start_date:
+        raise ValidationError(
+            {
+                "error": {
+                    "code": "invalid_date_range",
+                    "message": "Move-out date must be after the start date.",
+                    "details": {"start_date": start_date, "end_date": end_date},
+                }
+            }
+        )
+
+    # Step 3: Overlap detection (end-exclusive)
+    conflict = _find_conflicting_lease(
+        org=org,
+        unit=unit,
+        start_date=start_date,
+        end_date=end_date,
+        exclude_lease_id=exclude_lease_id,
+    )
+    if conflict is not None:
+        suggested_start = conflict.end_date  # adjacency allowed because end is exclusive
+        raise ValidationError(
+            {
+                "error": {
+                    "code": "lease_overlap",
+                    "message": "Lease dates conflict with an existing lease for this unit.",
+                    "details": {
+                        "conflict": {
+                            "lease_id": conflict.id,
+                            "start_date": conflict.start_date,
+                            "end_date": conflict.end_date,
+                            "status": conflict.status,
+                        },
+                        "suggested_start_date": suggested_start,
+                        "rule": "[start_date, end_date) end-exclusive",
+                    },
+                }
+            }
+        )
+
+    # Step 4: Only one ACTIVE lease per unit (status-driven)
+    if status == Lease.Status.ACTIVE:
+        active_qs = Lease.objects.filter(
+            organization=org,
+            unit=unit,
+            status=Lease.Status.ACTIVE,
+        )
         if exclude_lease_id is not None:
             active_qs = active_qs.exclude(id=exclude_lease_id)
 
         if active_qs.exists():
             raise ValidationError(
-                {"status": "This unit already has an active lease. End it before activating another."}
+                {
+                    "error": {
+                        "code": "active_lease_exists",
+                        "message": "This unit already has an active lease. End it before activating another.",
+                        "details": {"unit_id": unit.id},
+                    }
+                }
             )
 
 
@@ -181,28 +270,87 @@ def create_lease(
 
 
 @transaction.atomic
+def end_lease(
+    *,
+    org: Organization,
+    lease: Lease,
+    end_date: date,
+) -> Lease:
+    """End a lease by setting a concrete end_date (exclusive) and status=ENDED.
+
+    end_date is the move-out date (tenant does NOT occupy on this date).
+    """
+    # Step 1: Org integrity
+    if lease.organization_id != org.id:
+        raise ValidationError(
+            {
+                "error": {
+                    "code": "org_mismatch",
+                    "message": "Lease must belong to the active organization.",
+                    "details": {"lease_id": lease.id, "org_id": org.id},
+                }
+            }
+        )
+
+    # Step 2: Validate end-exclusive date rule
+    if end_date <= lease.start_date:
+        raise ValidationError(
+            {
+                "error": {
+                    "code": "invalid_end_date",
+                    "message": "Move-out date must be after the start date.",
+                    "details": {"start_date": lease.start_date, "end_date": end_date},
+                }
+            }
+        )
+
+    # Step 3: Apply end state deterministically
+    lease.end_date = end_date
+    lease.status = Lease.Status.ENDED
+    lease.save()
+
+    return lease
+
+
+@transaction.atomic
 def update_lease(
     *,
     org: Organization,
     lease: Lease,
     unit: Optional[Unit] = None,
     start_date: Optional[date] = None,
-    end_date: object = _MISSING,  # ✅ default must be _MISSING, not None
+    end_date: object = _MISSING,
     rent_amount: Optional[Decimal] = None,
     status: Optional[str] = None,
-    security_deposit_amount: object = _MISSING,  # ✅ default must be _MISSING, not None
+    security_deposit_amount: object = _MISSING,
     rent_due_day: Optional[int] = None,
     parties: Optional[Iterable[LeasePartyInput]] = None,
 ) -> Lease:
     """Update a lease (org-safe) with true PATCH semantics."""
     # Step 1: Org integrity
     if lease.organization_id != org.id:
-        raise ValidationError({"lease": "Lease must belong to the active organization."})
+        raise ValidationError(
+            {
+                "error": {
+                    "code": "org_mismatch",
+                    "message": "Lease must belong to the active organization.",
+                    "details": {"lease_id": lease.id, "org_id": org.id},
+                }
+            }
+        )
 
     # Step 2: Resolve effective unit
     resolved_unit = unit or lease.unit
     if resolved_unit.organization_id != org.id:
-        raise ValidationError({"unit": "Unit must belong to the active organization."})
+        raise ValidationError(
+            {
+                "error": {
+                    "code": "org_mismatch",
+                    "message": "Unit must belong to the active organization.",
+                    "details": {"unit_id": resolved_unit.id, "org_id": org.id},
+                }
+            }
+        )
 
     # Step 3: Compute effective values (PATCH semantics)
     effective_start = start_date if start_date is not None else lease.start_date
@@ -214,7 +362,7 @@ def update_lease(
 
     effective_status = status if status is not None else lease.status
 
-    # Step 4: Validate invariants using effective values
+    # Step 4: Validate invariants using effective values (end-exclusive)
     _validate_lease_invariants(
         org=org,
         unit=resolved_unit,
@@ -237,7 +385,7 @@ def update_lease(
         lease.rent_amount = rent_amount
 
     if security_deposit_amount is not _MISSING:
-        lease.security_deposit_amount = security_deposit_amount  # may be None
+        lease.security_deposit_amount = security_deposit_amount
 
     if rent_due_day is not None:
         lease.rent_due_day = rent_due_day
@@ -265,14 +413,25 @@ def _set_lease_parties(
 
     # Step 2: ensure tenants exist in org
     tenant_ids = [p.tenant_id for p in parties]
-    tenants: QuerySet[Tenant] = Tenant.objects.filter(organization=org, id__in=tenant_ids)
+    tenants: QuerySet[Tenant] = Tenant.objects.filter(
+        organization=org,
+        id__in=tenant_ids,
+    )
     tenant_map = {t.id: t for t in tenants}
 
     links = []
     for p in parties:
         tenant = tenant_map.get(p.tenant_id)
         if not tenant:
-            raise ValidationError({"parties": f"Tenant {p.tenant_id} not found in this organization."})
+            raise ValidationError(
+                {
+                    "error": {
+                        "code": "tenant_not_found",
+                        "message": "Tenant not found in this organization.",
+                        "details": {"tenant_id": p.tenant_id},
+                    }
+                }
+            )
 
         links.append(
             LeaseTenant(

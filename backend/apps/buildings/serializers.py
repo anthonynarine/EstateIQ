@@ -72,6 +72,10 @@ class UnitSerializer(serializers.ModelSerializer):
         - building cannot be changed after creation (prevents silent unit transfers).
     """
 
+    # Step 1: Computed/annotated fields (read-only; must be annotated in queryset)
+    is_occupied = serializers.BooleanField(read_only=True)
+    active_lease_id = serializers.IntegerField(read_only=True, allow_null=True)
+
     class Meta:
         model = Unit
         fields = [
@@ -81,10 +85,19 @@ class UnitSerializer(serializers.ModelSerializer):
             "bedrooms",
             "bathrooms",
             "sqft",
+            # Step 2: Occupancy fields
+            "is_occupied",
+            "active_lease_id",
             "created_at",
             "updated_at",
         ]
-        read_only_fields = ["id", "created_at", "updated_at"]
+        read_only_fields = [
+            "id",
+            "created_at",
+            "updated_at",
+            "is_occupied",
+            "active_lease_id",
+        ]
 
     def validate_building(self, building: Building) -> Building:
         """Validate building org membership and immutability.
@@ -107,10 +120,14 @@ class UnitSerializer(serializers.ModelSerializer):
 
         # Step 2: Prevent cross-tenant linking
         if building.organization_id != org.id:
-            raise serializers.ValidationError("Building belongs to a different organization.")
+            raise serializers.ValidationError(
+                "Building belongs to a different organization."
+            )
 
         # Step 3: Prevent changing building on update
         if self.instance is not None and building.id != self.instance.building_id:
-            raise serializers.ValidationError("Building cannot be changed after unit creation.")
+            raise serializers.ValidationError(
+                "Building cannot be changed after unit creation."
+            )
 
         return building

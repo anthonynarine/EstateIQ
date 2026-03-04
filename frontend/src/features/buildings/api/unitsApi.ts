@@ -15,17 +15,17 @@ import api from "../../../api/axios";
 export type Unit = {
   id: number;
   building: number;
-
   label: string;
+  bedrooms: number;
+  bathrooms: number;
+  sqft: number | null;
 
-  bedrooms: number | null;
-  bathrooms: number | null;
-  square_feet: number | null;
+  // Occupancy fields (computed server-side)
+  is_occupied: boolean;
+  active_lease_id: number | null;
 
-  notes?: string | null;
-
-  created_at?: string;
-  updated_at?: string;
+  created_at: string;
+  updated_at: string;
 };
 
 /**

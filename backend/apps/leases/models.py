@@ -1,4 +1,4 @@
-# Filename: backend/apps/leases/models.py
+# ✅ New Code
 from __future__ import annotations
 
 from decimal import Decimal
@@ -12,10 +12,7 @@ from apps.core.models import Organization
 
 
 class Tenant(models.Model):
-    """A tenant (person/business) scoped to an organization.
-
-    Data minimization: store only what we need (name + optional email/phone).
-    """
+    """A tenant (person/business) scoped to an organization."""
 
     organization = models.ForeignKey(
         Organization,
@@ -36,7 +33,6 @@ class Tenant(models.Model):
             models.Index(fields=["organization", "full_name"]),
         ]
         constraints = [
-            # If email is provided, enforce uniqueness within the org.
             models.UniqueConstraint(
                 fields=["organization", "email"],
                 condition=Q(email__isnull=False),
@@ -48,7 +44,6 @@ class Tenant(models.Model):
         return self.full_name
 
     def clean(self) -> None:
-        """Validate tenant fields."""
         errors = {}
 
         if self.email:
@@ -64,13 +59,18 @@ class Tenant(models.Model):
             raise ValidationError(errors)
 
     def save(self, *args, **kwargs) -> None:
-        # Step 1: enforce validation on every save
         self.full_clean()
         super().save(*args, **kwargs)
 
 
 class Lease(models.Model):
-    """A lease that ties a unit to rent terms within an organization."""
+    """A lease that ties a unit to rent terms within an organization.
+
+    Date semantics:
+      - start_date is inclusive (first day of occupancy)
+      - end_date is exclusive (move-out date; not occupied on end_date)
+      - interval is [start_date, end_date)
+    """
 
     class Status(models.TextChoices):
         DRAFT = "draft", "Draft"
@@ -120,7 +120,6 @@ class Lease(models.Model):
             models.Index(fields=["organization", "unit", "status"]),
         ]
         constraints = [
-            # Step 1: prevent double-occupancy — only one ACTIVE lease per unit per org.
             models.UniqueConstraint(
                 fields=["organization", "unit"],
                 condition=Q(status="active"),
@@ -132,17 +131,16 @@ class Lease(models.Model):
         return f"Lease(unit={self.unit_id}, status={self.status})"
 
     def clean(self) -> None:
-        """Validate org integrity + business rules."""
         errors = {}
 
-        # Step 1: hard org integrity (must match Unit.organization)
+        # Step 1: hard org integrity
         if self.unit_id and self.organization_id:
             if self.unit.organization_id != self.organization_id:
                 errors["unit"] = "Unit must belong to the same organization as the lease."
 
-        # Step 2: date rules
-        if self.end_date and self.end_date < self.start_date:
-            errors["end_date"] = "End date cannot be before start date."
+        # Step 2: date rules (end-exclusive)
+        if self.end_date and self.end_date <= self.start_date:
+            errors["end_date"] = "Move-out date must be after start date."
 
         # Step 3: money rules
         if self.rent_amount is None or self.rent_amount <= Decimal("0"):
@@ -155,7 +153,7 @@ class Lease(models.Model):
         if not (1 <= int(self.rent_due_day) <= 28):
             errors["rent_due_day"] = "Rent due day must be between 1 and 28."
 
-        # Step 5: status sanity
+        # Step 5: ended must have end_date
         if self.status == self.Status.ENDED and not self.end_date:
             errors["status"] = "Ended leases must have an end_date."
 
@@ -163,7 +161,6 @@ class Lease(models.Model):
             raise ValidationError(errors)
 
     def save(self, *args, **kwargs) -> None:
-        # Step 1: enforce validation on every save
         self.full_clean()
         super().save(*args, **kwargs)
 
@@ -215,7 +212,6 @@ class LeaseTenant(models.Model):
         return f"LeaseTenant(lease={self.lease_id}, tenant={self.tenant_id}, role={self.role})"
 
     def clean(self) -> None:
-        """Validate org consistency across the join."""
         errors = {}
 
         if self.organization_id and self.lease_id:
@@ -234,7 +230,5 @@ class LeaseTenant(models.Model):
             raise ValidationError(errors)
 
     def save(self, *args, **kwargs) -> None:
-        # Step 1: enforce validation on every save
         self.full_clean()
         super().save(*args, **kwargs)
-

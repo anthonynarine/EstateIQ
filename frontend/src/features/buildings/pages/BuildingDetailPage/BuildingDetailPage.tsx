@@ -1,89 +1,62 @@
 // # Filename: src/features/buildings/pages/BuildingDetailPage/BuildingDetailPage.tsx
 
+
 import { useMemo, useState } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
-import { useQueries } from "@tanstack/react-query";
+
 import { useOrg } from "../../../tenancy/hooks/useOrg";
 import { useBuildingQuery } from "../BuildingPage/hooks/useBuildings";
 import { useUnitsQuery } from "./hooks/useUnitsQuery";
+import { useUnitActions } from "./hooks/useUnitActions";
+
 import BuildingDetailHeader from "./components/BuildingDetailHeader";
 import BuildingUnitsSection from "./components/BuildingUnitsSection";
 import UnitCard from "./components/UnitCard";
+
 import CreateUnitForm from "./forms/CreateUnitForm";
-import { useUnitActions } from "./hooks/useUnitActions";
 import UnitEditModal from "./forms/UnitEditModal";
 import UnitDeleteConfirmModal from "./forms/UnitDeleteConfirmModal";
-import type { Lease } from "../../../leases/api/leaseApi";
-import { listLeasesByUnit } from "../../../leases/api/leaseApi";
-import { leasesByUnitQueryKey } from "../../../leases/queries/useLeasesByUnitQuery";
-import { getTodayISO, getUnitOccupancyStatus } from "../../../leases/utils/occupancy";
-
-type UnitForUi = {
-  id: number;
-  label: string | null;
-  bedrooms: number | null;
-  bathrooms: number | null;
-  sqft: number | null;
-};
 
 /**
  * BuildingDetailPage
  *
  * Orchestrator page for a single building:
  * - Fetch building + units (org-scoped)
- * - Compute occupancy per unit from lease truth (deterministic rule)
  * - Render header + units grid
- * - Keep add-unit UI state local
+ * - Occupancy is computed server-side (NO per-unit lease queries)
  * - Delegate edit/delete to `useUnitActions` (modals are presentational)
- *
- * Why lease-driven occupancy:
- * - Avoids the old "fetchUnitOccupancy not provided" hook failure
- * - Guarantees BuildingDetailPage matches Unit detail page occupancy
  */
 export default function BuildingDetailPage() {
-  // Step 1: Routing + org
+  // Step 1: Routing + org context
   const { buildingId } = useParams<{ buildingId: string }>();
   const { orgSlug } = useOrg();
   const navigate = useNavigate();
   const location = useLocation();
 
   const buildingIdNumber = Number(buildingId);
-  const canQuery = Number.isFinite(buildingIdNumber) && !!orgSlug;
+  const canQuery = Boolean(orgSlug) && Number.isFinite(buildingIdNumber);
 
-  // Step 2: UI state (Add Unit only)
+  // Step 2: Local UI state
   const [isAddUnitOpen, setIsAddUnitOpen] = useState(false);
 
-  // Step 3: Queries
+  // Step 3: Queries (org-scoped)
   const {
     data: building,
     isLoading: buildingLoading,
-    isError: buildingError,
+    isError: buildingIsError,
   } = useBuildingQuery(orgSlug, buildingIdNumber, canQuery);
 
   const {
     data: units = [],
     isLoading: unitsLoading,
-    isError: unitsError,
+    isError: unitsIsError,
   } = useUnitsQuery({
     orgSlug,
     buildingId: buildingIdNumber,
     enabled: canQuery,
   });
 
-  // Step 4: Normalize units for UI (stable shape)
-  const unitsForUi: UnitForUi[] = useMemo(
-    () =>
-      units.map((u) => ({
-        id: u.id,
-        label: u.label ?? null,
-        bedrooms: u.bedrooms ?? null,
-        bathrooms: u.bathrooms ?? null,
-        sqft: (u as any).sqft ?? (u as any).square_feet ?? null,
-      })),
-    [units]
-  );
-
-  // Step 5: Building header snapshot
+  // Step 4: Derived building header fields (stable)
   const buildingForHeader = useMemo(() => {
     if (!building) return null;
 
@@ -97,48 +70,18 @@ export default function BuildingDetailPage() {
     };
   }, [building]);
 
-  // Step 6: Lease-driven occupancy (source of truth)
-  const todayISO = useMemo(() => getTodayISO(), []);
-
-  const leaseQueries = useQueries({
-    queries: (canQuery ? unitsForUi : []).map((u) => ({
-      queryKey: leasesByUnitQueryKey(orgSlug as string, u.id),
-      queryFn: async () => {
-        const leases = await listLeasesByUnit(u.id);
-        return Array.isArray(leases) ? (leases as Lease[]) : [];
-      },
-      enabled: canQuery && Number.isFinite(u.id),
-      staleTime: 15_000,
-      gcTime: 5 * 60_000,
-      refetchOnWindowFocus: false,
-      retry: 1,
-    })),
-  });
-
-  const occupancyByUnitId = useMemo(() => {
-    const map: Record<number, boolean> = {};
-
-    unitsForUi.forEach((u, idx) => {
-      const q = leaseQueries[idx];
-      const leases = (q?.data ?? []) as Lease[];
-      map[u.id] = getUnitOccupancyStatus(leases, todayISO) === "occupied";
-    });
-
-    return map;
-  }, [leaseQueries, todayISO, unitsForUi]);
-
+  // Step 5: Derived occupancy counts (deterministic; no "Checking..." state)
   const occupiedUnitsCount = useMemo(() => {
-    return unitsForUi.filter((u) => occupancyByUnitId[u.id]).length;
-  }, [unitsForUi, occupancyByUnitId]);
+    return units.filter((u) => u.is_occupied).length;
+  }, [units]);
 
-  // Step 7: Unit edit/delete actions (modals)
+  // Step 6: Unit actions (edit/delete modals)
   const { openEdit, openDelete, editModalProps, deleteModalProps } =
     useUnitActions(buildingIdNumber);
 
-  // Step 8: Navigation
-  const goToUnit = (unit: { id: number; label: string | null }) => {
+  // Step 7: Navigate to unit detail page (preserve org querystring)
+  const goToUnit = (unit: { id: number; label: string }) => {
     const search = location.search || "";
-
     navigate(`/dashboard/units/${unit.id}${search}`, {
       state: {
         building: buildingForHeader,
@@ -147,11 +90,11 @@ export default function BuildingDetailPage() {
     });
   };
 
-  // Step 9: Guards
+  // Step 8: Guards
   if (!canQuery) {
     return (
       <div className="p-6 text-rose-300">
-        Missing org or invalid building id.
+        Missing organization context or invalid building id.
       </div>
     );
   }
@@ -160,7 +103,7 @@ export default function BuildingDetailPage() {
     return <div className="p-6 text-neutral-300">Loading building…</div>;
   }
 
-  if (buildingError || !building || !buildingForHeader) {
+  if (buildingIsError || !building || !buildingForHeader) {
     return <div className="p-6 text-rose-300">Failed to load building.</div>;
   }
 
@@ -170,13 +113,13 @@ export default function BuildingDetailPage() {
         orgSlug={orgSlug}
         building={buildingForHeader}
         occupiedUnitsCount={occupiedUnitsCount}
-        totalUnitsCount={unitsForUi.length}
+        totalUnitsCount={units.length}
       />
 
       <BuildingUnitsSection
         isLoading={unitsLoading}
-        isError={unitsError}
-        unitsCount={unitsForUi.length}
+        isError={unitsIsError}
+        unitsCount={units.length}
         isAddOpen={isAddUnitOpen}
         onToggleAdd={() => setIsAddUnitOpen((p) => !p)}
         addForm={
@@ -189,11 +132,11 @@ export default function BuildingDetailPage() {
           />
         }
         renderUnits={() =>
-          unitsForUi.map((u) => (
+          units.map((u) => (
             <UnitCard
               key={u.id}
               unit={u}
-              isOccupied={occupancyByUnitId[u.id] ?? false}
+              isOccupied={u.is_occupied}
               onOpen={() => goToUnit({ id: u.id, label: u.label })}
               onEdit={() => openEdit(u)}
               onDelete={() => openDelete(u)}
@@ -202,18 +145,19 @@ export default function BuildingDetailPage() {
         }
       />
 
-      {/* errorMessage is REQUIRED in its Props, so pass explicitly */}
+      {/* Step 9: Edit modal */}
       <UnitEditModal
         isOpen={editModalProps.isOpen}
         unitDisplayName={editModalProps.unitDisplayName}
         value={editModalProps.value}
-        isSaving={editModalProps.isSaving}
-        errorMessage={editModalProps.errorMessage ?? null}
+        onChange={editModalProps.onChange}
         onClose={editModalProps.onClose}
         onSubmit={editModalProps.onSubmit}
-        onChange={(next) => editModalProps.onChange(next)}
+        isSaving={editModalProps.isSaving}
+        errorMessage={editModalProps.errorMessage ?? null}
       />
 
+      {/* Step 10: Delete modal */}
       <UnitDeleteConfirmModal {...deleteModalProps} />
     </div>
   );

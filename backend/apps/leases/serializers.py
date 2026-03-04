@@ -1,4 +1,4 @@
-# Filename: backend/apps/leases/serializers.py
+# ✅ New Code
 from __future__ import annotations
 
 from django.core.exceptions import ValidationError as DjangoValidationError
@@ -11,6 +11,7 @@ from apps.leases.services import (
     _MISSING,
     create_lease,
     create_tenant,
+    end_lease,
     update_lease,
     update_tenant,
 )
@@ -32,12 +33,10 @@ class TenantSerializer(serializers.ModelSerializer):
         read_only_fields = ["id", "created_at", "updated_at"]
 
     def create(self, validated_data):
-        # Step 1: Org derived from request middleware
         org = self.context["request"].org
         return create_tenant(org=org, **validated_data)
 
     def update(self, instance, validated_data):
-        # Step 1: Tenant update (PATCH/PUT safe)
         return update_tenant(tenant=instance, **validated_data)
 
 
@@ -60,14 +59,7 @@ class LeasePartyDetailSerializer(serializers.ModelSerializer):
 
 
 class LeaseSerializer(serializers.ModelSerializer):
-    """Lease serializer (organization derived from request.org).
-
-    Write:
-      parties: [{ "tenant_id": 1, "role": "primary" }, ...]
-
-    Read:
-      parties_detail: [{ "tenant": {...}, "role": "primary" }, ...]
-    """
+    """Lease serializer (organization derived from request.org)."""
 
     parties = LeasePartySerializer(many=True, required=False, write_only=True)
     parties_detail = serializers.SerializerMethodField(read_only=True)
@@ -91,42 +83,37 @@ class LeaseSerializer(serializers.ModelSerializer):
         read_only_fields = ["id", "created_at", "updated_at", "parties_detail"]
 
     def get_parties_detail(self, obj: Lease):
-        # Step 1: joined tenants + roles
         qs = obj.parties.select_related("tenant").all().order_by("role", "id")
         return LeasePartyDetailSerializer(qs, many=True, context=self.context).data
 
     def validate_unit(self, unit: Unit) -> Unit:
-        # Step 1: ensure unit belongs to org boundary
         org = self.context["request"].org
         if unit.organization_id != org.id:
             raise serializers.ValidationError({"unit": ["Unit must belong to the active organization."]})
         return unit
 
-    # Step 2: Normalize service-layer Django ValidationError -> DRF ValidationError
     def _raise_service_validation(self, exc: DjangoValidationError) -> None:
-        """
-        Convert django.core.exceptions.ValidationError raised by the service layer
-        into rest_framework.serializers.ValidationError so DRF returns HTTP 400.
+        """Normalize Django ValidationError into DRF ValidationError.
 
-        The service may raise:
-          - ValidationError({"field": "message"})
-          - ValidationError({"field": ["message"]})
-          - ValidationError("message")
-
-        We normalize to DRF's expected error shape:
-          - {"field": ["message"]}
-          - {"non_field_errors": ["message"]}
+        Enterprise behavior:
+          - Preserve structured payloads when the service returns {"error": {...}}.
+          - Preserve dict values (do NOT stringify them).
         """
         if hasattr(exc, "message_dict"):
-            normalized: dict[str, list[str]] = {}
+            normalized: dict = {}
             for field, messages in exc.message_dict.items():
+                # Step 1: Preserve nested dicts (structured error payloads)
+                if isinstance(messages, dict):
+                    normalized[field] = messages
+                    continue
+
+                # Step 2: Normalize strings / lists to DRF shape
                 if isinstance(messages, (list, tuple)):
                     normalized[field] = [str(m) for m in messages]
                 else:
                     normalized[field] = [str(messages)]
             raise serializers.ValidationError(normalized)
 
-        # Fallback: plain message list
         messages = getattr(exc, "messages", None)
         if messages:
             raise serializers.ValidationError({"non_field_errors": [str(m) for m in messages]})
@@ -134,7 +121,6 @@ class LeaseSerializer(serializers.ModelSerializer):
         raise serializers.ValidationError({"non_field_errors": ["Validation error."]})
 
     def create(self, validated_data):
-        # Step 1: org derived from request
         org = self.context["request"].org
         parties_data = validated_data.pop("parties", None)
 
@@ -142,31 +128,24 @@ class LeaseSerializer(serializers.ModelSerializer):
         if parties_data is not None:
             parties = [LeasePartyInput(**p) for p in parties_data]
 
-        # Step 2: call service; return proper 400 on invariant violations
         try:
             return create_lease(org=org, parties=parties, **validated_data)
         except DjangoValidationError as exc:
             self._raise_service_validation(exc)
 
     def update(self, instance, validated_data):
-        """PATCH-safe update with explicit null support."""
-        # Step 1: org derived from request
         org = self.context["request"].org
 
-        # Step 2: parties (authoritative if provided)
         parties_data = validated_data.pop("parties", None)
         parties = None
         if parties_data is not None:
             parties = [LeasePartyInput(**p) for p in parties_data]
 
-        # Step 3: unit defaults to instance.unit if omitted
         unit = validated_data.pop("unit", None) or instance.unit
 
-        # Step 4: sentinel fields (distinguish omitted vs explicit null)
         end_date = validated_data.pop("end_date", _MISSING)
         security_deposit_amount = validated_data.pop("security_deposit_amount", _MISSING)
 
-        # Step 5: delegate to service; return proper 400 on invariant violations
         try:
             return update_lease(
                 org=org,
@@ -179,3 +158,18 @@ class LeaseSerializer(serializers.ModelSerializer):
             )
         except DjangoValidationError as exc:
             self._raise_service_validation(exc)
+
+
+class LeaseEndSerializer(serializers.Serializer):
+    """Serializer for ending a lease (move-out date, end-exclusive)."""
+
+    end_date = serializers.DateField(help_text="Move-out date (tenant does not occupy on this date).")
+
+    def save(self, **kwargs):
+        org = self.context["request"].org
+        lease: Lease = self.context["lease"]
+        try:
+            return end_lease(org=org, lease=lease, end_date=self.validated_data["end_date"])
+        except DjangoValidationError as exc:
+            # Step 1: Convert service layer errors
+            LeaseSerializer()._raise_service_validation(exc)  # reuse normalization
