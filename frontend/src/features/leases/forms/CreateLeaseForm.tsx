@@ -6,51 +6,16 @@ import { useNavigate } from "react-router-dom";
 import { useOrg } from "../../tenancy/hooks/useOrg";
 import { useCreateLeaseMutation } from "../queries/useCreateLeaseMutation";
 import { formatApiFormErrors } from "../../../api/formatApiFormErrors";
-import FormErrorSummary, { FormErrorAction } from "./FormErrorSummary";
+import FormErrorSummary from "./FormErrorSummary";
 import FormActions from "./FormActions";
 import LeaseTermsFields from "./LeaseTermsFields";
 import TenantSection from "./TenantSection/TenantSection";
 import { useCreateLeaseForm } from "./useCreateLeaseForm";
+import { useLeaseOverlapUx, type LeaseOverlapMeta } from "./useLeaseOverlapUx";
 
 type Props = {
   unitId: number;
 };
-
-type LeaseOverlapMeta = {
-  kind: "lease_overlap";
-  conflict: {
-    lease_id: number;
-    start_date: string;
-    end_date: string | null;
-    status: string;
-  };
-  suggestedStartDate: string | null;
-};
-
-// Step 1: Format YYYY-MM-DD as "May 4, 2026" (UTC-safe)
-function formatIsoDateForUi(isoDate: string): string {
-  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(isoDate);
-  if (!m) return isoDate;
-
-  const year = Number(m[1]);
-  const monthIndex = Number(m[2]) - 1;
-  const day = Number(m[3]);
-
-  const d = new Date(Date.UTC(year, monthIndex, day));
-  return d.toLocaleDateString(undefined, {
-    year: "numeric",
-    month: "short",
-    day: "numeric",
-    timeZone: "UTC",
-  });
-}
-
-function withOrg(path: string, orgSlug: string | null | undefined): string {
-  // Step 1: Append ?org= only when we have an org
-  if (!orgSlug) return path;
-  const joiner = path.includes("?") ? "&" : "?";
-  return `${path}${joiner}org=${encodeURIComponent(orgSlug)}`;
-}
 
 export default function CreateLeaseForm({ unitId }: Props) {
   const { orgSlug } = useOrg();
@@ -110,78 +75,14 @@ export default function CreateLeaseForm({ unitId }: Props) {
       ? ((normalized as any).meta as LeaseOverlapMeta)
       : null;
 
-  const errorNotes = useMemo(() => {
-    // Step 1: Status-aware explanation (includes date, formatted)
-    if (!overlapMeta) return [];
-
-    const moveOutRaw =
-      overlapMeta.suggestedStartDate ?? overlapMeta.conflict.end_date ?? null;
-
-    const moveOutPretty = moveOutRaw ? formatIsoDateForUi(moveOutRaw) : null;
-
-    if (overlapMeta.conflict.status === "ACTIVE") {
-      return [
-        moveOutPretty
-          ? `This lease is still active and reserves the unit until the move-out date (${moveOutPretty}).`
-          : "This lease is still active and reserves the unit until the move-out date.",
-      ];
-    }
-
-    if (overlapMeta.conflict.status === "ENDED") {
-      return [
-        moveOutPretty
-          ? `This lease is marked ended, but the move-out date still reserves the unit until ${moveOutPretty}.`
-          : "This lease is marked ended, but it still reserves the unit until the move-out date.",
-      ];
-    }
-
-    return [
-      moveOutPretty
-        ? `This lease reserves the unit until the move-out date (${moveOutPretty}).`
-        : "This lease reserves the unit until the move-out date.",
-    ];
-  }, [overlapMeta]);
-
-  const errorActions: FormErrorAction[] = useMemo(() => {
-    // Step 1: Only show actions for overlap errors
-    if (!overlapMeta) return [];
-
-    const actions: FormErrorAction[] = [];
-
-    if (overlapMeta.suggestedStartDate) {
-      const suggestedPretty = formatIsoDateForUi(overlapMeta.suggestedStartDate);
-
-      actions.push({
-        key: "use_suggested_start",
-        label: `Use suggested start date (${suggestedPretty})`,
-        variant: "primary",
-        onClick: () => {
-          // Step 1: Apply suggested date (keep value as ISO for inputs)
-          setStartDate(overlapMeta.suggestedStartDate as string);
-
-          // Step 2: Clear mutation error state if supported (React Query mutations)
-          if (typeof (mutation as any).reset === "function") {
-            (mutation as any).reset();
-          }
-
-          // Step 3: Hide stale API errors for clean UX
-          setHideApiErrors(true);
-        },
-      });
-    }
-
-    actions.push({
-      key: "review_conflicting_lease",
-      label: "Review conflicting lease",
-      variant: "secondary",
-      onClick: () => {
-        const leaseId = overlapMeta.conflict.lease_id;
-        navigate(withOrg(`/dashboard/leases/${leaseId}/ledger`, orgSlug));
-      },
-    });
-
-    return actions;
-  }, [navigate, orgSlug, overlapMeta, setStartDate, mutation]);
+  const { errorActions, errorNotes } = useLeaseOverlapUx({
+    overlapMeta,
+    orgSlug,
+    navigate,
+    setStartDate,
+    mutationReset: typeof (mutation as any).reset === "function" ? (mutation as any).reset : null,
+    setHideApiErrors,
+  });
 
   const handleCancel = () => {
     // Step 1: reset and close
@@ -215,7 +116,7 @@ export default function CreateLeaseForm({ unitId }: Props) {
       setHideApiErrors(false);
       setIsOpen(false);
     } catch {
-      // No-op: errors render via `error`
+      // No-op: errors render via mutation.error
     }
   };
 
@@ -279,7 +180,7 @@ export default function CreateLeaseForm({ unitId }: Props) {
             securityDeposit={securityDeposit}
             status={status}
             onStartDateChange={(v) => {
-              // Step 1: If user changes it manually, re-enable errors
+              // Step 1: Manual change = re-enable errors (prevents “hidden forever” state)
               setHideApiErrors(false);
               setStartDate(v);
             }}
