@@ -1,7 +1,6 @@
 # Filename: backend/apps/buildings/services.py
 
 from __future__ import annotations
-
 from typing import Any, Dict, TYPE_CHECKING
 from typing import Any, Mapping
 from django.core.exceptions import ValidationError

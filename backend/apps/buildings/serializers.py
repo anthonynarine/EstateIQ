@@ -1,9 +1,7 @@
 # Filename: apps/buildings/serializers.py
 
 from __future__ import annotations
-
 from rest_framework import serializers
-
 from apps.buildings.models import Building, Unit
 
 
