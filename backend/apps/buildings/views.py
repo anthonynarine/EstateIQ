@@ -1,4 +1,5 @@
-# ✅ New Code
+# Filename: apps/buildings/views.py
+
 from __future__ import annotations
 
 from django.db.models import Count, F, IntegerField, OuterRef, QuerySet, Subquery, Value, Q
@@ -12,7 +13,11 @@ from rest_framework.response import Response
 
 from apps.buildings import selectors, services
 from apps.buildings.models import Unit
-from apps.buildings.serializers import BuildingSerializer, UnitSerializer
+from apps.buildings.serializers import (
+    BuildingSerializer,
+    UnitSerializer,
+    UnitDetailSerializer,
+)
 from apps.leases import selectors as lease_selectors
 from apps.leases.models import Lease
 from apps.leases.serializers import LeaseSerializer
@@ -47,7 +52,6 @@ class BuildingViewSet(viewsets.ModelViewSet):
                 status=Lease.Status.ACTIVE,
                 start_date__lte=today,
             )
-            # end_date is exclusive => GT (not GTE)
             .filter(Q(end_date__isnull=True) | Q(end_date__gt=today))
             .values("unit__building_id")
             .annotate(c=Count("unit_id", distinct=True))
@@ -81,9 +85,19 @@ class UnitViewSet(viewsets.ModelViewSet):
     ordering_fields = ["label", "bedrooms", "bathrooms", "sqft", "created_at", "updated_at", "id"]
     ordering = ["id"]
 
+    def get_serializer_class(self):
+        """Use a richer serializer for retrieve views only."""
+        if self.action == "retrieve":
+            return UnitDetailSerializer
+        return UnitSerializer
+
     def get_queryset(self) -> QuerySet[Unit]:
         org = self.request.org
-        qs = selectors.units_qs_for_org(org=org).order_by("id")
+        qs = (
+            selectors.units_qs_for_org(org=org)
+            .select_related("building")
+            .order_by("id")
+        )
 
         building_param = self.request.query_params.get("building")
         if building_param:
@@ -124,7 +138,6 @@ class UnitViewSet(viewsets.ModelViewSet):
                 status=Lease.Status.ACTIVE,
                 start_date__lte=today,
             )
-            # end_date is exclusive => GT (not GTE)
             .filter(Q(end_date__isnull=True) | Q(end_date__gt=today))
             .exists()
         )

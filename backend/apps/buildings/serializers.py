@@ -129,3 +129,43 @@ class UnitSerializer(serializers.ModelSerializer):
             )
 
         return building
+    
+    
+class BuildingSummarySerializer(serializers.ModelSerializer):
+    """Small nested building representation for unit detail responses."""
+
+    class Meta:
+        model = Building
+        fields = ["id", "name"]
+
+class UnitDetailSerializer(UnitSerializer):
+    """Detailed unit serializer for retrieve views.
+
+    This keeps the base UnitSerializer lean for list/create/update while
+    allowing the unit detail page to receive the parent building summary
+    needed for deterministic navigation and header rendering.
+    """
+
+    building = BuildingSummarySerializer(read_only=True)
+
+    class Meta(UnitSerializer.Meta):
+        fields = [
+            "id",
+            "building",
+            "label",
+            "bedrooms",
+            "bathrooms",
+            "sqft",
+            "is_occupied",
+            "active_lease_id",
+            "created_at",
+            "updated_at",
+        ]
+        read_only_fields = [
+            "id",
+            "building",
+            "created_at",
+            "updated_at",
+            "is_occupied",
+            "active_lease_id",
+        ]
