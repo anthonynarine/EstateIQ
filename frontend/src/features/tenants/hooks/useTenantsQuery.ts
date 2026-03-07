@@ -1,73 +1,71 @@
 // # Filename: src/features/tenants/hooks/useTenantsQuery.ts
 
 import { useQuery } from "@tanstack/react-query";
+
 import { listTenants } from "../api/tenantsApi";
-import type { Tenant } from "../api/types";
+import type { PaginatedResponse, Tenant, TenantListParams } from "../api/types";
+import { tenantQueryKeys } from "../utils/tenantQueryKeys";
 
 /**
- * tenantsQueryKey
+ * UseTenantsQueryParams
  *
- * Canonical query key for the tenant directory within an organization.
+ * Input contract for the tenant directory query hook.
  *
- * Shape:
- *   ["org", orgSlug, "tenants"]
- *
- * Why:
- * - Keeps all org-scoped cache keys consistent
- * - Prevents cross-tenant cache bleed
- * - Gives mutations one exact key to invalidate
+ * Why this shape matters:
+ * - Keeps org scoping explicit.
+ * - Makes pagination and search part of the cache key.
+ * - Prevents page/search state from being hidden in component internals.
  */
-export function tenantsQueryKey(orgSlug: string) {
-  // Step 1: Return canonical org-scoped key
-  return ["org", orgSlug, "tenants"] as const;
-}
+type UseTenantsQueryParams = {
+  orgSlug: string;
+  page?: number;
+  pageSize?: number;
+  search?: string;
+};
 
 /**
  * useTenantsQuery
  *
- * TanStack Query hook for tenant directory data.
+ * Fetches the paginated tenant directory for the given organization.
  *
- * Responsibilities:
- * - Fetch tenants for the active org
- * - Cache the response by orgSlug
- * - Expose loading/error state to the UI
+ * Returns a DRF-style paginated envelope:
+ * {
+ *   count,
+ *   next,
+ *   previous,
+ *   results
+ * }
+ *
+ * Mobile/UI note:
+ * - placeholderData preserves previous page results while the next page loads.
  */
-export function useTenantsQuery(orgSlug: string) {
-  // Step 1: Guard execution until org context exists
-  const canFetch = Boolean(orgSlug);
+export function useTenantsQuery({
+  orgSlug,
+  page = 1,
+  pageSize = 12,
+  search = "",
+}: UseTenantsQueryParams) {
+  const trimmedSearch = search.trim();
 
-  return useQuery<Tenant[], Error>({
-    // Step 2: Use canonical query key
-    queryKey: canFetch
-      ? tenantsQueryKey(orgSlug)
-      : (["org", "missing-org", "tenants"] as const),
-
-    // Step 3: Fetch function
+  return useQuery<PaginatedResponse<Tenant>, Error>({
+    queryKey: tenantQueryKeys.list({
+      orgSlug,
+      page,
+      pageSize,
+      search: trimmedSearch,
+    }),
     queryFn: async () => {
-      if (!orgSlug) {
-        return [];
-      }
+      // Step 1: Build the API params contract
+      const params: TenantListParams = {
+        page,
+        page_size: pageSize,
+        search: trimmedSearch || undefined,
+      };
 
-      return await listTenants(orgSlug);
+      // Step 2: Fetch the org-scoped paginated tenant list
+      return await listTenants(orgSlug, params);
     },
-
-    // Step 4: Execution gate
-    enabled: canFetch,
-
-    // Step 5: Reasonable freshness for CRUD directory UX
-    staleTime: 30_000,
-    gcTime: 5 * 60_000,
-
-    // Step 6: UX improvements
-    refetchOnWindowFocus: false,
-    retry: (failureCount, error) => {
-      const message = String(error?.message ?? "");
-
-      if (message.includes("401") || message.includes("403")) {
-        return false;
-      }
-
-      return failureCount < 2;
-    },
+    enabled: Boolean(orgSlug),
+    placeholderData: (previousData) => previousData,
   });
 }

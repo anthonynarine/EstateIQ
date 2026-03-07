@@ -1,7 +1,7 @@
 // # Filename: src/features/leases/forms/TenantSection/TenantSelectPanel.tsx
 
 
-import TenantSelect from "../../../tenants/components/TenantSelect";
+import TenantSelect from "../../../tenants/components/selectors//TenantSelect";
 
 type Props = {
   // Step 1: Org context

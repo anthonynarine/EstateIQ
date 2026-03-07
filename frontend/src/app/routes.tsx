@@ -13,7 +13,7 @@ import DashboardLayout from "../layout/DashboardLayout";
 
 import DashboardPage from "../features/tenancy/pages/DashboardPage";
 import TenancyPage from "../features/tenancy/pages/TenancyPage";
-import TenantsPage from "../features/tenants/pages/TenantPage";
+import TenantsPage from "../features/tenants/pages/TenantsPage";
 import UnitLeasesPage from "../features/tenancy/pages/UnitLeasesPage";
 import LeaseLedgerPage from "../features/finance/pages/LeaseLedgerPage";
 

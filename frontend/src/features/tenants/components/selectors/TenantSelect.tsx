@@ -1,22 +1,28 @@
 // # Filename: src/features/tenants/components/TenantSelect.tsx
+
 import { useMemo } from "react";
-import { useTenantsQuery } from "../hooks/useTenantsQuery";
+import { useTenantsQuery } from "../../hooks/useTenantsQuery";
 
 /**
  * TenantSelect
  *
  * Purpose:
  * - Lets the user choose the PRIMARY tenant for a lease.
- * - Reads tenants from the org-scoped TanStack Query cache.
+ * - Reads tenants from the org-scoped tenant directory query.
  *
  * Why this is its own component:
- * - CreateLeaseForm and EditLeaseModal will both need the same picker.
+ * - CreateLeaseForm and EditLeaseModal can share the same picker.
  * - Keeps org-scoping + loading/error UI standardized in one place.
  *
  * Behavior:
  * - Shows a select dropdown.
  * - Supports "no tenant selected" (tenantId = null).
  * - Emits selected tenantId via onChange.
+ *
+ * Note:
+ * - For now, this reads from the first page of the tenant directory.
+ * - If the tenant directory becomes very large, this should move to a
+ *   dedicated lightweight tenant-picker endpoint or searchable async select.
  */
 type Props = {
   orgSlug: string;
@@ -33,15 +39,20 @@ export default function TenantSelect({
   label = "Primary tenant",
   helperText = "Select the tenant for this lease (optional for now).",
 }: Props) {
-  const { data, isLoading, isError, error, refetch } = useTenantsQuery(orgSlug);
+  const { data, isLoading, isError, error, refetch } = useTenantsQuery({
+    orgSlug,
+    page: 1,
+    pageSize: 100,
+    search: "",
+  });
 
   // Step 1: Stable sorting for dropdown UX
   const options = useMemo(() => {
-    const tenants = data ?? [];
+    const tenants = data?.results ?? [];
     return [...tenants].sort((a, b) => a.full_name.localeCompare(b.full_name));
   }, [data]);
 
-  // Step 2: Render states (enterprise: helpful, not noisy)
+  // Step 2: Render states
   if (isLoading) {
     return (
       <div className="rounded-2xl border border-white/10 bg-white/5 p-3">
@@ -72,23 +83,25 @@ export default function TenantSelect({
 
   return (
     <div className="rounded-2xl border border-white/10 bg-white/5 p-3">
-      <label className="block text-xs font-medium text-white/80">{label}</label>
+      <label className="block text-xs font-medium text-white/80">
+        {label}
+      </label>
 
       <select
         className="mt-2 w-full rounded-xl border border-white/10 bg-black/20 px-3 py-2 text-sm text-white outline-none focus:border-white/20"
         value={tenantId ?? ""}
         onChange={(e) => {
-          // Step 3: Convert empty option -> null (no tenant)
+          // Step 3: Convert empty option -> null
           const raw = e.target.value;
           onChange(raw === "" ? null : Number(raw));
         }}
       >
         <option value="">No tenant selected</option>
 
-        {options.map((t) => (
-          <option key={t.id} value={t.id}>
-            {t.full_name}
-            {t.email ? ` — ${t.email}` : ""}
+        {options.map((tenant) => (
+          <option key={tenant.id} value={tenant.id}>
+            {tenant.full_name}
+            {tenant.email ? ` — ${tenant.email}` : ""}
           </option>
         ))}
       </select>
