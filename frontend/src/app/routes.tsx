@@ -12,7 +12,8 @@ import RequireAuth from "../auth/requireAuth";
 import DashboardLayout from "../layout/DashboardLayout";
 
 import DashboardPage from "../features/tenancy/pages/DashboardPage";
-import TenantsPage from "../features/tenancy/pages/TenantsPage";
+import TenancyPage from "../features/tenancy/pages/TenancyPage";
+import TenantsPage from "../features/tenants/pages/TenantPage";
 import UnitLeasesPage from "../features/tenancy/pages/UnitLeasesPage";
 import LeaseLedgerPage from "../features/finance/pages/LeaseLedgerPage";
 
@@ -30,11 +31,9 @@ export const routes = createBrowserRouter([
         children: [
           { index: true, element: <Navigate to="/dashboard" replace /> },
 
-          // Public
           { path: "login", element: <LoginPage /> },
           { path: "register", element: <RegisterPage /> },
 
-          // Protected Dashboard
           {
             path: "dashboard",
             element: (
@@ -45,20 +44,18 @@ export const routes = createBrowserRouter([
             children: [
               { index: true, element: <DashboardPage /> },
 
-              // Tenancy
+              // Tenancy app workspace
+              { path: "tenancy", element: <TenancyPage /> },
+
+              // Tenant domain workspace
               { path: "tenants", element: <TenantsPage /> },
 
-              // Unit detail (Lease creation + list lives here)
               { path: "units/:unitId", element: <UnitDetailPage /> },
-
-              // Existing (you can keep this for now; we may retire later)
               { path: "units/:unitId/leases", element: <UnitLeasesPage /> },
 
-              // Properties (Buildings → Units)
               { path: "buildings", element: <BuildingsPage /> },
               { path: "buildings/:buildingId", element: <BuildingDetailPage /> },
 
-              // Finance
               { path: "leases/:leaseId/ledger", element: <LeaseLedgerPage /> },
             ],
           },

@@ -1,41 +1,29 @@
 // # Filename: src/features/leases/forms/TenantSection/TenantModeToggle.tsx
+// ✅ New Code
 
 import type { TenantMode } from "./tenantTypes";
 
 type Props = {
-  // Step 1: Current mode
   mode: TenantMode;
-
-  // Step 2: Mode setter
   onModeChange: (mode: TenantMode) => void;
 };
 
 /**
  * TenantModeToggle
  *
- * Presentational toggle that switches between:
- * - selecting an existing tenant
- * - creating a new tenant inline
- *
- * Responsibilities:
- * - Render the toggle UI
- * - Emit mode changes upward
- *
- * Non-responsibilities:
- * - No tenant draft state
- * - No API calls
+ * Premium segmented control for switching tenant entry mode.
  */
 export default function TenantModeToggle({ mode, onModeChange }: Props) {
   return (
-    <div className="flex gap-2">
+    <div className="inline-flex w-fit rounded-2xl border border-neutral-800 bg-neutral-950 p-1">
       <button
         type="button"
         onClick={() => onModeChange("select")}
         className={[
-          "rounded-lg border px-3 py-1.5 text-xs",
+          "rounded-xl px-4 py-2 text-sm font-medium transition",
           mode === "select"
-            ? "border-neutral-600 bg-white/10 text-white"
-            : "border-neutral-800 bg-neutral-950 text-neutral-300 hover:bg-neutral-900",
+            ? "bg-white/10 text-white shadow-[0_0_0_1px_rgba(255,255,255,0.04)]"
+            : "text-neutral-400 hover:text-neutral-200",
         ].join(" ")}
       >
         Select existing
@@ -45,10 +33,10 @@ export default function TenantModeToggle({ mode, onModeChange }: Props) {
         type="button"
         onClick={() => onModeChange("create")}
         className={[
-          "rounded-lg border px-3 py-1.5 text-xs",
+          "rounded-xl px-4 py-2 text-sm font-medium transition",
           mode === "create"
-            ? "border-neutral-600 bg-white/10 text-white"
-            : "border-neutral-800 bg-neutral-950 text-neutral-300 hover:bg-neutral-900",
+            ? "bg-white/10 text-white shadow-[0_0_0_1px_rgba(255,255,255,0.04)]"
+            : "text-neutral-400 hover:text-neutral-200",
         ].join(" ")}
       >
         Create new

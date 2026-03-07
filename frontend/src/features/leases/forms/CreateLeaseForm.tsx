@@ -1,22 +1,33 @@
 // # Filename: src/features/leases/forms/CreateLeaseForm.tsx
 
 
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { useOrg } from "../../tenancy/hooks/useOrg";
-import { useCreateLeaseMutation } from "../queries/useCreateLeaseMutation";
+
 import { formatApiFormErrors } from "../../../api/formatApiFormErrors";
-import FormErrorSummary from "./FormErrorSummary";
+import { useOrg } from "../../tenancy/hooks/useOrg";
 import FormActions from "./FormActions";
+import FormErrorSummary from "./FormErrorSummary";
 import LeaseTermsFields from "./LeaseTermsFields";
 import TenantSection from "./TenantSection/TenantSection";
 import { useCreateLeaseForm } from "./useCreateLeaseForm";
 import { useLeaseOverlapUx, type LeaseOverlapMeta } from "./useLeaseOverlapUx";
+import { useCreateLeaseMutation } from "../queries/useCreateLeaseMutation";
 
 type Props = {
   unitId: number;
 };
 
+/**
+ * CreateLeaseForm
+ *
+ * Premium lease-creation workspace for a unit.
+ *
+ * Responsibilities:
+ * - Own expand/collapse state
+ * - Own local orchestration for create-lease submission
+ * - Delegate tenant and lease-term rendering to presentational sections
+ */
 export default function CreateLeaseForm({ unitId }: Props) {
   const { orgSlug } = useOrg();
   const navigate = useNavigate();
@@ -51,6 +62,7 @@ export default function CreateLeaseForm({ unitId }: Props) {
     buildPayload,
     enterCreateTenantMode,
     selectExistingTenant,
+    setTenantMode,
   } = useCreateLeaseForm();
 
   const canRender =
@@ -80,19 +92,22 @@ export default function CreateLeaseForm({ unitId }: Props) {
     orgSlug,
     navigate,
     setStartDate,
-    mutationReset: typeof (mutation as any).reset === "function" ? (mutation as any).reset : null,
+    mutationReset:
+      typeof (mutation as any).reset === "function"
+        ? (mutation as any).reset
+        : null,
     setHideApiErrors,
   });
 
   const handleCancel = () => {
-    // Step 1: reset and close
+    // Step 1: Reset and close
     reset();
     setHideApiErrors(false);
     setIsOpen(false);
   };
 
   const handleSubmit = async () => {
-    // Step 1: show API errors again for fresh attempt
+    // Step 1: Show API errors again for fresh attempt
     setHideApiErrors(false);
 
     if (!orgSlug) {
@@ -116,47 +131,55 @@ export default function CreateLeaseForm({ unitId }: Props) {
       setHideApiErrors(false);
       setIsOpen(false);
     } catch {
-      // No-op: errors render via mutation.error
+      // Step 2: No-op
+      // Errors render through mutation.error
     }
   };
 
   if (!canRender) {
     return (
-      <div className="rounded-xl border border-red-500/30 bg-red-500/5 p-4 text-sm text-red-300">
+      <div className="rounded-2xl border border-red-500/30 bg-red-500/5 p-4 text-sm text-red-300">
         Cannot create a lease without a selected org and a valid unit.
       </div>
     );
   }
 
   return (
-    <div className="space-y-3">
-      <div className="flex items-start justify-between gap-3">
-        <div className="min-w-0">
-          <div className="text-sm font-semibold text-white">Lease</div>
-          <div className="text-xs text-neutral-400">
-            Create a lease for this unit (org-scoped).
+    <section className="overflow-hidden rounded-3xl border border-neutral-800/80 bg-neutral-950 shadow-[0_0_0_1px_rgba(255,255,255,0.02)]">
+      <div className="border-b border-neutral-800/80 px-5 py-4 sm:px-6">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+          <div className="space-y-1">
+            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-neutral-500">
+              Lease creation
+            </p>
+            <h3 className="text-xl font-semibold tracking-tight text-white">
+              Lease
+            </h3>
+            <p className="text-sm text-neutral-400">
+              Create a lease for this unit and optionally attach a tenant inline.
+            </p>
           </div>
-        </div>
 
-        <button
-          type="button"
-          onClick={() => setIsOpen((v) => !v)}
-          className="shrink-0 rounded-lg border border-neutral-700 bg-neutral-950 px-3 py-1.5 text-xs text-neutral-200 hover:bg-neutral-900"
-        >
-          {isOpen ? "Close" : "Add lease"}
-        </button>
+          <button
+            type="button"
+            onClick={() => setIsOpen((value) => !value)}
+            className="w-fit rounded-xl border border-neutral-700 bg-neutral-900 px-4 py-2 text-sm font-medium text-neutral-100 transition hover:border-neutral-600 hover:bg-neutral-800"
+          >
+            {isOpen ? "Close" : "Add lease"}
+          </button>
+        </div>
       </div>
 
       {isOpen ? (
-        <div className="space-y-4 rounded-xl border border-neutral-800 bg-neutral-950 p-4">
+        <div className="space-y-6 px-5 py-5 sm:px-6 sm:py-6">
           {localError ? (
-            <div className="rounded-lg border border-red-500/30 bg-red-500/5 p-3 text-xs text-red-200">
+            <div className="rounded-2xl border border-red-500/30 bg-red-500/5 p-4 text-sm text-red-200">
               {localError}
             </div>
           ) : null}
 
           <FormErrorSummary
-            title="Validation error"
+            title="Lease submission blocked"
             errors={formErrors}
             actions={errorActions}
             notes={errorNotes}
@@ -170,6 +193,7 @@ export default function CreateLeaseForm({ unitId }: Props) {
             enterCreateTenantMode={enterCreateTenantMode}
             selectExistingTenant={selectExistingTenant}
             onCreateDraftChange={setTenantCreateDraft}
+            onTenantModeChange={setTenantMode}
           />
 
           <LeaseTermsFields
@@ -179,10 +203,10 @@ export default function CreateLeaseForm({ unitId }: Props) {
             rentDueDay={rentDueDay}
             securityDeposit={securityDeposit}
             status={status}
-            onStartDateChange={(v) => {
-              // Step 1: Manual change = re-enable errors (prevents “hidden forever” state)
+            onStartDateChange={(value) => {
+              // Step 1: Manual change should re-enable API errors
               setHideApiErrors(false);
-              setStartDate(v);
+              setStartDate(value);
             }}
             onEndDateChange={setEndDate}
             onRentAmountChange={setRentAmount}
@@ -192,13 +216,15 @@ export default function CreateLeaseForm({ unitId }: Props) {
             fieldErrors={fieldErrors}
           />
 
-          <FormActions
-            isPending={isPending}
-            onCancel={handleCancel}
-            onSubmit={handleSubmit}
-          />
+          <div className="border-t border-neutral-800/80 pt-5">
+            <FormActions
+              isPending={isPending}
+              onCancel={handleCancel}
+              onSubmit={handleSubmit}
+            />
+          </div>
         </div>
       ) : null}
-    </div>
+    </section>
   );
 }

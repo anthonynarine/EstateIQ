@@ -1,5 +1,4 @@
 // # Filename: src/features/buildings/pages/BuildingPage/BuildingsPage.tsx
-// ✅ New Code
 
 import type React from "react";
 import { useMemo, useState } from "react";
@@ -21,7 +20,7 @@ type DRFPaginated<T> = {
 };
 
 const PAGE_CONTAINER_CLASS =
-  "mx-auto w-full px-4 py-6 max-w-[980px] lg:max-w-[1200px] lg:px-6 2xl:max-w-[1400px]";
+  "mx-auto w-full max-w-6xl px-4 py-6 sm:px-6 lg:px-8";
 
 const EMPTY_FORM: BuildingFormValue = {
   name: "",
@@ -76,28 +75,29 @@ function normalizeCreatePayload(v: BuildingFormValue): CreateBuildingInput {
  *
  * Orchestrator-only page:
  * - Fetch buildings
- * - Create building (inline form)
- * - Delegate edit/delete to `useBuildingActions`
+ * - Create building
+ * - Delegate edit/delete modal behavior to useBuildingActions
  */
 export default function BuildingsPage() {
   const { orgSlug } = useOrg();
   const hasOrg = Boolean(orgSlug);
 
-  // Step 1: Server state (org-scoped)
+  // Step 1: Server state
   const buildingsQuery = useBuildingsQuery(orgSlug);
   const createMutation = useCreateBuildingMutation(orgSlug);
 
-  // ✅ New Code: page-level building actions (edit/delete)
-  const { openEdit, openDelete, editModalProps, deleteModalProps } = useBuildingActions(orgSlug);
+  // Step 2: Edit/delete orchestration
+  const { openEdit, openDelete, editModalProps, deleteModalProps } =
+    useBuildingActions(orgSlug);
 
-  // Step 2: UI state (create only)
+  // Step 3: Local create-form state
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [form, setForm] = useState<BuildingFormValue>(EMPTY_FORM);
   const [formErrors, setFormErrors] = useState<
     Partial<Record<keyof BuildingFormValue, string>>
   >({});
 
-  // Step 3: Normalize DRF response shape (array vs {results})
+  // Step 4: Normalize DRF response shape
   const buildingsRaw =
     buildingsQuery.data as Building[] | DRFPaginated<Building> | undefined;
 
@@ -111,11 +111,16 @@ export default function BuildingsPage() {
     return [...list].sort((a, b) => a.name.localeCompare(b.name));
   }, [buildingsRaw]);
 
-  // Step 4: Error formatting
-  const listErrorText = buildingsQuery.error ? formatApiError(buildingsQuery.error) : null;
-  const createErrorText = createMutation.error ? formatApiError(createMutation.error) : null;
+  // Step 5: Error formatting
+  const listErrorText = buildingsQuery.error
+    ? formatApiError(buildingsQuery.error)
+    : null;
 
-  // Step 5: Field setter (matches CreateBuildingForm contract)
+  const createErrorText = createMutation.error
+    ? formatApiError(createMutation.error)
+    : null;
+
+  // Step 6: Controlled field setter
   function updateField<K extends keyof BuildingFormValue>(
     key: K,
     value: BuildingFormValue[K]
@@ -130,12 +135,13 @@ export default function BuildingsPage() {
     });
   }
 
-  // Step 6: Submit
+  // Step 7: Submit create form
   const handleSubmit: React.FormEventHandler<HTMLFormElement> = async (e) => {
     e.preventDefault();
 
     const errors = validateForm(form);
     setFormErrors(errors);
+
     if (Object.keys(errors).length > 0) return;
 
     const payload = normalizeCreatePayload(form);
@@ -146,30 +152,37 @@ export default function BuildingsPage() {
     setIsCreateOpen(false);
   };
 
-  // Step 7: Org guard
+  // Step 8: Org guard
   if (!hasOrg) {
     return (
       <div className={PAGE_CONTAINER_CLASS}>
-        <div className="rounded-2xl border border-white/10 bg-white/5 p-5">
-          <h1 className="text-lg font-semibold text-white">Buildings</h1>
-          <p className="mt-2 text-sm text-white/70">
-            Select an organization first. This page is org-scoped.
-          </p>
-        </div>
+        <section className="rounded-3xl border border-neutral-800/80 bg-neutral-950 shadow-[0_0_0_1px_rgba(255,255,255,0.02)]">
+          <div className="p-5 sm:p-6">
+            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-neutral-500">
+              Organization required
+            </p>
+            <h1 className="mt-2 text-2xl font-semibold tracking-tight text-white">
+              Buildings
+            </h1>
+            <p className="mt-2 text-sm text-neutral-400">
+              Select an organization first. This page is org-scoped.
+            </p>
+          </div>
+        </section>
       </div>
     );
   }
 
   return (
     <div className={PAGE_CONTAINER_CLASS}>
-      <BuildingHeader
-        orgSlug={orgSlug}
-        isCreateOpen={isCreateOpen}
-        onToggleCreate={() => setIsCreateOpen((v) => !v)}
-      />
+      <div className="space-y-6">
+        <BuildingHeader
+          orgSlug={orgSlug}
+          isCreateOpen={isCreateOpen}
+          onToggleCreate={() => setIsCreateOpen((v) => !v)}
+        />
 
-      {isCreateOpen ? (
-        <div className="mt-5">
+        {isCreateOpen ? (
           <CreateBuildingForm
             value={form}
             errors={formErrors}
@@ -183,10 +196,8 @@ export default function BuildingsPage() {
             isSubmitting={createMutation.isPending}
             errorText={createErrorText}
           />
-        </div>
-      ) : null}
+        ) : null}
 
-      <div className="mt-5 space-y-3">
         {listErrorText ? (
           <div className="rounded-2xl border border-red-500/30 bg-red-500/10 p-4 text-sm text-red-200">
             {listErrorText}
@@ -197,13 +208,11 @@ export default function BuildingsPage() {
           buildings={buildings}
           isLoading={buildingsQuery.isLoading}
           isFetching={buildingsQuery.isFetching}
-          // ✅ New Code
           onEdit={openEdit}
           onDelete={openDelete}
         />
       </div>
 
-      {/* ✅ New Code: modals (pure presentational) */}
       <BuildingEditModal {...editModalProps} />
       <BuildingDeleteConfirmModal {...deleteModalProps} />
     </div>

@@ -1,19 +1,15 @@
 // # Filename: src/features/buildings/pages/BuildingPage/components/BuildingCard.tsx
-
+// ✅ New Code
 
 import { useCallback } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
-import { Pencil, Trash2 } from "lucide-react";
+import { Pencil, Trash2, ArrowRight } from "lucide-react";
 import type { Building } from "../../../api/buildingsApi";
 
 type Props = {
   building: Building;
-
-  //optional actions
   onEdit?: (building: Building) => void;
   onDelete?: (building: Building) => void;
-
-  // allow parent to disable delete if needed
   disableDelete?: boolean;
 };
 
@@ -23,14 +19,10 @@ type Props = {
  * Presentational + navigation card for a Building record.
  *
  * Responsibilities:
- * - Display building address + summary counts (units/occupied/vacant)
- * - Provide "View units" navigation
- * - Provide optional edit/delete icon actions (delegated to parent orchestration)
- *
- * Non-responsibilities:
- * - No data fetching
- * - No mutation calls
- * - No org scoping logic
+ * - Display building identity and address
+ * - Display summary chips
+ * - Navigate to the building detail workspace
+ * - Delegate edit/delete actions to parent orchestration
  */
 export default function BuildingCard({
   building,
@@ -41,7 +33,6 @@ export default function BuildingCard({
   const navigate = useNavigate();
   const location = useLocation();
 
-  // Step 1: Pull summary counts from API (safe defaults for old cached shapes)
   const summary = building as Building & {
     units_count?: number;
     occupied_units_count?: number;
@@ -53,18 +44,14 @@ export default function BuildingCard({
   const vacantCount =
     summary.vacant_units_count ?? Math.max(0, unitsCount - occupiedCount);
 
-  // Step 2: Keep org selection stable by preserving ?org=<slug>
   const onViewUnits = useCallback(() => {
     navigate({
       pathname: `/dashboard/buildings/${building.id}`,
       search: location.search,
-      // Step 2b: Pass a snapshot so the detail page can render address instantly.
-      // NOTE: Route state is not persisted on refresh.
       state: { building },
     });
   }, [building, location.search, navigate]);
 
-  // icon handlers
   const handleEdit = useCallback(
     (e: React.MouseEvent) => {
       e.stopPropagation();
@@ -82,7 +69,6 @@ export default function BuildingCard({
     [building, disableDelete, onDelete]
   );
 
-  // Step 3: Chip component (matches Unit chips more closely)
   const Chip = ({
     label,
     value,
@@ -93,12 +79,12 @@ export default function BuildingCard({
     variant?: "neutral" | "occupied" | "vacant";
   }) => {
     const base =
-      "inline-flex items-center rounded-full px-3 py-1 text-xs font-medium border";
+      "inline-flex items-center rounded-full px-3 py-1 text-xs font-medium ring-1";
 
     const styles: Record<typeof variant, string> = {
-      neutral: "border-white/10 bg-white/5 text-white/80",
-      occupied: "border-emerald-400/25 bg-emerald-500/10 text-emerald-200",
-      vacant: "border-red-400/25 bg-red-500/10 text-red-200",
+      neutral: "bg-white/5 text-neutral-200 ring-white/10",
+      occupied: "bg-emerald-500/10 text-emerald-300 ring-emerald-400/20",
+      vacant: "bg-rose-500/10 text-rose-300 ring-rose-400/20",
     };
 
     return (
@@ -109,26 +95,27 @@ export default function BuildingCard({
   };
 
   return (
-    <div className="w-full rounded-2xl border border-white/10 bg-white/5 p-4 lg:p-5">
-      <div className="flex items-start justify-between gap-3">
-        <div className="min-w-0">
-          <h3 className="truncate text-base font-semibold text-white">
-            {building.name}
-          </h3>
+    <article className="rounded-2xl border border-white/10 bg-white/5 p-5 shadow-[0_0_0_1px_rgba(255,255,255,0.03)]">
+      <div className="flex items-start justify-between gap-4">
+        <div className="min-w-0 space-y-3">
+          <div className="space-y-1">
+            <h3 className="truncate text-xl font-semibold tracking-tight text-white">
+              {building.name}
+            </h3>
 
-          <p className="mt-1 truncate text-sm text-white/70">
-            {building.address_line1}
-            {building.address_line2 ? `, ${building.address_line2}` : ""}
-          </p>
+            <p className="truncate text-sm text-neutral-300">
+              {building.address_line1}
+              {building.address_line2 ? `, ${building.address_line2}` : ""}
+            </p>
 
-          <p className="truncate text-sm text-white/60">
-            {building.city}, {building.state} {building.postal_code}
-          </p>
+            <p className="truncate text-sm text-neutral-400">
+              {building.city}, {building.state} {building.postal_code}
+            </p>
+          </div>
 
-          {/* Step 4: Summary chips */}
-          <div className="mt-3 flex flex-wrap gap-2">
+          <div className="flex flex-wrap gap-2">
             {unitsCount === 0 ? (
-              <span className="inline-flex items-center rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs font-medium text-white/80">
+              <span className="inline-flex items-center rounded-full bg-white/5 px-3 py-1 text-xs font-medium text-neutral-200 ring-1 ring-white/10">
                 No units added
               </span>
             ) : (
@@ -141,14 +128,13 @@ export default function BuildingCard({
           </div>
         </div>
 
-        {/* icon actions (top-right) */}
         {onEdit || onDelete ? (
-          <div className="flex items-center gap-2">
+          <div className="flex shrink-0 items-center gap-2">
             {onEdit ? (
               <button
                 type="button"
                 onClick={handleEdit}
-                className="inline-flex h-9 w-9 items-center justify-center rounded-full bg-white/5 ring-1 ring-white/10 hover:bg-white/10"
+                className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-white/5 ring-1 ring-white/10 transition hover:bg-white/10"
                 title="Edit building"
               >
                 <Pencil className="h-4 w-4 text-neutral-200" />
@@ -160,11 +146,7 @@ export default function BuildingCard({
                 type="button"
                 onClick={handleDelete}
                 disabled={disableDelete}
-                className={[
-                  "inline-flex h-9 w-9 items-center justify-center rounded-full",
-                  "bg-white/5 ring-1 ring-white/10 hover:bg-white/10",
-                  "disabled:cursor-not-allowed disabled:opacity-40",
-                ].join(" ")}
+                className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-white/5 ring-1 ring-white/10 transition hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-40"
                 title={
                   disableDelete
                     ? "Cannot delete this building right now."
@@ -178,15 +160,22 @@ export default function BuildingCard({
         ) : null}
       </div>
 
-      <div className="mt-3 flex justify-end">
-        <button
-          type="button"
-          onClick={onViewUnits}
-          className="rounded-xl border border-white/15 bg-transparent px-3 py-1.5 text-xs text-white/80 hover:bg-white/5"
-        >
-          View units
-        </button>
+      <div className="mt-5 border-t border-white/10 pt-4">
+        <div className="flex items-center justify-between gap-4">
+          <p className="max-w-xl text-sm text-neutral-400">
+            Open this building to manage units and lease activity.
+          </p>
+
+          <button
+            type="button"
+            onClick={onViewUnits}
+            className="inline-flex shrink-0 items-center gap-2 text-sm font-medium text-neutral-100 transition hover:text-white"
+          >
+            View units
+            <ArrowRight className="h-4 w-4" />
+          </button>
+        </div>
       </div>
-    </div>
+    </article>
   );
 }

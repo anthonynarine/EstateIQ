@@ -6,7 +6,6 @@ import { useCallback, useMemo, useState } from "react";
 import { useOrg } from "../../../../tenancy/hooks/useOrg";
 import { useCreateUnitMutation } from "../hooks/useCreateUnitMutation";
 
-
 /**
  * CreateUnitFormProps
  *
@@ -15,10 +14,10 @@ import { useCreateUnitMutation } from "../hooks/useCreateUnitMutation";
  *
  * variant:
  * - "standalone": renders its own header + internal open/close toggle (default)
- * - "inline": renders only the form body (no header, no toggle). Parent controls visibility.
+ * - "inline": renders only the form body shell. Parent controls visibility.
  *
  * orgSlug:
- * - Optional. If not provided, we fallback to OrgProvider via `useOrg()`.
+ * - Optional. If not provided, fallback to OrgProvider via `useOrg()`.
  *
  * onSuccess:
  * - Called after successful creation. Use this to close parent dropdown.
@@ -54,7 +53,7 @@ function parseNullableNumber(value: string): number | null {
   // Step 2: Numeric conversion
   const n = Number(value);
 
-  // Step 3: Invalid numeric -> null (we validate separately for required fields)
+  // Step 3: Invalid numeric -> null (validated separately where needed)
   if (!Number.isFinite(n)) return null;
 
   return n;
@@ -84,20 +83,20 @@ function extractDrfErrorMessage(error: unknown): string | null {
 
   const maybe = data as Record<string, unknown>;
 
-  // Step 3: Prefer non_field_errors (constraint errors often land here)
+  // Step 3: Prefer non_field_errors
   const nonField = maybe.non_field_errors;
   if (Array.isArray(nonField) && nonField.length > 0) {
     const msg = String(nonField[0]);
 
-    // Step 4: Special-case the unique constraint to make it user-friendly
+    // Step 4: Friendly uniqueness message
     if (msg.toLowerCase().includes("must make a unique set")) {
-      return "That unit label already exists for this building. Please choose a different label (e.g., B2, 2A, Basement).";
+      return "That unit label already exists for this building. Please choose a different label (for example: B2, 2A, Basement).";
     }
 
     return msg;
   }
 
-  // Step 5: Fall back to label field errors if present
+  // Step 5: Fall back to label field errors
   const labelErrors = maybe.label;
   if (Array.isArray(labelErrors) && labelErrors.length > 0) {
     return String(labelErrors[0]);
@@ -116,8 +115,8 @@ function extractDrfErrorMessage(error: unknown): string | null {
  * CreateUnitForm
  *
  * Unit create form that can render in two modes:
- * - standalone: includes its own header and an internal open/close toggle
- * - inline: form-only (no header/toggle). Parent controls visibility.
+ * - standalone: includes its own header and internal toggle
+ * - inline: full premium form shell for embedding inside BuildingUnitsSection
  */
 export default function CreateUnitForm({
   buildingId,
@@ -126,23 +125,23 @@ export default function CreateUnitForm({
   onSuccess,
   onCancel,
 }: CreateUnitFormProps) {
-  // Step 1: Resolve org slug (prefer prop; fallback to context)
+  // Step 1: Resolve org slug
   const { orgSlug: orgSlugFromContext } = useOrg();
   const orgSlug = orgSlugProp ?? orgSlugFromContext;
 
   const isInline = variant === "inline";
 
-  // Step 2: Internal open/close state ONLY for standalone mode
+  // Step 2: Internal open/close state (standalone only)
   const [isOpen, setIsOpen] = useState(false);
 
-  // Step 3: UI form values (strings)
+  // Step 3: UI form values
   const [label, setLabel] = useState("");
   const [bedrooms, setBedrooms] = useState("");
   const [bathrooms, setBathrooms] = useState("");
   const [squareFeet, setSquareFeet] = useState("");
   const [notes, setNotes] = useState("");
 
-  // Step 4: Local error state (for UX; API errors are also shown)
+  // Step 4: Local UX error state
   const [localError, setLocalError] = useState<string | null>(null);
 
   // Step 5: Mutation
@@ -151,10 +150,16 @@ export default function CreateUnitForm({
     buildingId,
   });
 
-  // Step 6: Derived loading state
+  // Step 6: Derived state
   const isSaving = createUnitMutation.isPending;
 
-  // Step 7: Reset helper
+  const canSubmit = useMemo(() => {
+    if (!orgSlug) return false;
+    if (!label.trim()) return false;
+    return true;
+  }, [label, orgSlug]);
+
+  // Step 7: Helpers
   const resetForm = useCallback(() => {
     setLabel("");
     setBedrooms("");
@@ -164,12 +169,11 @@ export default function CreateUnitForm({
     setLocalError(null);
   }, []);
 
-  // Step 8: Client-side validation (minimal but strict)
-  const canSubmit = useMemo(() => {
-    if (!orgSlug) return false;
-    if (!label.trim()) return false;
-    return true;
-  }, [label, orgSlug]);
+  const inputClassName =
+    "mt-2 w-full rounded-2xl border border-neutral-800 bg-neutral-900 px-4 py-3 text-sm text-white placeholder:text-neutral-500 outline-none transition focus:border-emerald-500/40 focus:ring-2 focus:ring-emerald-500/20";
+
+  const textareaClassName =
+    "mt-2 w-full rounded-2xl border border-neutral-800 bg-neutral-900 px-4 py-3 text-sm text-white placeholder:text-neutral-500 outline-none transition focus:border-emerald-500/40 focus:ring-2 focus:ring-emerald-500/20";
 
   const toggleOpen = useCallback(() => {
     setIsOpen((v) => !v);
@@ -178,14 +182,17 @@ export default function CreateUnitForm({
   }, [createUnitMutation]);
 
   const handleCancel = useCallback(() => {
+    // Step 1: Reset local state
     resetForm();
     createUnitMutation.reset();
 
+    // Step 2: Let parent close inline mode
     if (isInline) {
       onCancel?.();
       return;
     }
 
+    // Step 3: Standalone closes itself
     setIsOpen(false);
   }, [createUnitMutation, isInline, onCancel, resetForm]);
 
@@ -197,19 +204,19 @@ export default function CreateUnitForm({
       setLocalError(null);
       createUnitMutation.reset();
 
-      // Step 2: Guard org (hard boundary)
+      // Step 2: Guard org
       if (!orgSlug) {
-        setLocalError("Organization not selected. Add ?org=<slug> to URL.");
+        setLocalError("Organization not selected. Add ?org=<slug> to the URL.");
         return;
       }
 
       // Step 3: Required field validation
       if (!label.trim()) {
-        setLocalError("Unit label is required (e.g., 'Unit 2A').");
+        setLocalError("Unit label is required (for example: 'Unit 2A').");
         return;
       }
 
-      // Step 4: Convert numeric fields safely
+      // Step 4: Build payload
       const payload = {
         label: label.trim(),
         bedrooms: parseNullableNumber(bedrooms),
@@ -222,16 +229,16 @@ export default function CreateUnitForm({
         // Step 5: Execute mutation
         await createUnitMutation.mutateAsync(payload);
 
-        // Step 6: Reset and notify parent
+        // Step 6: Reset + notify parent
         resetForm();
         onSuccess?.();
 
-        // Step 7: Standalone closes itself; inline is controlled by parent
+        // Step 7: Standalone closes itself
         if (!isInline) {
           setIsOpen(false);
         }
       } catch (err) {
-        // Step 8: Decode DRF errors into a friendly message
+        // Step 8: Decode DRF-friendly error
         const drfMessage = extractDrfErrorMessage(err);
         if (drfMessage) {
           setLocalError(drfMessage);
@@ -255,81 +262,103 @@ export default function CreateUnitForm({
     ]
   );
 
-  // Step 9: Shared form body (used by both variants)
+  // Step 8: Shared form body
   const formBody = (
-    <form onSubmit={onSubmit} className={isInline ? "" : "border-t border-white/10 p-4"}>
+    <form onSubmit={onSubmit} className="space-y-6">
       {(localError || createUnitMutation.error) && (
-        <div className="mb-3 rounded-xl border border-red-500/30 bg-red-500/10 p-3 text-sm text-red-200">
+        <div className="rounded-2xl border border-red-500/30 bg-red-500/10 p-4 text-sm text-red-200">
           {localError ?? createUnitMutation.error?.message}
         </div>
       )}
 
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-        <div className="sm:col-span-2">
-          <label className="block text-xs font-medium text-white/70">
-            Label <span className="text-red-300">*</span>
-          </label>
-          <input
-            value={label}
-            onChange={(e) => setLabel(e.target.value)}
-            placeholder="e.g., 2nd floor, 1A, B2"
-            className="mt-1 w-full rounded-xl border border-white/10 bg-black/20 px-3 py-2 text-sm text-white placeholder:text-white/30 focus:outline-none focus:ring-2 focus:ring-white/10"
-          />
-          <div className="mt-1 text-[11px] text-white/50">
-            Must be unique within this building (e.g., B1, B2, 1A, 1B).
+      <section className="rounded-2xl border border-neutral-800 bg-neutral-900/40">
+        <div className="border-b border-neutral-800 px-5 py-4">
+          <div className="space-y-1">
+            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-neutral-500">
+              Unit details
+            </p>
+            <h4 className="text-lg font-semibold text-white">Identity and layout</h4>
+            <p className="text-sm text-neutral-400">
+              Define the unit label and optional physical details.
+            </p>
           </div>
         </div>
 
-        <div>
-          <label className="block text-xs font-medium text-white/70">Bedrooms</label>
-          <input
-            inputMode="decimal"
-            value={bedrooms}
-            onChange={(e) => setBedrooms(e.target.value)}
-            placeholder="e.g., 2 or 2.5"
-            className="mt-1 w-full rounded-xl border border-white/10 bg-black/20 px-3 py-2 text-sm text-white placeholder:text-white/30 focus:outline-none focus:ring-2 focus:ring-white/10"
-          />
-        </div>
+        <div className="grid grid-cols-1 gap-5 px-5 py-5 md:grid-cols-2">
+          <div className="md:col-span-2">
+            <label className="block text-xs font-medium text-neutral-300">
+              Label <span className="text-red-300">*</span>
+            </label>
+            <input
+              value={label}
+              onChange={(e) => setLabel(e.target.value)}
+              placeholder="e.g. 2nd floor, 1A, B2"
+              className={inputClassName}
+            />
+            <div className="mt-2 text-xs text-neutral-500">
+              Must be unique within this building.
+            </div>
+          </div>
 
-        <div>
-          <label className="block text-xs font-medium text-white/70">Bathrooms</label>
-          <input
-            inputMode="decimal"
-            value={bathrooms}
-            onChange={(e) => setBathrooms(e.target.value)}
-            placeholder="e.g., 1 or 1.5"
-            className="mt-1 w-full rounded-xl border border-white/10 bg-black/20 px-3 py-2 text-sm text-white placeholder:text-white/30 focus:outline-none focus:ring-2 focus:ring-white/10"
-          />
-        </div>
+          <div>
+            <label className="block text-xs font-medium text-neutral-300">
+              Bedrooms
+            </label>
+            <input
+              inputMode="decimal"
+              value={bedrooms}
+              onChange={(e) => setBedrooms(e.target.value)}
+              placeholder="e.g. 2 or 2.5"
+              className={inputClassName}
+            />
+          </div>
 
-        <div className="sm:col-span-2">
-          <label className="block text-xs font-medium text-white/70">Square Feet</label>
-          <input
-            inputMode="numeric"
-            value={squareFeet}
-            onChange={(e) => setSquareFeet(e.target.value)}
-            placeholder="e.g., 850"
-            className="mt-1 w-full rounded-xl border border-white/10 bg-black/20 px-3 py-2 text-sm text-white placeholder:text-white/30 focus:outline-none focus:ring-2 focus:ring-white/10"
-          />
-        </div>
+          <div>
+            <label className="block text-xs font-medium text-neutral-300">
+              Bathrooms
+            </label>
+            <input
+              inputMode="decimal"
+              value={bathrooms}
+              onChange={(e) => setBathrooms(e.target.value)}
+              placeholder="e.g. 1 or 1.5"
+              className={inputClassName}
+            />
+          </div>
 
-        <div className="sm:col-span-2">
-          <label className="block text-xs font-medium text-white/70">Notes</label>
-          <textarea
-            value={notes}
-            onChange={(e) => setNotes(e.target.value)}
-            placeholder="Optional notes..."
-            rows={3}
-            className="mt-1 w-full rounded-xl border border-white/10 bg-black/20 px-3 py-2 text-sm text-white placeholder:text-white/30 focus:outline-none focus:ring-2 focus:ring-white/10"
-          />
-        </div>
-      </div>
+          <div className="md:col-span-2">
+            <label className="block text-xs font-medium text-neutral-300">
+              Square feet
+            </label>
+            <input
+              inputMode="numeric"
+              value={squareFeet}
+              onChange={(e) => setSquareFeet(e.target.value)}
+              placeholder="e.g. 850"
+              className={inputClassName}
+            />
+          </div>
 
-      <div className="mt-4 flex items-center justify-end gap-2">
+          <div className="md:col-span-2">
+            <label className="block text-xs font-medium text-neutral-300">
+              Notes
+            </label>
+            <textarea
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+              placeholder="Optional notes about this unit..."
+              rows={4}
+              className={textareaClassName}
+            />
+          </div>
+        </div>
+      </section>
+
+      <div className="flex items-center justify-end gap-3 border-t border-neutral-800 pt-5">
         <button
           type="button"
           onClick={handleCancel}
-          className="rounded-xl border border-white/15 bg-transparent px-3 py-2 text-xs text-white/70 hover:bg-white/5"
+          className="rounded-2xl border border-neutral-700 bg-transparent px-4 py-2.5 text-sm text-neutral-300 transition hover:bg-neutral-900 disabled:opacity-50"
           disabled={isSaving}
         >
           Cancel
@@ -338,7 +367,7 @@ export default function CreateUnitForm({
         <button
           type="submit"
           disabled={!canSubmit || isSaving}
-          className="rounded-xl bg-white px-3 py-2 text-xs font-semibold text-black hover:bg-white/90 disabled:opacity-50"
+          className="rounded-2xl bg-white px-4 py-2.5 text-sm font-semibold text-black transition hover:bg-neutral-200 disabled:opacity-50"
         >
           {isSaving ? "Creating..." : "Create unit"}
         </button>
@@ -346,36 +375,58 @@ export default function CreateUnitForm({
     </form>
   );
 
-  // Step 10: Inline variant = form only (NO header/toggle/panel)
+  // Step 9: Inline variant
   if (isInline) {
     return (
-      <div className="rounded-2xl border border-white/10 bg-black/10 p-4">
-        {formBody}
+      <div className="rounded-3xl border border-neutral-800/80 bg-neutral-950 shadow-[0_0_0_1px_rgba(255,255,255,0.02)]">
+        <div className="border-b border-neutral-800/80 px-5 py-4">
+          <div className="space-y-1">
+            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-neutral-500">
+              Unit creation
+            </p>
+
+            <h3 className="text-lg font-semibold tracking-tight text-white">
+              Add unit
+            </h3>
+
+            <p className="text-sm text-neutral-400">
+              Create a new unit under this building. Labels must be unique within
+              the building.
+            </p>
+          </div>
+        </div>
+
+        <div className="px-5 py-5">{formBody}</div>
       </div>
     );
   }
 
-  // Step 11: Standalone variant = your existing panel + internal toggle
+  // Step 10: Standalone variant
   return (
-    <div className="rounded-2xl border border-white/10 bg-white/5">
-      <div className="flex items-center justify-between gap-3 p-4">
-        <div>
-          <div className="text-sm font-semibold text-white">Units</div>
-          <div className="mt-1 text-xs text-white/60">
-            Add units under this building (org-scoped).
-          </div>
+    <div className="rounded-3xl border border-neutral-800/80 bg-neutral-950 shadow-[0_0_0_1px_rgba(255,255,255,0.02)]">
+      <div className="flex items-start justify-between gap-4 border-b border-neutral-800/80 px-5 py-4">
+        <div className="space-y-1">
+          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-neutral-500">
+            Unit creation
+          </p>
+          <h3 className="text-lg font-semibold tracking-tight text-white">
+            Units
+          </h3>
+          <p className="text-sm text-neutral-400">
+            Add units under this building. This workflow is org-scoped.
+          </p>
         </div>
 
         <button
           type="button"
           onClick={toggleOpen}
-          className="rounded-xl border border-white/15 bg-transparent px-3 py-2 text-xs text-white/80 hover:bg-white/5"
+          className="rounded-2xl border border-neutral-700 bg-neutral-900 px-4 py-2 text-sm font-medium text-neutral-200 transition hover:bg-neutral-800"
         >
           {isOpen ? "Close" : "Add unit"}
         </button>
       </div>
 
-      {isOpen ? formBody : null}
+      {isOpen ? <div className="px-5 py-5">{formBody}</div> : null}
     </div>
   );
 }

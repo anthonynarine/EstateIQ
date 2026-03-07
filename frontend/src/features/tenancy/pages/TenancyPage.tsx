@@ -11,7 +11,7 @@ import TenantCreateModal from "../components/TenantCreateModal";
 import { formatApiError } from "../../../api/formatApiError";
 import { useOrg } from "../hooks/useOrg";
 
-export default function TenantsPage() {
+export default function TenancyPage() {
   // Step 1: Resolve orgSlug from OrgProvider
   const orgCtx = useOrg() as any;
   const orgSlug: string =

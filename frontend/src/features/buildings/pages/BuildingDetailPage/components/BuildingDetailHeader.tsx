@@ -1,5 +1,5 @@
 // # Filename: src/features/buildings/pages/BuildingDetailPage/components/BuildingDetailHeader.tsx
-
+// ✅ New Code
 
 type BuildingHeaderModel = {
   name: string;
@@ -21,17 +21,13 @@ type Props = {
 /**
  * BuildingDetailHeader
  *
- * Presentational header for BuildingDetailPage.
+ * Premium workspace header for the Building Detail page.
  *
  * Responsibilities:
- * - Render building name and formatted address.
- * - Render occupancy summary chips (occupied/vacant + total).
- * - Keep UI stable while the page is loading (optional `isLoading`).
- *
- * Non-responsibilities:
- * - Does NOT fetch data.
- * - Does NOT compute occupancy (caller provides counts).
- * - Does NOT perform navigation (caller owns routing).
+ * - Render building identity with strong visual hierarchy
+ * - Render formatted address and org context
+ * - Render occupancy summary chips
+ * - Stay purely presentational
  */
 export default function BuildingDetailHeader({
   orgSlug,
@@ -40,43 +36,55 @@ export default function BuildingDetailHeader({
   totalUnitsCount,
   isLoading = false,
 }: Props) {
-  // Step 1: Derive computed display values (UI-safe)
+  // Step 1: Derived counts
   const vacantUnitsCount = Math.max(totalUnitsCount - occupiedUnitsCount, 0);
 
-  const line2 = building.address_line2?.trim() ? `, ${building.address_line2.trim()}` : "";
-  const address = `${building.address_line1}${line2}`;
+  // Step 2: UI-safe formatted address
+  const addressLine2 = building.address_line2?.trim()
+    ? `, ${building.address_line2.trim()}`
+    : "";
+
+  const address = `${building.address_line1}${addressLine2}`;
   const cityStateZip = `${building.city}, ${building.state} ${building.postal_code}`;
 
   return (
-    <div className="rounded-2xl border border-white/10 bg-white/5 p-6 shadow-[0_0_0_1px_rgba(255,255,255,0.03)]">
-      <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
-        <div className="space-y-1">
-          <h1 className="text-2xl font-semibold text-white">
-            {isLoading ? "Loading building…" : building.name}
-          </h1>
+    <section className="overflow-hidden rounded-3xl border border-neutral-800/80 bg-gradient-to-b from-neutral-900 to-neutral-950 shadow-[0_0_0_1px_rgba(255,255,255,0.02)]">
+      <div className="p-5 sm:p-6">
+        <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
+          <div className="min-w-0 space-y-3">
+            <div className="space-y-1">
+              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-neutral-500">
+                Building workspace
+              </p>
 
-          <div className="text-sm text-neutral-300">
-            <div>{address}</div>
-            <div>{cityStateZip}</div>
+              <h1 className="text-2xl font-semibold tracking-tight text-white sm:text-3xl">
+                {isLoading ? "Loading building…" : building.name}
+              </h1>
+            </div>
+
+            <div className="space-y-1 text-sm text-neutral-300">
+              <div>{address}</div>
+              <div>{cityStateZip}</div>
+            </div>
+
+            <p className="text-sm text-neutral-500">Org: {orgSlug}</p>
           </div>
 
-          <div className="text-xs text-neutral-500">Org: {orgSlug}</div>
-        </div>
+          <div className="flex flex-wrap items-center gap-2 lg:justify-end">
+            <span className="inline-flex items-center rounded-full border border-neutral-700 bg-neutral-900 px-3 py-1 text-xs font-medium text-neutral-200">
+              Units: {totalUnitsCount}
+            </span>
 
-        <div className="flex flex-wrap items-center gap-2">
-          <span className="inline-flex items-center rounded-full bg-white/5 px-3 py-1 text-xs text-neutral-200 ring-1 ring-white/10">
-            Units: {totalUnitsCount}
-          </span>
+            <span className="inline-flex items-center rounded-full border border-emerald-500/20 bg-emerald-500/10 px-3 py-1 text-xs font-medium text-emerald-300">
+              Occupied: {occupiedUnitsCount}
+            </span>
 
-          <span className="inline-flex items-center rounded-full bg-emerald-500/10 px-3 py-1 text-xs font-medium text-emerald-300 ring-1 ring-emerald-400/20">
-            Occupied: {occupiedUnitsCount}
-          </span>
-
-          <span className="inline-flex items-center rounded-full bg-rose-500/10 px-3 py-1 text-xs font-medium text-rose-300 ring-1 ring-rose-400/20">
-            Vacant: {vacantUnitsCount}
-          </span>
+            <span className="inline-flex items-center rounded-full border border-rose-500/20 bg-rose-500/10 px-3 py-1 text-xs font-medium text-rose-300">
+              Vacant: {vacantUnitsCount}
+            </span>
+          </div>
         </div>
       </div>
-    </div>
+    </section>
   );
 }
