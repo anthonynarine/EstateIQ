@@ -1,0 +1,1 @@
+export const TENANT_DIRECTORY_PAGE_SIZE = 6;

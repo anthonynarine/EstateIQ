@@ -1,4 +1,5 @@
 // # Filename: src/app/routes.tsx
+// ✅ Updated Code
 
 import { createBrowserRouter, Navigate } from "react-router-dom";
 
@@ -20,6 +21,9 @@ import LeaseLedgerPage from "../features/finance/pages/LeaseLedgerPage";
 import BuildingsPage from "../features/buildings/pages/BuildingPage/BuildingsPage";
 import BuildingDetailPage from "../features/buildings/pages/BuildingDetailPage/BuildingDetailPage";
 import UnitDetailPage from "../features/leases/pages/UnitLeaseDetailPage";
+import NeuralComponentTreePage from "../features/easterEgg/pages/NeuralComponentTreePage";
+import LeaseCreatePage from "../features/leases/pages/LeaseCreatePage";
+
 
 export const routes = createBrowserRouter([
   {
@@ -52,11 +56,14 @@ export const routes = createBrowserRouter([
 
               { path: "units/:unitId", element: <UnitDetailPage /> },
               { path: "units/:unitId/leases", element: <UnitLeasesPage /> },
-
+              { path: "leases/new", element: <LeaseCreatePage />,},
               { path: "buildings", element: <BuildingsPage /> },
               { path: "buildings/:buildingId", element: <BuildingDetailPage /> },
 
               { path: "leases/:leaseId/ledger", element: <LeaseLedgerPage /> },
+
+              // Fun / lab page
+              { path: "lab/neural-tree", element: <NeuralComponentTreePage /> },
             ],
           },
         ],

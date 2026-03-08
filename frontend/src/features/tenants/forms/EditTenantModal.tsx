@@ -1,6 +1,3 @@
-// # Filename: src/features/tenants/forms/EditTenantModal.tsx
-
-
 import type { TenantFormValue } from "./CreateTenantForm";
 import { validateTenantFormValue } from "./CreateTenantForm";
 
@@ -86,8 +83,8 @@ export default function EditTenantModal({
               >
                 Editing <span className="text-white">{tenantDisplayName}</span>.
                 Tenant residence history is controlled by leases, not by editing
-                the tenant record directly. That keeps the data model aligned with
-                lease-driven history. :contentReference[oaicite:4]{index=4}
+                the tenant record directly. That keeps the data model aligned
+                with lease-driven history.
               </div>
             </div>
 
@@ -124,7 +121,8 @@ export default function EditTenantModal({
                   <p className="text-sm text-neutral-400">
                     Keep the directory clean and reusable for leasing, billing,
                     and delinquency workflows. Tenants CRUD is part of the core
-                    leasing MVP, so this edit path should stay lean and reliable. :contentReference[oaicite:5]{index=5}
+                    leasing MVP, so this edit path should stay lean and
+                    reliable.
                   </p>
                 </div>
               </div>
@@ -136,9 +134,7 @@ export default function EditTenantModal({
                   </label>
                   <input
                     value={value.full_name}
-                    onChange={(e) =>
-                      onChange({ full_name: e.target.value })
-                    }
+                    onChange={(e) => onChange({ full_name: e.target.value })}
                     placeholder="e.g. John Doe"
                     className={inputClassName}
                   />

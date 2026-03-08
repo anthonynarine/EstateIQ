@@ -5,6 +5,7 @@ import { useQuery } from "@tanstack/react-query";
 import { listTenants } from "../api/tenantsApi";
 import type { PaginatedResponse, Tenant, TenantListParams } from "../api/types";
 import { tenantQueryKeys } from "../utils/tenantQueryKeys";
+import { TENANT_DIRECTORY_PAGE_SIZE } from "../constants/tenantConstants";
 
 /**
  * UseTenantsQueryParams
@@ -42,7 +43,7 @@ type UseTenantsQueryParams = {
 export function useTenantsQuery({
   orgSlug,
   page = 1,
-  pageSize = 12,
+  pageSize = TENANT_DIRECTORY_PAGE_SIZE,
   search = "",
 }: UseTenantsQueryParams) {
   const trimmedSearch = search.trim();

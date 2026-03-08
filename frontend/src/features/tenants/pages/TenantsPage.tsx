@@ -17,6 +17,7 @@ import { useCreateTenantMutation } from "../hooks/useCreateTenantMutation";
 import { useTenantDirectoryUrlState } from "../hooks/useTenantDirectoryUrlState";
 import { useTenantsQuery } from "../hooks/useTenantsQuery";
 import { useUpdateTenantMutation } from "../hooks/useUpdateTenantMutation";
+import { TENANT_DIRECTORY_PAGE_SIZE } from "../constants/tenantConstants";
 
 /**
  * normalizeOptionalText
@@ -95,27 +96,30 @@ export default function TenantsPage() {
     phone: "",
   });
 
-  // Step 3: Fetch tenant directory data
-  const {
-    data: tenantPage,
-    isLoading,
-    isError,
-    error,
-  } = useTenantsQuery({
-    orgSlug,
-    page: currentPage,
-    pageSize: 12,
-    search,
-  });
+// Step 2: Fetch tenant directory data
+const {
+  data: tenantPage,
+  isLoading,
+  isError,
+  error,
+} = useTenantsQuery({
+  orgSlug,
+  page: currentPage,
+  pageSize: TENANT_DIRECTORY_PAGE_SIZE,
+  search,
+});
 
-  // Step 4: Org-scoped mutations
-  const createTenantMutation = useCreateTenantMutation(orgSlug);
-  const updateTenantMutation = useUpdateTenantMutation(orgSlug);
+// Step 3: Org-scoped mutations
+const createTenantMutation = useCreateTenantMutation(orgSlug);
+const updateTenantMutation = useUpdateTenantMutation(orgSlug);
 
-  // Step 5: Derive page data safely
-  const tenants = tenantPage?.results ?? [];
-  const totalCount = tenantPage?.count ?? 0;
-  const totalPages = Math.max(1, Math.ceil(totalCount / 12));
+// Step 4: Derive page data safely
+const tenants = tenantPage?.results ?? [];
+const totalCount = tenantPage?.count ?? 0;
+const totalPages = Math.max(
+  1,
+  Math.ceil(totalCount / TENANT_DIRECTORY_PAGE_SIZE)
+);
 
   // Step 6: Clamp stale/out-of-range page values
   useEffect(() => {
@@ -147,8 +151,12 @@ export default function TenantsPage() {
   }, [editingTenant]);
 
   // Step 9: View workflow
-  function handleViewTenant(tenant: Tenant) {
-    navigate(`/dashboard/tenants/${tenant.id}?org=${orgSlug}`);
+  function handleOpenLease(tenant: Tenant) {
+    if (!tenant.active_lease?.id) {
+      return;
+    }
+
+    navigate(`/dashboard/leases/${tenant.active_lease.id}?org=${orgSlug}`);
   }
 
   // Step 10: Edit workflow
@@ -338,9 +346,13 @@ export default function TenantsPage() {
           <TenantCard
             key={tenant.id}
             tenant={tenant}
-            onView={() => handleViewTenant(tenant)}
             onEdit={() => handleEditTenant(tenant)}
             onCreateLease={() => handleCreateLease(tenant)}
+            onOpenLease={
+              tenant.active_lease?.id
+                ? () => handleOpenLease(tenant)
+                : undefined
+            }
           />
         ))}
       </TenantDirectorySection>
