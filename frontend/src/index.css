@@ -19,7 +19,32 @@
 }
 
 /* Step 2: Base */
-html,
+html {
+  overflow-y: scroll;
+  scrollbar-gutter: stable;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.12) transparent;
+}
+
+html::-webkit-scrollbar {
+  width: 8px;
+}
+
+html::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+html::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.12);
+  border-radius: 9999px;
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+
+html::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.18);
+}
+
 body,
 #root {
   height: 100%;
@@ -53,14 +78,14 @@ body {
   }
 }
 
-/* Step 3: Premium dark scrollbar for tenant select dropdown */
+/* Step 4: Premium dark scrollbar for tenant select dropdown */
 .tenant-select-scroll {
   scrollbar-width: thin;
   scrollbar-color: rgba(255, 255, 255, 0.14) transparent;
 }
 
 .tenant-select-scroll::-webkit-scrollbar {
-  width: 10px;
+  width: 8px;
 }
 
 .tenant-select-scroll::-webkit-scrollbar-track {
