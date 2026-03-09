@@ -1,6 +1,6 @@
 // # Filename: src/features/leases/components/CurrentLeasePanel.tsx
 
-import CreateLeaseForm from "../forms/CreateLeaseForm";
+import CreateLeaseForm from "../forms/CreateLeaseForm/CreateLeaseForm";
 import LeaseCard from "./LeaseCard";
 import type { Lease } from "../api/leaseApi";
 

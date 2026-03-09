@@ -50,12 +50,7 @@ export default function TenantSection({
   const isCreateMode = tenantMode === "create";
 
   const handleModeChange = (mode: TenantMode) => {
-    if (mode === "create") {
-      enterCreateTenantMode();
-      return;
-    }
-
-    onTenantModeChange("select");
+    onTenantModeChange(mode);
   };
 
   return (

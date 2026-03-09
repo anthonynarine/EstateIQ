@@ -1,6 +1,5 @@
 // # Filename: src/features/leases/forms/TenantSection/useTenantModeActions.ts
 
-
 import { useCallback } from "react";
 import type { TenantMode } from "./tenantTypes";
 
@@ -12,13 +11,8 @@ type Props = {
 /**
  * useTenantModeActions
  *
- * Keeps tenant mode transitions explicit and out of the parent form.
- *
- * Responsibilities:
- * - Route "create" mode into create-tenant workflow state
- * - Route "select" mode into existing-tenant workflow state
- *
- * This keeps CreateLeaseForm.tsx smaller and easier to read.
+ * Keeps tenant mode workflow transitions explicit and isolated from the
+ * parent lease form component.
  */
 export function useTenantModeActions({
   enterCreateTenantMode,
