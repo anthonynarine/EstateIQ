@@ -12,7 +12,6 @@ import FormActions from "../FormActions";
 import FormErrorSummary from "../FormErrorSummary";
 import LeaseTermsFields from "../LeaseTermsFields";
 import TenantSection from "../TenantSection/TenantSection";
-import { useTenantModeActions } from "../TenantSection/useTenantModeActions";
 import { useCreateLeaseForm } from "../useCreateLeaseForm";
 import {
   useLeaseOverlapUx,
@@ -96,15 +95,9 @@ export default function CreateLeaseForm({ unitId }: Props) {
     reset,
     validate,
     buildPayload,
-    enterCreateTenantMode,
-    enterSelectTenantMode,
     selectExistingTenant,
+    onTenantModeChange,
   } = useCreateLeaseForm();
-
-  const { handleTenantModeChange } = useTenantModeActions({
-    enterCreateTenantMode,
-    enterSelectTenantMode,
-  });
 
   // Step 3: Basic render guard
   const canRender =
@@ -241,10 +234,9 @@ export default function CreateLeaseForm({ unitId }: Props) {
             tenantMode={tenantMode}
             tenantId={primaryTenantId}
             tenantCreateDraft={tenantCreateDraft}
-            enterCreateTenantMode={enterCreateTenantMode}
             selectExistingTenant={selectExistingTenant}
             onCreateDraftChange={setTenantCreateDraft}
-            onTenantModeChange={handleTenantModeChange}
+            onTenantModeChange={onTenantModeChange}
           />
 
           <LeaseTermsFields

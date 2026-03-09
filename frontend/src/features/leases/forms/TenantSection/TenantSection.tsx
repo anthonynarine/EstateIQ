@@ -1,5 +1,4 @@
 // # Filename: src/features/leases/forms/TenantSection/TenantSection.tsx
-// ✅ New Code
 
 import TenantCreatePanel from "./TenantCreatePanel";
 import TenantModeToggle from "./TenantModeToggle";
@@ -15,7 +14,6 @@ type Props = {
   tenantMode: TenantMode;
   tenantId: number | null;
   tenantCreateDraft: TenantCreateDraft;
-  enterCreateTenantMode: () => void;
   selectExistingTenant: (tenantId: number | null) => void;
   onCreateDraftChange: (draft: TenantCreateDraft) => void;
   onTenantModeChange: (mode: TenantMode) => void;
@@ -29,7 +27,7 @@ type Props = {
  *
  * Tenant selection / creation step inside lease workflow.
  *
- * Design goals
+ * Design goals:
  * - lighter surface
  * - remove nested heavy borders
  * - mobile-first spacing
@@ -39,7 +37,6 @@ export default function TenantSection({
   tenantMode,
   tenantId,
   tenantCreateDraft,
-  enterCreateTenantMode,
   selectExistingTenant,
   onCreateDraftChange,
   onTenantModeChange,
@@ -49,13 +46,8 @@ export default function TenantSection({
 }: Props) {
   const isCreateMode = tenantMode === "create";
 
-  const handleModeChange = (mode: TenantMode) => {
-    onTenantModeChange(mode);
-  };
-
   return (
     <section className="space-y-5">
-      {/* Section header */}
       <div className="space-y-3">
         <div>
           <p className="text-xs font-semibold uppercase tracking-[0.18em] text-neutral-500">
@@ -67,10 +59,12 @@ export default function TenantSection({
           <p className="mt-1 text-sm text-neutral-400">{helperText}</p>
         </div>
 
-        <TenantModeToggle mode={tenantMode} onModeChange={handleModeChange} />
+        <TenantModeToggle
+          mode={tenantMode}
+          onModeChange={onTenantModeChange}
+        />
       </div>
 
-      {/* Content */}
       <div className="space-y-4">
         {!isCreateMode ? (
           <TenantSelectPanel

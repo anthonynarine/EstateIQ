@@ -118,7 +118,7 @@ Full-Stack Software Engineer
 
 EstateIQ is a **solo-built system** created by Anthony Narine.
 
-The project was originally built to help **Anthony’s mother manage her rental business more easily**.
+The project was originally built to help **My mom manage her rental business more easily**.
 
 During research it became clear that:
 
