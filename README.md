@@ -1,129 +1,160 @@
 
 <p align="center">
-  <img src="https://images.unsplash.com/photo-1560518883-ce09059eeffa?auto=format&fit=crop&w=1600&q=80" alt="EstateIQ Banner" width="100%">
+  <img src="docs/assets/estateiq-hero.png" width="100%" alt="EstateIQ Hero"/>
 </p>
 
-<h1 align="center">EstateIQ (PortfolioOS)</h1>
+<h1 align="center">🌌 EstateIQ</h1>
 
 <p align="center">
-AI‑Native Financial Operating System for Small Real Estate Portfolios
+<b>Financial Operating System for Small Real Estate Portfolios</b>
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/Frontend-React-blue?style=for-the-badge&logo=react">
-  <img src="https://img.shields.io/badge/Backend-Django-green?style=for-the-badge&logo=django">
-  <img src="https://img.shields.io/badge/Language-TypeScript-blue?style=for-the-badge&logo=typescript">
-  <img src="https://img.shields.io/badge/Database-PostgreSQL-blue?style=for-the-badge&logo=postgresql">
-  <img src="https://img.shields.io/badge/Auth-JWT-orange?style=for-the-badge">
+Built by <b>Anthony Narine</b> • Solo Full-Stack Developer
+</p>
+
+<p align="center">
+  <img src="https://img.shields.io/badge/Frontend-React-61dafb?style=for-the-badge&logo=react"/>
+  <img src="https://img.shields.io/badge/Backend-Django-092e20?style=for-the-badge&logo=django"/>
+  <img src="https://img.shields.io/badge/Language-TypeScript-3178c6?style=for-the-badge&logo=typescript"/>
+  <img src="https://img.shields.io/badge/Database-PostgreSQL-336791?style=for-the-badge&logo=postgresql"/>
+  <img src="https://img.shields.io/badge/Auth-JWT-orange?style=for-the-badge"/>
 </p>
 
 ---
 
-# Vision
+## ✨ Vision
 
-EstateIQ is not a rent tracker.
+EstateIQ is **not a rent tracker**.
 
-It is a **ledger‑first, multi‑tenant financial operating system** for landlords managing **1–50 units**.
+It is a **ledger-first financial operating system** designed for landlords managing **1–50 units**.
 
-The platform focuses on:
+Most property software focuses on collecting rent.
 
-• Deterministic financial logic  
-• Strict tenant isolation (multi‑tenant SaaS design)  
-• Structured financial data for analytics and AI interpretation  
-• Clear financial visibility across real estate portfolios  
+EstateIQ focuses on **financial clarity**.
 
-The goal is to give **small landlords the clarity that enterprise real estate systems provide to institutional investors**.
+The platform is designed around:
+
+- deterministic financial records
+- strict multi-tenant data isolation
+- domain-driven architecture
+- structured financial data ready for analytics and AI
+
+> Give small landlords the financial visibility institutional investors already have.
 
 ---
 
-# Author
+## 🪐 At a Glance
+
+- **Built by:** Anthony Narine
+- **Built for:** a real family rental business
+- **Architecture:** multi-tenant SaaS
+- **Core model:** organization → building → unit → lease → tenant
+- **Security:** JWT with secure HTTP-only cookies in production
+- **Purpose:** give small landlords a real financial operating system, not just rent collection tools
+
+---
+
+## 🌐 System Diagram
+
+```text
+┌───────────────┐
+│ React + TS UI │
+└───────┬───────┘
+        │
+        ▼
+┌───────────────────┐
+│ TanStack Query    │
+│ Axios API Client  │
+└───────┬───────────┘
+        │
+        ▼
+┌───────────────────────────────┐
+│ Django REST API               │
+│ Auth + Org Resolution         │
+│ Permission + Service Layer    │
+└───────┬───────────────────────┘
+        │
+        ▼
+┌───────────────────┐
+│ PostgreSQL        │
+│ Org-Scoped Data   │
+└───────────────────┘
+```
+
+---
+
+## 🧭 Domain Architecture
+
+```text
+Organization
+   ├── Members
+   ├── Buildings
+   │    └── Units
+   │         └── Leases
+   │              └── Tenants
+   └── Financial Activity
+        ├── Charges
+        ├── Payments
+        └── Allocations
+```
+
+The **lease** is the core business contract because it connects:
+
+- tenant
+- unit
+- rent amount
+- lease dates
+- financial charges
+
+That mirrors the real-world workflow of property management.
+
+---
+
+## 👨‍💻 Author
 
 **Anthony Narine**  
-Full‑Stack Software Engineer
+Full-Stack Software Engineer
 
-EstateIQ is a **solo-built full-stack application** created by Anthony Narine.
+EstateIQ is a **solo-built system** created by Anthony Narine.
 
-The project was originally built to help **Anthony’s mother manage her rental property business more easily**.
+The project was originally built to help **Anthony’s mother manage her rental business more easily**.
 
-While researching existing software it became clear that:
+During research it became clear that:
 
-• Most property management software is **built for large apartment operators**  
-• Many platforms are **expensive for small landlords**  
-• Existing tools prioritize **rent collection over financial clarity**
+- most property management tools target **large apartment operators**
+- small landlords are often **priced out of good software**
+- existing tools prioritize **rent collection over financial insight**
 
-EstateIQ was designed to solve these problems by providing a **clear financial operating system for small real estate portfolios**.
+EstateIQ was designed to solve those problems by creating a **clear financial operating system for small portfolios**.
 
 This project serves both as:
 
-• A **real operational tool for a family rental business**  
-• A **production-grade portfolio application demonstrating modern SaaS architecture**
+- a real operational tool for a family business
+- a production-grade portfolio project demonstrating SaaS architecture
 
 ---
 
-# Key Features
+## 🧠 Core Idea
 
-• Multi‑tenant SaaS architecture  
-• Organization‑scoped real estate portfolios  
-• Buildings → Units → Leases → Tenants domain model  
-• Ledger‑first financial accounting system  
-• Charge and payment allocation tracking  
-• Tenant lifecycle and lease management  
-• Role-based organization membership  
-• Financial insight readiness for AI analysis  
+EstateIQ treats a real estate portfolio like a **financial system**, not a spreadsheet.
 
----
+Instead of loosely tracking data, the platform creates a **deterministic ledger of financial activity**.
 
-# Application Screenshots
+This enables:
 
-*(Replace with screenshots from your app)*
-
-## Dashboard
-![Dashboard Placeholder](https://via.placeholder.com/1200x600?text=EstateIQ+Dashboard)
-
-## Buildings & Units
-![Buildings Placeholder](https://via.placeholder.com/1200x600?text=Buildings+and+Units)
-
-## Lease Management
-![Lease Placeholder](https://via.placeholder.com/1200x600?text=Lease+Management)
+- transparent payment allocation
+- accurate receivable tracking
+- reliable financial reporting
+- AI-readable financial history
 
 ---
 
-# Tech Stack
+## 🏢 Domain Model
 
-### Frontend
+EstateIQ follows **domain-driven design**.
 
-• React  
-• TypeScript  
-• TanStack Query  
-• TailwindCSS  
-
-### Backend
-
-• Django  
-• Django REST Framework  
-• Service Layer Architecture  
-
-### Database
-
-• PostgreSQL
-
-### Authentication & Security
-
-• JWT Authentication  
-• **JWT stored in secure HTTP‑only cookies in production**  
-• Organization membership validation  
-• Org-scoped requests using `X-Org-Slug` header  
-• Strict tenant isolation across the database  
-
----
-
-# Domain Modeling
-
-EstateIQ follows **domain-driven design principles**.
-
-The data model mirrors how real property portfolios operate.
-
-```
+```text
 Organization
    └── Building
         └── Unit
@@ -131,158 +162,171 @@ Organization
                   └── Tenant
 ```
 
-Core modeling principles:
+### Modeling Principles
 
-• **Organization** represents the SaaS tenant boundary  
-• **Buildings belong to organizations**  
-• **Buildings contain multiple units**  
-• **Units may have multiple leases over time**  
-• **Tenants participate in leases but do not own the lease record**
+**Organization**  
+Represents the SaaS tenant boundary.
 
-The **Lease** entity acts as the core financial contract connecting:
+**Buildings**  
+Physical properties owned by the organization.
 
-• Tenant  
-• Unit  
-• Rent amount  
-• Lease dates  
-• Financial charges  
+**Units**  
+Individual rentable spaces.
 
-This mirrors real-world landlord workflows.
+**Leases**  
+Financial contracts connecting tenants and units.
+
+**Tenants**  
+People renting units.
 
 ---
 
-# Multi‑Tenant Architecture
+## 🌐 Multi-Tenant Architecture
 
-EstateIQ allows multiple landlord businesses to operate inside the same system while keeping all data isolated.
+EstateIQ is built as a **multi-tenant SaaS system**.
 
-Example request flow:
+Each landlord business operates within its own **organization boundary**.
 
-```
+```text
 React Frontend
-      ↓
-Authorization: Bearer <token>
-X-Org-Slug: fazie-inc
-      ↓
-Django Middleware resolves request.org
-      ↓
+       ↓
+JWT Authentication
+       ↓
+X-Org-Slug Header
+       ↓
+Django Middleware resolves organization
+       ↓
 Database queries filtered by organization_id
-      ↓
-Org-scoped data returned
 ```
 
-This ensures **complete data isolation between landlord organizations**.
+This guarantees:
+
+- strict tenant isolation
+- secure data boundaries
+- scalable SaaS architecture
 
 ---
 
-# Ledger‑First Financial Model
+## 📊 Ledger-First Financial Model
 
-EstateIQ is **ledger-first**.
+EstateIQ uses a **deterministic financial ledger**.
 
-Financial data is generated through deterministic entries rather than inferred calculations.
+Nothing is inferred without entries.
 
-```
+```text
 Rent Posting
-      ↓
+     ↓
 Charge
-      ↓
+     ↓
 Ledger Entry
-      ↓
+     ↓
 Payment
-      ↓
+     ↓
 Allocation
-      ↓
+     ↓
 Reports
 ```
 
-This structure allows:
+Benefits:
 
-• Accurate receivable tracking  
-• Transparent payment allocation  
-• AI-readable financial records  
-
----
-
-# System Architecture
-
-```
-React + TypeScript
-        ↓
-TanStack Query
-        ↓
-Django REST API
-        ↓
-Service Layer
-        ↓
-PostgreSQL
-```
-
-EstateIQ uses a **modular monolith architecture** to balance simplicity and scalability.
+- transparent financial history
+- consistent reporting
+- AI-ready structured data
 
 ---
 
-# Security Model
+## 🔐 Security Model
 
-Security is designed around strict multi‑tenant isolation.
+Security is designed around strict multi-tenant isolation.
 
 Features include:
 
-• JWT authentication  
-• **JWT stored in HTTP‑only cookies in production**  
-• Organization membership validation  
-• Organization‑scoped database queries  
-• Role-based access control  
+- JWT authentication
+- **JWT stored in secure HTTP-only cookies in production**
+- organization membership validation
+- organization-scoped queries
+- role-based access control
 
-No cross‑tenant data access is possible.
-
----
-
-# Development Principles
-
-• Modular Django apps  
-• Service-layer business logic  
-• Deterministic financial modeling  
-• Strict domain separation  
-• Predictable API contracts  
-• Org‑scoped TanStack query keys  
+No cross-tenant data access is possible.
 
 ---
 
-# Roadmap
+## 🛠 Tech Stack
+
+### Frontend
+- React
+- TypeScript
+- TanStack Query
+- TailwindCSS
+
+### Backend
+- Django
+- Django REST Framework
+- Service Layer Architecture
+
+### Database
+- PostgreSQL
+
+---
+
+## 🖥 Application Screenshots
+
+Add your real screenshots here:
+
+```text
+docs/screenshots/dashboard.png
+docs/screenshots/buildings.png
+docs/screenshots/leases.png
+```
+
+Recommended layout:
+
+```markdown
+### Dashboard
+![Dashboard](docs/screenshots/dashboard.png)
+
+### Buildings & Units
+![Buildings](docs/screenshots/buildings.png)
+
+### Lease Management
+![Leases](docs/screenshots/leases.png)
+```
+
+---
+
+## 🚀 Roadmap
 
 ### Phase 1 — Deterministic Intelligence
-
-• Portfolio dashboard  
-• Delinquency reports  
-• Rent posting automation  
+- portfolio dashboard
+- delinquency reporting
+- rent posting automation
 
 ### Phase 2 — AI Simulation
-
-• Rent increase modeling  
-• Vacancy stress scenarios  
-• Building performance analysis  
+- rent increase modeling
+- vacancy stress scenarios
+- building performance analysis
 
 ### Phase 3 — Predictive Intelligence
-
-• Delinquency prediction  
-• Expense anomaly detection  
-• Portfolio optimization insights  
+- delinquency prediction
+- expense anomaly detection
+- portfolio optimization insights
 
 ---
 
-# Why This Project Matters
+## ⭐ Why This Project Matters
 
-EstateIQ demonstrates the ability to build **real SaaS software for real-world business problems**.
+EstateIQ demonstrates the ability to build **real SaaS software solving real-world business problems**.
 
-The system showcases:
+The project showcases:
 
-• Multi‑tenant SaaS architecture  
-• Domain‑driven design  
-• Modern full‑stack development  
-• Financial data modeling  
-• Secure authentication practices  
+- multi-tenant SaaS architecture
+- domain-driven design
+- modern full-stack engineering
+- financial system modeling
+- secure authentication practices
 
 ---
 
 <p align="center">
-EstateIQ is being developed as a production-grade SaaS platform for small real estate portfolios.
+Built with care by Anthony Narine
 </p>
