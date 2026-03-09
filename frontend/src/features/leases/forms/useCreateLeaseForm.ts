@@ -35,29 +35,9 @@ type ValidateResult =
  * useCreateLeaseForm
  *
  * Form-state + validation + payload builder for CreateLeaseForm.
- *
- * Responsibilities:
- * - Owns controlled lease term state (string-first for inputs)
- * - Owns tenant UX state:
- *   - tenantMode: "select" (existing) or "create" (inline new)
- *   - primaryTenantId (select mode)
- *   - tenantCreateDraft (create mode)
- * - Client-side validation for:
- *   - required lease fields (start date, rent amount)
- *   - due day range (1–28)
- *   - create-mode requirement: tenant full_name
- * - Builds a DRF-ready lease payload:
- *   - Decimal-safe strings
- *   - nullable fields normalized
- *   - parties included only when selecting an existing tenant
- *
- * Non-responsibilities:
- * - No API calls (tenant creation + lease creation orchestration comes later)
- * - No server error normalization (handled by formatApiFormErrors)
- * - No org scoping (orgSlug lives in CreateLeaseForm)
  */
 export function useCreateLeaseForm() {
-  // Step 1: Lease term controlled state (string-based)
+  // Step 1: Lease term controlled state
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
   const [rentAmount, setRentAmount] = useState("");
@@ -65,10 +45,10 @@ export function useCreateLeaseForm() {
   const [securityDeposit, setSecurityDeposit] = useState("");
   const [status, setStatus] = useState<LeaseStatus>("active");
 
-  // Step 2: Tenant selection state (select-mode only)
+  // Step 2: Tenant selection state
   const [primaryTenantId, setPrimaryTenantId] = useState<number | null>(null);
 
-  // Step 3: Tenant UX state (best UX path)
+  // Step 3: Tenant UX state
   const [tenantMode, setTenantMode] = useState<TenantMode>("select");
   const [tenantCreateDraft, setTenantCreateDraft] =
     useState<TenantCreateDraft>(EMPTY_TENANT_DRAFT);
@@ -79,32 +59,56 @@ export function useCreateLeaseForm() {
   /**
    * enterCreateTenantMode
    *
-   * Switch UI into "create tenant" mode.
-   * - Clears any selected tenant because select/create are mutually exclusive.
+   * Switch UI into create mode and clear any selected tenant.
    */
   const enterCreateTenantMode = () => {
     // Step 1: Switch to create mode
     setTenantMode("create");
 
-    // Step 2: Clear selected tenant id
+    // Step 2: Clear selected tenant
     setPrimaryTenantId(null);
   };
 
   /**
    * selectExistingTenant
    *
-   * Switch UI into "select tenant" mode and set tenant id.
-   * - Passing null means "no tenant selected".
-   * - Clears create draft to avoid stale values when toggling back and forth.
+   * Switch UI into select mode and set the current tenant id.
    */
   const selectExistingTenant = (tenantId: number | null) => {
     // Step 1: Switch to select mode
     setTenantMode("select");
 
-    // Step 2: Set selected tenant id (nullable)
+    // Step 2: Set selected tenant id
     setPrimaryTenantId(tenantId);
 
-    // Step 3: Clear create draft (optional but keeps UX clean)
+    // Step 3: Clear create draft
+    setTenantCreateDraft(EMPTY_TENANT_DRAFT);
+  };
+
+  /**
+   * onTenantModeChange
+   *
+   * Single safe mode-switching API for the UI.
+   *
+   * Why this exists:
+   * - Prevents the parent from using raw setTenantMode directly
+   * - Keeps select/create transitions consistent
+   * - Fixes toggle regressions when moving back from create -> select
+   *
+   * Behavior:
+   * - "create": clears selected tenant id
+   * - "select": keeps current selected tenant if any, and clears create draft
+   */
+  const onTenantModeChange = (mode: TenantMode) => {
+    // Step 1: Move into create mode
+    if (mode === "create") {
+      setTenantMode("create");
+      setPrimaryTenantId(null);
+      return;
+    }
+
+    // Step 2: Move into select mode
+    setTenantMode("select");
     setTenantCreateDraft(EMPTY_TENANT_DRAFT);
   };
 
@@ -158,12 +162,10 @@ export function useCreateLeaseForm() {
     }
 
     // Step 4: Tenant create-mode validation
-    if (tenantMode === "create") {
-      if (!tenantCreateDraft.full_name.trim()) {
-        const msg = "Tenant full name is required.";
-        setLocalError(msg);
-        return { ok: false, message: msg };
-      }
+    if (tenantMode === "create" && !tenantCreateDraft.full_name.trim()) {
+      const msg = "Tenant full name is required.";
+      setLocalError(msg);
+      return { ok: false, message: msg };
     }
 
     return { ok: true };
@@ -176,7 +178,7 @@ export function useCreateLeaseForm() {
       ? securityDeposit.trim()
       : null;
 
-    // Step 2: Normalize Decimal-safe strings
+    // Step 2: Normalize decimal-safe strings
     const normalizedRent = rentAmount.trim();
 
     // Step 3: Normalize due day
@@ -188,7 +190,6 @@ export function useCreateLeaseForm() {
         ? [{ tenant_id: primaryTenantId, role: "primary" }]
         : undefined;
 
-    // Step 5: Build payload
     const payload = {
       start_date: startDate.trim(),
       end_date: normalizedEndDate,
@@ -219,7 +220,7 @@ export function useCreateLeaseForm() {
     // Step 3: Local error
     localError,
 
-    // Step 4: Setters (keep available for flexibility)
+    // Step 4: Setters
     setStartDate,
     setEndDate,
     setRentAmount,
@@ -231,9 +232,10 @@ export function useCreateLeaseForm() {
     setTenantCreateDraft,
     setLocalError,
 
-    // Step 5: Preferred tenant actions for the new UX
+    // Step 5: Tenant actions
     enterCreateTenantMode,
     selectExistingTenant,
+    onTenantModeChange,
 
     // Step 6: Helpers
     reset,

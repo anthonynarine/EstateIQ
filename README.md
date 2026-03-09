@@ -3,116 +3,138 @@
 
 AI‑Native Financial Operating System for Small Real Estate Portfolios
 
-------------------------------------------------------------------------
+---
 
-# 1. Vision
+![EstateIQ Banner](https://images.unsplash.com/photo-1560518883-ce09059eeffa?auto=format&fit=crop&w=1600&q=80)
+
+---
+
+# Vision
 
 EstateIQ is not a rent tracker.
 
 It is a **ledger‑first, multi‑tenant financial operating system** for
-landlords managing 1–50 units.
+landlords managing **1–50 units**.
 
 The system is built around:
 
 - Deterministic financial logic
 - Strict tenant isolation (SaaS multi‑tenancy)
-- Structured data for AI interpretation
-- Explainable financial insights
+- Structured financial data for AI interpretation
+- Explainable portfolio insights
 
-------------------------------------------------------------------------
+The goal is to provide small landlords with the same level of clarity
+that enterprise real estate systems provide to institutional investors.
 
-# 1.1 Real‑World Origin
+---
+
+# Author
+
+**Anthony Narine**  
+Full‑Stack Software Engineer
+
+EstateIQ is a **solo‑built full‑stack application** created by Anthony
+Narine.
+
+The system was originally built to help **Anthony’s mother manage her
+rental business more easily**. Existing property management platforms
+were either:
+
+- Too expensive for small landlords
+- Designed for large apartment operators
+- Focused mainly on rent collection rather than financial clarity
+
+EstateIQ was designed to solve those problems by giving small portfolio
+owners a **clear financial operating system for their properties**.
+
+This project serves both as:
+
+- A **real operational tool for a family business**
+- A **production‑grade portfolio project demonstrating modern SaaS
+architecture**
+
+---
+
+# Key Features
+
+• Multi‑tenant SaaS architecture  
+• Organization‑scoped property portfolios  
+• Buildings → Units → Leases → Tenants domain model  
+• Ledger‑first financial system for accurate reporting  
+• Tenant and lease lifecycle management  
+• Financial charge + payment allocation engine  
+• Role‑based access for organization members  
+• Real estate portfolio insights powered by structured data  
+
+---
+
+# Tech Stack
+
+### Frontend
+- React
+- TypeScript
+- TanStack Query
+- TailwindCSS
+
+### Backend
+- Django
+- Django REST Framework
+- Service‑layer architecture
+
+### Database
+- PostgreSQL
+
+### Authentication & Security
+- JWT authentication
+- **JWT stored in secure cookies in production**
+- Organization membership enforcement
+- Org‑scoped API requests using `X-Org-Slug`
+- Strict tenant isolation across the database
+
+---
+
+# Real‑World Origin
 
 EstateIQ was originally built to support a **real family‑owned rental
 business**.
 
-The author's mother manages several rental properties through a small
-family real estate company. While evaluating existing software, several
-problems became clear:
+The author’s mother manages several rental properties through a small
+family real estate company. During that process several problems became
+clear:
 
-• Most property management platforms are designed for **large apartment operators**  
-• Many tools are **expensive for small landlords**  
-• Existing systems focus heavily on **rent collection rather than financial clarity**  
+• Small landlords lack affordable software  
+• Most systems target enterprise property managers  
+• Financial visibility across properties is limited  
 
-EstateIQ was designed to support the **actual workflow of a small
-portfolio landlord**, where understanding cash flow, expenses, and
-property performance is just as important as collecting rent.
+EstateIQ was designed to support the **actual workflow of small rental
+portfolio owners**.
 
-This real‑world origin shaped both the **data model** and the **user
-experience** of the application.
+---
 
-------------------------------------------------------------------------
+# Domain Modeling
 
-# 2. Multi‑Tenancy: The Organization Boundary
+EstateIQ uses **domain‑driven design principles** rather than generic
+CRUD modeling.
 
-## What "Organization is the tenant boundary" means
+The core entities mirror how real property portfolios operate.
 
-In SaaS terminology, a *tenant* is a customer account boundary.
+```
+Organization
+   └── Building
+        └── Unit
+             └── Lease
+                  └── Tenant
+```
 
-In EstateIQ:
+Key modeling principles:
 
-- **Organization = SaaS tenant boundary (landlord business)**
-- **OrganizationMember = internal user inside an organization**
-- **Tenant (model) = renter paying rent (NOT a SaaS tenant)**
-
-This distinction is critical.
-
-------------------------------------------------------------------------
-
-## Why This Matters
-
-Multiple landlord businesses share:
-
-- The same database
-- The same backend
-- The same application
-
-But they must NEVER see each other's data.
-
-The `Organization` model is the wall between customers.
-
-------------------------------------------------------------------------
-
-## How Isolation Works
-
-sequenceDiagram
-  participant UI as React Frontend
-  participant API as Django API
-  participant DB as PostgreSQL
-
-  UI->>API: Authorization: Bearer <access>\nX-Org-Slug: juju-inc
-  API->>API: Middleware resolves request.org
-  API->>API: Permission checks membership + role
-  API->>DB: Query WHERE organization_id = request.org.id
-  DB-->>API: Org-scoped results
-  API-->>UI: Response
-
-------------------------------------------------------------------------
-
-# 3. Domain Modeling
-
-EstateIQ is designed using **domain‑driven design principles** rather
-than generic CRUD entities.
-
-The goal is to model how **real property portfolios operate**.
-
-High‑level relationship model:
-
-ORGANIZATION
-   └── BUILDING
-        └── UNIT
-             └── LEASE
-                  └── TENANT
-
-### Core Modeling Principles
-
-• **Organization** is the SaaS tenant boundary  
+• **Organization** represents the SaaS tenant boundary  
 • **Buildings belong to organizations**  
 • **Buildings contain many units**  
-• **Units can have multiple leases over time**  
-• **Tenants participate in leases but do not own the lease record**  
+• **Units may have many leases over time**  
+• **Tenants participate in leases but do not own the lease record**
 
-The **Lease** entity acts as the central relationship connecting:
+The **Lease** entity acts as the central financial contract connecting:
 
 - Tenant
 - Unit
@@ -120,146 +142,134 @@ The **Lease** entity acts as the central relationship connecting:
 - Lease dates
 - Financial charges
 
-This mirrors the real world where the **lease agreement is the primary
-financial contract** between landlord and renter.
+This structure mirrors real property management workflows.
 
-------------------------------------------------------------------------
+---
 
-# 4. Data Architecture (High-Level)
+# Multi‑Tenancy Architecture
 
-erDiagram
-  ORGANIZATION ||--o{ ORGANIZATION_MEMBER : has
-  ORGANIZATION ||--o{ BUILDING : owns
-  BUILDING ||--o{ UNIT : contains
-  ORGANIZATION ||--o{ TENANT : tracks
-  UNIT ||--o{ LEASE : has
-  TENANT ||--o{ LEASE : participates
-  LEASE ||--o{ CHARGE : generates
-  LEASE ||--o{ PAYMENT : receives
-  PAYMENT ||--o{ ALLOCATION : applies_to
-  CHARGE ||--o{ ALLOCATION : settles
+EstateIQ supports multiple landlord businesses within a single system.
 
-------------------------------------------------------------------------
+Each **Organization** represents a separate customer account.
 
-# 5. Ledger‑First Financial Model
+All application data is scoped to the organization context.
 
-EstateIQ is ledger‑first.
+Example request flow:
 
-Nothing is inferred without entries.
+```
+React App
+   ↓
+Authorization: Bearer <token>
+X‑Org‑Slug: fazie-inc
+   ↓
+Django Middleware resolves request.org
+   ↓
+Queries filtered by organization_id
+   ↓
+Org‑scoped data returned
+```
 
-## Flow of Money
+This ensures **complete data isolation between landlord businesses**.
 
-flowchart LR
-  RentPosting --> Charge
-  Charge --> LedgerEntry
-  Payment --> Allocation
-  Allocation --> LedgerEntry
-  LedgerEntry --> Reports
+---
 
-- Charges create receivables
-- Payments allocate against charges
-- Ledger entries drive reports
-- AI interprets structured financial data
+# Ledger‑First Financial Model
 
-------------------------------------------------------------------------
+EstateIQ uses a **deterministic financial ledger**.
 
-# 6. Role Model (Internal Users)
+Nothing is inferred without financial records.
 
-OrganizationMember roles:
+Financial flow:
 
-- owner
-- manager
-- accountant
-- read_only
+```
+Rent Posting
+      ↓
+Charge
+      ↓
+Ledger Entry
+      ↓
+Payment
+      ↓
+Allocation
+      ↓
+Reports
+```
 
-Roles control:
+This allows:
 
-- Write access
-- Report access
-- Financial actions
-- Administrative control
+- Accurate receivable tracking
+- Transparent payment allocation
+- AI‑readable financial history
 
-------------------------------------------------------------------------
+---
 
-# 7. System Architecture Overview
+# Security Model
 
-flowchart TB
+Security is built around strict multi‑tenant isolation.
 
-  subgraph Frontend
-    React[React + TypeScript]
-    Query[TanStack Query]
-  end
+Features include:
 
-  subgraph Backend
-    Django[Django + DRF]
-    Auth[JWT Authentication]
-    Middleware[Org Resolution Middleware]
-    Services[Service Layer]
-  end
+- JWT authentication
+- **JWT stored in HTTP‑only cookies in production**
+- Organization membership validation
+- Organization‑scoped database queries
+- Role‑based access control
 
-  subgraph Database
-    Postgres[(PostgreSQL)]
-  end
+No cross‑tenant data access is possible.
 
-  React --> Query
-  Query --> Django
-  Django --> Middleware
-  Middleware --> Services
-  Services --> Postgres
+---
 
-------------------------------------------------------------------------
+# System Architecture
 
-# 8. Security Model
+```
+React + TypeScript
+        ↓
+TanStack Query
+        ↓
+Django REST API
+        ↓
+Service Layer
+        ↓
+PostgreSQL
+```
 
-- JWT-based authentication
-- Organization membership enforcement
-- X-Org-Slug required for org-scoped endpoints
-- All queries filtered by organization
-- No cross-tenant data access
+EstateIQ follows a **modular monolith architecture** to maintain
+simplicity while enabling long‑term scalability.
 
-------------------------------------------------------------------------
+---
 
-# 9. AI-First Design Philosophy
+# Development Principles
 
-EstateIQ is designed so that:
-
-- All financial actions produce structured ledger data
-- AI reads from deterministic data
-- AI never mutates financial records
-- AI explanations reference actual ledger entries
-
-AI is an interpretation layer — not a replacement for financial logic.
-
-------------------------------------------------------------------------
-
-# 10. Development Principles
-
-- Modular monolith (Django apps)
-- Service-layer business logic
+- Modular Django apps
+- Service‑layer business logic
 - Deterministic accounting
 - Strict domain separation
-- URL-driven org context
-- Org-scoped TanStack query keys
+- Org‑scoped query keys
+- Predictable API contracts
 
-------------------------------------------------------------------------
+---
 
-# 11. Roadmap
+# Roadmap
 
-Phase 1: Deterministic Intelligence  
-- Dashboard summary  
-- Delinquency report  
-- Rent posting automation  
+### Phase 1 — Deterministic Intelligence
 
-Phase 2: AI Simulation  
-- Rent increase modeling  
-- Vacancy stress scenarios  
-- Underperforming building analysis  
+- Portfolio dashboard
+- Delinquency reports
+- Rent posting automation
 
-Phase 3: Predictive Layer  
-- Delinquency prediction  
-- Expense anomaly detection  
-- Portfolio optimization recommendations  
+### Phase 2 — AI Simulation
 
-------------------------------------------------------------------------
+- Rent increase modeling
+- Vacancy stress scenarios
+- Building performance analysis
 
-EstateIQ is being built as a production‑grade, defensible SaaS product.
+### Phase 3 — Predictive Layer
+
+- Delinquency prediction
+- Expense anomaly detection
+- Portfolio optimization insights
+
+---
+
+EstateIQ is being developed as a **production‑grade SaaS platform for
+small real estate portfolios**.
