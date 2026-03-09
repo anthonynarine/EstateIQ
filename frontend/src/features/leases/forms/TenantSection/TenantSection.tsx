@@ -1,4 +1,5 @@
 // # Filename: src/features/leases/forms/TenantSection/TenantSection.tsx
+// ✅ New Code
 
 import TenantCreatePanel from "./TenantCreatePanel";
 import TenantModeToggle from "./TenantModeToggle";
@@ -26,12 +27,12 @@ type Props = {
 /**
  * TenantSection
  *
- * Premium tenant selection/creation section for lease creation.
+ * Tenant selection / creation step inside lease workflow.
  *
- * Responsibilities:
- * - Show a clear mode switch between existing vs new tenant
- * - Render either the select panel or create panel
- * - Keep a single, calm interaction surface
+ * Design goals
+ * - lighter surface
+ * - remove nested heavy borders
+ * - mobile-first spacing
  */
 export default function TenantSection({
   orgSlug,
@@ -58,22 +59,24 @@ export default function TenantSection({
   };
 
   return (
-    <section className="rounded-3xl border border-neutral-800/80 bg-neutral-900/40">
-      <div className="border-b border-neutral-800/80 px-5 py-4">
-        <div className="space-y-3">
-          <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-neutral-500">
-              Tenant assignment
-            </p>
-            <h4 className="mt-1 text-lg font-semibold text-white">{label}</h4>
-            <p className="mt-1 text-sm text-neutral-400">{helperText}</p>
-          </div>
+    <section className="space-y-5">
+      {/* Section header */}
+      <div className="space-y-3">
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-neutral-500">
+            Tenant assignment
+          </p>
 
-          <TenantModeToggle mode={tenantMode} onModeChange={handleModeChange} />
+          <h4 className="mt-1 text-lg font-semibold text-white">{label}</h4>
+
+          <p className="mt-1 text-sm text-neutral-400">{helperText}</p>
         </div>
+
+        <TenantModeToggle mode={tenantMode} onModeChange={handleModeChange} />
       </div>
 
-      <div className="space-y-4 px-5 py-5">
+      {/* Content */}
+      <div className="space-y-4">
         {!isCreateMode ? (
           <TenantSelectPanel
             orgSlug={orgSlug}
