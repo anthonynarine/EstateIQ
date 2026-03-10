@@ -93,14 +93,14 @@ export default function BuildingUnitsSection({
               type="button"
               onClick={onToggleAdd}
               className={[
-                "inline-flex items-center gap-2 rounded-full px-4 py-2",
-                "text-xs font-semibold transition",
+                "inline-flex min-h-11 items-center gap-2 rounded-2xl px-4 py-2.5",
+                "text-sm font-medium transition",
                 isAddOpen
-                  ? "border border-neutral-700 bg-neutral-900 text-neutral-200 hover:bg-neutral-800"
-                  : "border border-white/10 bg-white/5 text-white hover:bg-white/10",
+                  ? "border border-white/10 bg-white/[0.03] text-neutral-200 hover:bg-white/[0.06]"
+                  : "border border-cyan-400/20 bg-cyan-500/10 text-cyan-200 hover:border-cyan-300/30 hover:bg-cyan-500/15",
               ].join(" ")}
-            >
-              <span className="text-sm leading-none">{isAddOpen ? "×" : "+"}</span>
+              >
+              <span className="text-base leading-none">{isAddOpen ? "×" : "+"}</span>
               {isAddOpen ? "Close form" : "Add unit"}
             </button>
           </div>

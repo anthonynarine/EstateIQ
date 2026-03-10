@@ -1,5 +1,6 @@
 # Filename: apps/buildings/views.py
 
+
 from __future__ import annotations
 
 from django.db.models import Count, F, IntegerField, OuterRef, QuerySet, Subquery, Value, Q
@@ -21,6 +22,7 @@ from apps.buildings.serializers import (
 from apps.leases import selectors as lease_selectors
 from apps.leases.models import Lease
 from apps.leases.serializers import LeaseSerializer
+from shared.api.pagination import BuildingsPagination, UnitsPagination
 from shared.auth.permissions import IsOrgMember
 
 
@@ -29,11 +31,13 @@ class BuildingViewSet(viewsets.ModelViewSet):
 
     permission_classes = [IsOrgMember]
     serializer_class = BuildingSerializer
+    pagination_class = BuildingsPagination
     filter_backends = [OrderingFilter]
     ordering_fields = ["name", "created_at", "updated_at"]
     ordering = ["-created_at"]
 
     def get_queryset(self):
+        """Return org-scoped buildings annotated with occupancy summary fields."""
         org = self.request.org
         qs = selectors.buildings_qs_for_org(org=org)
         today = timezone.localdate()
@@ -59,9 +63,15 @@ class BuildingViewSet(viewsets.ModelViewSet):
         )
 
         return qs.annotate(
-            units_count=Coalesce(Subquery(units_count_sq), Value(0), output_field=IntegerField()),
+            units_count=Coalesce(
+                Subquery(units_count_sq),
+                Value(0),
+                output_field=IntegerField(),
+            ),
             occupied_units_count=Coalesce(
-                Subquery(occupied_units_count_sq), Value(0), output_field=IntegerField()
+                Subquery(occupied_units_count_sq),
+                Value(0),
+                output_field=IntegerField(),
             ),
         ).annotate(
             vacant_units_count=Coalesce(F("units_count"), Value(0))
@@ -69,8 +79,18 @@ class BuildingViewSet(viewsets.ModelViewSet):
         )
 
     def perform_create(self, serializer):
+        """Create a building through the service layer."""
         instance = services.create_building(
             org=self.request.org,
+            data=serializer.validated_data,
+        )
+        serializer.instance = instance
+
+    def perform_update(self, serializer):
+        """Update a building through the service layer."""
+        instance = services.update_building(
+            org=self.request.org,
+            instance=self.get_object(),
             data=serializer.validated_data,
         )
         serializer.instance = instance
@@ -81,23 +101,29 @@ class UnitViewSet(viewsets.ModelViewSet):
 
     permission_classes = [IsOrgMember]
     serializer_class = UnitSerializer
+    pagination_class = UnitsPagination
     filter_backends = [OrderingFilter]
-    ordering_fields = ["label", "bedrooms", "bathrooms", "sqft", "created_at", "updated_at", "id"]
+    ordering_fields = [
+        "label",
+        "bedrooms",
+        "bathrooms",
+        "sqft",
+        "created_at",
+        "updated_at",
+        "id",
+    ]
     ordering = ["id"]
 
     def get_serializer_class(self):
-        """Use a richer serializer for retrieve views only."""
+        """Use a richer serializer for retrieve only."""
         if self.action == "retrieve":
             return UnitDetailSerializer
         return UnitSerializer
 
     def get_queryset(self) -> QuerySet[Unit]:
+        """Return org-scoped units, optionally filtered by building."""
         org = self.request.org
-        qs = (
-            selectors.units_qs_for_org(org=org)
-            .select_related("building")
-            .order_by("id")
-        )
+        qs = selectors.units_qs_for_org(org=org).select_related("building").order_by("id")
 
         building_param = self.request.query_params.get("building")
         if building_param:
@@ -110,14 +136,18 @@ class UnitViewSet(viewsets.ModelViewSet):
         return qs
 
     def perform_create(self, serializer):
+        """Create a unit scoped to the request organization."""
         serializer.save(organization=self.request.org)
 
     def perform_update(self, serializer):
+        """Update a unit through the service layer and protect building reassignment."""
         if "building" in serializer.validated_data:
             incoming_building = serializer.validated_data.get("building")
             current_unit = self.get_object()
             if incoming_building and incoming_building.id != current_unit.building_id:
-                raise ValidationError({"building": "Building cannot be changed after unit creation."})
+                raise ValidationError(
+                    {"building": "Building cannot be changed after unit creation."}
+                )
 
         instance = services.update_unit(
             org=self.request.org,
@@ -127,6 +157,7 @@ class UnitViewSet(viewsets.ModelViewSet):
         serializer.instance = instance
 
     def destroy(self, request, *args, **kwargs):
+        """Prevent deleting units with active leases or lease history."""
         unit = self.get_object()
         org = request.org
         today = timezone.localdate()
@@ -148,7 +179,11 @@ class UnitViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_409_CONFLICT,
             )
 
-        has_any_lease_history = Lease.objects.filter(organization=org, unit=unit).exists()
+        has_any_lease_history = Lease.objects.filter(
+            organization=org,
+            unit=unit,
+        ).exists()
+
         if has_any_lease_history:
             return Response(
                 {"detail": "Cannot delete a unit that has lease history. Archive it instead."},
@@ -159,6 +194,12 @@ class UnitViewSet(viewsets.ModelViewSet):
 
     @action(detail=True, methods=["get"], url_path="leases")
     def leases(self, request, pk=None):
+        """Return all leases for a unit.
+
+        Note:
+            This custom action is not paginated yet. We can paginate it in the
+            next pass when we wire lease-history pagination.
+        """
         unit = self.get_object()
         qs = lease_selectors.leases_qs(org=request.org).filter(unit=unit)
         serializer = LeaseSerializer(qs, many=True, context={"request": request})

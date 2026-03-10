@@ -1,6 +1,7 @@
 // # Filename: src/features/buildings/pages/BuildingPage/components/BuildingsList.tsx
 // ✅ New Code
 
+import type { ReactNode } from "react";
 import type { Building } from "../../../api/buildingsApi";
 import BuildingCard from "./BuildingCard";
 
@@ -10,6 +11,7 @@ type Props = {
   isFetching: boolean;
   onEdit?: (building: Building) => void;
   onDelete?: (building: Building) => void;
+  footer?: ReactNode;
 };
 
 /**
@@ -33,6 +35,7 @@ export default function BuildingsList({
   isFetching,
   onEdit,
   onDelete,
+  footer,
 }: Props) {
   const safeBuildings = buildings ?? [];
   const buildingCount = safeBuildings.length;
@@ -107,8 +110,8 @@ export default function BuildingsList({
               Portfolio buildings
             </h2>
             <p className="text-sm text-neutral-400">
-              {buildingCount} building{buildingCount === 1 ? "" : "s"} in this
-              organization.
+              Review inventory and open a building workspace to manage units,
+              leases, and occupancy.
             </p>
           </div>
 
@@ -138,6 +141,8 @@ export default function BuildingsList({
           ))}
         </div>
       </div>
+
+      {footer}
     </section>
   );
 }

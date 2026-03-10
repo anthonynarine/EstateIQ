@@ -1,34 +1,57 @@
-// # Filename: src/features/buildings/queries/useBuildings.ts
+// # Filename: src/features/buildings/hooks/useBuildings.ts
 
 
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import {
-  createBuilding,
-  listBuildings,
-  getBuilding, 
-} from "../../../api/buildingsApi";
-import type { CreateBuildingInput } from "../../../api/buildingsApi";
+import { useQuery } from "@tanstack/react-query";
+import { listBuildings, getBuilding } from "../../../api/buildingsApi";
 
 export const BUILDINGS_KEYS = {
   all: (orgSlug: string) => ["org", orgSlug, "buildings"] as const,
+
+  list: (orgSlug: string, page: number, pageSize: number) =>
+    ["org", orgSlug, "buildings", "list", { page, pageSize }] as const,
+
   detail: (orgSlug: string, buildingId: number) =>
-    ["org", orgSlug, "buildings", buildingId] as const,
+    ["org", orgSlug, "buildings", "detail", buildingId] as const,
 };
 
-export function useBuildingsQuery(orgSlug: string | null) {
+/**
+ * useBuildingsQuery
+ *
+ * Paginated buildings query for the buildings index page.
+ */
+export function useBuildingsQuery(
+  orgSlug: string | null,
+  page: number,
+  pageSize: number
+) {
   return useQuery({
-    queryKey: orgSlug ? BUILDINGS_KEYS.all(orgSlug) : ["org", "none", "buildings"],
+    queryKey: orgSlug
+      ? BUILDINGS_KEYS.list(orgSlug, page, pageSize)
+      : ["org", "none", "buildings", "list", { page, pageSize }],
     enabled: Boolean(orgSlug),
     queryFn: async () => {
-      if (!orgSlug) throw new Error("useBuildingsQuery called without orgSlug.");
-      return await listBuildings(orgSlug);
+      if (!orgSlug) {
+        throw new Error("useBuildingsQuery called without orgSlug.");
+      }
+
+      return await listBuildings({
+        orgSlug,
+        page,
+        pageSize,
+      });
     },
+    placeholderData: (previous) => previous,
     staleTime: 30_000,
     gcTime: 5 * 60_000,
     refetchOnWindowFocus: false,
   });
 }
 
+/**
+ * useBuildingQuery
+ *
+ * Single-building detail query.
+ */
 export function useBuildingQuery(
   orgSlug: string | null,
   buildingId: number | null,
@@ -40,30 +63,21 @@ export function useBuildingQuery(
     queryKey:
       orgSlug && buildingId != null
         ? BUILDINGS_KEYS.detail(orgSlug, buildingId)
-        : ["org", "none", "buildings", "none"],
+        : ["org", "none", "buildings", "detail", "none"],
     enabled,
     queryFn: async () => {
-      if (!orgSlug) throw new Error("useBuildingQuery called without orgSlug.");
-      if (buildingId == null) throw new Error("useBuildingQuery called without buildingId.");
+      if (!orgSlug) {
+        throw new Error("useBuildingQuery called without orgSlug.");
+      }
+
+      if (buildingId == null) {
+        throw new Error("useBuildingQuery called without buildingId.");
+      }
+
       return await getBuilding(orgSlug, buildingId);
     },
     staleTime: 30_000,
     gcTime: 5 * 60_000,
     refetchOnWindowFocus: false,
-  });
-}
-
-export function useCreateBuildingMutation(orgSlug: string | null) {
-  const queryClient = useQueryClient();
-
-  return useMutation({
-    mutationFn: async (payload: CreateBuildingInput) => {
-      if (!orgSlug) throw new Error("Cannot create building without orgSlug.");
-      return await createBuilding(orgSlug, payload);
-    },
-    onSuccess: async () => {
-      if (!orgSlug) return;
-      await queryClient.invalidateQueries({ queryKey: BUILDINGS_KEYS.all(orgSlug) });
-    },
   });
 }
