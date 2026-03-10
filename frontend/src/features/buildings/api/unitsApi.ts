@@ -1,5 +1,5 @@
 // # Filename: src/features/buildings/api/unitsApi.ts
-
+// ✅ New Code
 
 import api from "../../../api/axios";
 
@@ -26,6 +26,30 @@ export type Unit = {
 
   created_at: string;
   updated_at: string;
+};
+
+/**
+ * PaginatedResponse
+ *
+ * Standard DRF page-number pagination envelope used by list endpoints.
+ */
+export type PaginatedResponse<T> = {
+  count: number;
+  next: string | null;
+  previous: string | null;
+  results: T[];
+};
+
+/**
+ * ListUnitsByBuildingParams
+ *
+ * Params for listing units scoped to a single building.
+ */
+export type ListUnitsByBuildingParams = {
+  buildingId: number;
+  page?: number;
+  pageSize?: number;
+  ordering?: string;
 };
 
 /**
@@ -62,56 +86,78 @@ export type UpdateUnitInput = Partial<{
 }>;
 
 /**
- * DRFPaginated
+ * normalizePaginatedResponse
  *
- * Minimal shape of Django REST Framework paginated responses.
- */
-type DRFPaginated<T> = {
-  count: number;
-  next: string | null;
-  previous: string | null;
-  results: T[];
-};
-
-/**
- * normalizeListResponse
+ * Ensures the units list always returns a stable paginated shape.
  *
- * Normalizes list endpoint responses into an array.
+ * Why this exists:
+ * - The backend should return DRF pagination metadata.
+ * - This guard protects the frontend from malformed or unexpected payloads.
+ * - We intentionally do NOT flatten the response to an array because the UI
+ *   needs count/next/previous for real pagination controls.
  */
-function normalizeListResponse<T>(data: unknown): T[] {
-  // Step 1: Plain list response
-  if (Array.isArray(data)) return data as T[];
-
-  // Step 2: DRF paginated response
+function normalizePaginatedResponse<T>(data: unknown): PaginatedResponse<T> {
+  // Step 1: DRF paginated payload
   if (
     data &&
     typeof data === "object" &&
     "results" in data &&
     Array.isArray((data as { results?: unknown }).results)
   ) {
-    return (data as DRFPaginated<T>).results;
+    const typed = data as Partial<PaginatedResponse<T>>;
+
+    return {
+      count: typeof typed.count === "number" ? typed.count : 0,
+      next: typed.next ?? null,
+      previous: typed.previous ?? null,
+      results: Array.isArray(typed.results) ? typed.results : [],
+    };
   }
 
-  // Step 3: Defensive fallback to avoid UI crashes
-  // eslint-disable-next-line no-console
-  console.error("Unexpected list response shape:", data);
-  return [];
+  // Step 2: Legacy/plain-list fallback
+  // This keeps the frontend from exploding if a non-paginated response slips through.
+  if (Array.isArray(data)) {
+    return {
+      count: data.length,
+      next: null,
+      previous: null,
+      results: data as T[],
+    };
+  }
+
+  // Step 3: Fail-safe empty payload
+  return {
+    count: 0,
+    next: null,
+    previous: null,
+    results: [],
+  };
 }
 
 /**
  * listUnitsByBuilding
  *
+ * Returns a paginated units collection for a single building.
+ *
  * Endpoint:
- * - GET /api/v1/units/?building=<buildingId>
+ * - GET /api/v1/units/?building=<buildingId>&page=<page>&page_size=<pageSize>
  */
-export async function listUnitsByBuilding(buildingId: number): Promise<Unit[]> {
-  // Step 1: Request
-  const res = await api.get<Unit[] | DRFPaginated<Unit>>("/api/v1/units/", {
-    params: { building: buildingId },
+export async function listUnitsByBuilding({
+  buildingId,
+  page = 1,
+  pageSize = 6,
+  ordering,
+}: ListUnitsByBuildingParams): Promise<PaginatedResponse<Unit>> {
+  const res = await api.get<PaginatedResponse<Unit> | Unit[]>("/api/v1/units/", {
+    params: {
+      building: buildingId,
+      page,
+      page_size: pageSize,
+      ...(ordering ? { ordering } : {}),
+    },
   });
 
-  // Step 2: Normalize response to array
-  return normalizeListResponse<Unit>(res.data);
+  return normalizePaginatedResponse<Unit>(res.data);
 }
 
 /**
@@ -121,10 +167,7 @@ export async function listUnitsByBuilding(buildingId: number): Promise<Unit[]> {
  * - POST /api/v1/units/
  */
 export async function createUnit(payload: CreateUnitInput): Promise<Unit> {
-  // Step 1: Request
   const res = await api.post<Unit>("/api/v1/units/", payload);
-
-  // Step 2: Return created unit
   return res.data;
 }
 
@@ -143,10 +186,7 @@ export async function updateUnit(
   unitId: number,
   payload: UpdateUnitInput
 ): Promise<Unit> {
-  // Step 1: Request
   const res = await api.patch<Unit>(`/api/v1/units/${unitId}/`, payload);
-
-  // Step 2: Return updated record
   return res.data;
 }
 
@@ -163,6 +203,5 @@ export async function updateUnit(
  *   Surface `error.response.data.detail` in the UI confirm modal.
  */
 export async function deleteUnit(unitId: number): Promise<void> {
-  // Step 1: Request
   await api.delete(`/api/v1/units/${unitId}/`);
 }

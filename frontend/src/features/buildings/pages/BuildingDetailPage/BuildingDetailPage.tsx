@@ -1,7 +1,7 @@
 // # Filename: src/features/buildings/pages/BuildingDetailPage/BuildingDetailPage.tsx
 
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 
 import { useOrg } from "../../../tenancy/hooks/useOrg";
@@ -16,15 +16,16 @@ import UnitCard from "./components/UnitCard";
 import CreateUnitForm from "./forms/CreateUnitForm";
 import UnitEditModal from "./forms/UnitEditModal";
 import UnitDeleteConfirmModal from "./forms/UnitDeleteConfirmModal";
+import CollectionPaginationFooter from "../../../../components/pagination/CollectionPaginationFooter";
 
 /**
  * BuildingDetailPage
  *
  * Orchestrator page for a single building:
- * - Fetch building + units (org-scoped)
+ * - Fetch building + paginated units (org-scoped)
  * - Render header + units grid
- * - Occupancy is computed server-side (NO per-unit lease queries)
- * - Delegate edit/delete to `useUnitActions` (modals are presentational)
+ * - Occupancy is computed server-side
+ * - Delegate edit/delete to `useUnitActions`
  */
 export default function BuildingDetailPage() {
   // Step 1: Routing + org context
@@ -38,27 +39,47 @@ export default function BuildingDetailPage() {
 
   // Step 2: Local UI state
   const [isAddUnitOpen, setIsAddUnitOpen] = useState(false);
+  const [page, setPage] = useState(1);
 
-  // Step 3: Queries (org-scoped)
+  const PAGE_SIZE = 6;
+
+  // Step 3: Building query
   const {
     data: building,
     isLoading: buildingLoading,
     isError: buildingIsError,
   } = useBuildingQuery(orgSlug, buildingIdNumber, canQuery);
 
-  const {
-    data: units = [],
-    isLoading: unitsLoading,
-    isError: unitsIsError,
-  } = useUnitsQuery({
+  // Step 4: Units query (paginated)
+  const unitsQuery = useUnitsQuery({
     orgSlug,
     buildingId: buildingIdNumber,
+    page,
+    pageSize: PAGE_SIZE,
     enabled: canQuery,
   });
 
-  // Step 4: Derived building header fields (stable)
+  const pageData = unitsQuery.data;
+  const units = pageData?.results ?? [];
+  const totalCount = pageData?.count ?? 0;
+  const totalPages = Math.max(1, Math.ceil(totalCount / PAGE_SIZE));
+
+  // Step 5: Clamp page if deletes or mutations reduce the page count
+  useEffect(() => {
+    if (!unitsQuery.isSuccess) {
+      return;
+    }
+
+    if (page > totalPages) {
+      setPage(totalPages);
+    }
+  }, [page, totalPages, unitsQuery.isSuccess]);
+
+  // Step 6: Derived building header fields
   const buildingForHeader = useMemo(() => {
-    if (!building) return null;
+    if (!building) {
+      return null;
+    }
 
     return {
       name: building.name,
@@ -70,18 +91,19 @@ export default function BuildingDetailPage() {
     };
   }, [building]);
 
-  // Step 5: Derived occupancy counts (deterministic; no "Checking..." state)
+  // Step 7: Occupancy count for currently loaded units
   const occupiedUnitsCount = useMemo(() => {
     return units.filter((u) => u.is_occupied).length;
   }, [units]);
 
-  // Step 6: Unit actions (edit/delete modals)
+  // Step 8: Unit actions (edit/delete modals)
   const { openEdit, openDelete, editModalProps, deleteModalProps } =
     useUnitActions(buildingIdNumber);
 
-  // Step 7: Navigate to unit detail page (preserve org querystring)
+  // Step 9: Navigate to unit detail page
   const goToUnit = (unit: { id: number; label: string }) => {
     const search = location.search || "";
+
     navigate(`/dashboard/units/${unit.id}${search}`, {
       state: {
         building: buildingForHeader,
@@ -90,7 +112,7 @@ export default function BuildingDetailPage() {
     });
   };
 
-  // Step 8: Guards
+  // Step 10: Guards
   if (!canQuery) {
     return (
       <div className="p-6 text-rose-300">
@@ -113,21 +135,24 @@ export default function BuildingDetailPage() {
         orgSlug={orgSlug}
         building={buildingForHeader}
         occupiedUnitsCount={occupiedUnitsCount}
-        totalUnitsCount={units.length}
+        totalUnitsCount={totalCount}
       />
 
       <BuildingUnitsSection
-        isLoading={unitsLoading}
-        isError={unitsIsError}
+        isLoading={unitsQuery.isLoading}
+        isError={unitsQuery.isError}
         unitsCount={units.length}
         isAddOpen={isAddUnitOpen}
-        onToggleAdd={() => setIsAddUnitOpen((p) => !p)}
+        onToggleAdd={() => setIsAddUnitOpen((prev) => !prev)}
         addForm={
           <CreateUnitForm
             orgSlug={orgSlug}
             buildingId={buildingIdNumber}
             variant="inline"
-            onSuccess={() => setIsAddUnitOpen(false)}
+            onSuccess={() => {
+              setIsAddUnitOpen(false);
+              setPage(1);
+            }}
             onCancel={() => setIsAddUnitOpen(false)}
           />
         }
@@ -143,9 +168,19 @@ export default function BuildingDetailPage() {
             />
           ))
         }
+        footer={
+          <CollectionPaginationFooter
+            page={page}
+            pageSize={PAGE_SIZE}
+            totalCount={totalCount}
+            itemLabel="unit"
+            isFetching={unitsQuery.isFetching}
+            onPrevious={() => setPage((prev) => Math.max(1, prev - 1))}
+            onNext={() => setPage((prev) => Math.min(totalPages, prev + 1))}
+          />
+        }
       />
 
-      {/* Step 9: Edit modal */}
       <UnitEditModal
         isOpen={editModalProps.isOpen}
         unitDisplayName={editModalProps.unitDisplayName}
@@ -157,7 +192,6 @@ export default function BuildingDetailPage() {
         errorMessage={editModalProps.errorMessage ?? null}
       />
 
-      {/* Step 10: Delete modal */}
       <UnitDeleteConfirmModal {...deleteModalProps} />
     </div>
   );

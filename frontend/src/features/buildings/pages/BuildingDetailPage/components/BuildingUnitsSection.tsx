@@ -1,5 +1,5 @@
 // # Filename: src/features/buildings/pages/BuildingDetailPage/components/BuildingUnitsSection.tsx
-
+// ✅ New Code
 
 import type { ReactNode } from "react";
 
@@ -14,6 +14,7 @@ type Props = {
   isError: boolean;
   emptyMessage?: string;
   renderUnits: () => ReactNode;
+  footer?: ReactNode;
 };
 
 /**
@@ -26,6 +27,7 @@ type Props = {
  * - Toggle inline unit creation form
  * - Render loading / error / empty states
  * - Render the unit grid via `renderUnits`
+ * - Render an optional section footer (pagination)
  *
  * Non-responsibilities:
  * - Fetching data
@@ -43,6 +45,7 @@ export default function BuildingUnitsSection({
   isError,
   emptyMessage = "No units yet. Add the first unit under this building to get started.",
   renderUnits,
+  footer,
 }: Props) {
   // Step 1: Loading state
   if (isLoading) {
@@ -71,7 +74,7 @@ export default function BuildingUnitsSection({
   }
 
   return (
-    <section className="rounded-3xl border border-neutral-800/80 bg-neutral-950 shadow-[0_0_0_1px_rgba(255,255,255,0.02)]">
+    <section className="overflow-hidden rounded-3xl border border-neutral-800/80 bg-neutral-950 shadow-[0_0_0_1px_rgba(255,255,255,0.02)]">
       <div className="border-b border-neutral-800/80 px-5 py-4 sm:px-6">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
           <div className="space-y-1">
@@ -99,7 +102,7 @@ export default function BuildingUnitsSection({
                   ? "border border-white/10 bg-white/[0.03] text-neutral-200 hover:bg-white/[0.06]"
                   : "border border-cyan-400/20 bg-cyan-500/10 text-cyan-200 hover:border-cyan-300/30 hover:bg-cyan-500/15",
               ].join(" ")}
-              >
+            >
               <span className="text-base leading-none">{isAddOpen ? "×" : "+"}</span>
               {isAddOpen ? "Close form" : "Add unit"}
             </button>
@@ -138,6 +141,8 @@ export default function BuildingUnitsSection({
           </div>
         )}
       </div>
+
+      {footer}
     </section>
   );
 }
