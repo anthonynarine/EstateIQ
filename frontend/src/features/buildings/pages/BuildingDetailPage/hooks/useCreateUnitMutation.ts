@@ -2,8 +2,11 @@
 
 
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { createUnit, type CreateUnitInput, type Unit } from "../../../api/unitsApi";
-import { unitsQueryKey } from "./useUnitsQuery"; 
+import {
+  createUnit,
+  type CreateUnitInput,
+  type Unit,
+} from "../../../api/unitsApi";
 
 /**
  * UseCreateUnitMutationArgs
@@ -26,16 +29,16 @@ type UseCreateUnitMutationArgs = {
 /**
  * useCreateUnitMutation
  *
- * Creates a Unit under a Building and invalidates the Units list query for that building.
+ * Creates a Unit under a Building and invalidates all paginated Units list
+ * queries for that building.
  *
  * Cache strategy:
- * - Invalidate: ["org", orgSlug, "units", buildingId]
- * - No manual refetch hacks.
- * - TanStack Query remains the single source of server state.
+ * - Invalidate prefix: ["org", orgSlug, "units", buildingId]
+ * - This catches page 1, page 2, and any page-size variants.
  *
  * Security / tenancy:
- * - Backend enforces tenant boundary via request.org (derived from X-Org-Slug).
- * - If orgSlug is missing, this mutation will throw early.
+ * - Backend enforces tenant boundary via request.org.
+ * - If orgSlug is missing, this mutation throws early.
  */
 export function useCreateUnitMutation({
   orgSlug,
@@ -48,13 +51,14 @@ export function useCreateUnitMutation({
      * mutationFn
      *
      * Accepts form values excluding `building` because the page context
-     * provides the buildingId (prevents user tampering + keeps UI simpler).
+     * provides the buildingId.
      */
     mutationFn: async (input) => {
       // Step 1: Hard guard required context
       if (!orgSlug) {
         throw new Error("Organization not selected (missing orgSlug).");
       }
+
       if (!buildingId) {
         throw new Error("Invalid building context (missing buildingId).");
       }
@@ -72,15 +76,16 @@ export function useCreateUnitMutation({
     /**
      * onSuccess
      *
-     * Invalidate Units list for this building so UI updates deterministically.
+     * Invalidate all paginated Units queries for this building so the UI
+     * refreshes immediately without a manual page reload.
      */
     onSuccess: async () => {
-      // Step 1: Only invalidate when keys are valid
-      if (!orgSlug || !buildingId) return;
+      if (!orgSlug || !buildingId) {
+        return;
+      }
 
-      // Step 2: Invalidate the exact tenant+building scoped list
       await queryClient.invalidateQueries({
-        queryKey: unitsQueryKey(orgSlug, buildingId),
+        queryKey: ["org", orgSlug, "units", buildingId],
       });
     },
   });
