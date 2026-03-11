@@ -1,8 +1,12 @@
 // # Filename: src/features/leases/pages/LeaseCreatePage.tsx
-// ✅ New Code
 
 import { Link, useSearchParams } from "react-router-dom";
-import { FilePlus2, Building2 } from "lucide-react";
+import { Building2, FilePlus2 } from "lucide-react";
+
+import CreateLeaseForm, {
+  type LeaseCreateInitialContext,
+  type LeaseCreateLaunchMode,
+} from "../forms/CreateLeaseForm/CreateLeaseForm";
 
 /**
  * parseOptionalNumber
@@ -30,6 +34,38 @@ function parseOptionalNumber(value: string | null): number | null {
 }
 
 /**
+ * deriveLaunchMode
+ *
+ * Determines which lease-create workflow launched this page.
+ *
+ * @param tenantId Parsed tenant id
+ * @param unitId Parsed unit id
+ * @returns Launch mode for the shared lease form
+ */
+function deriveLaunchMode(
+  tenantId: number | null,
+  unitId: number | null
+): LeaseCreateLaunchMode {
+  // Step 1: Both tenant + unit present
+  if (tenantId && unitId) {
+    return "tenant-and-unit";
+  }
+
+  // Step 2: Tenant-only launch
+  if (tenantId) {
+    return "tenant-first";
+  }
+
+  // Step 3: Unit-only launch
+  if (unitId) {
+    return "unit-first";
+  }
+
+  // Step 4: Fully manual launch
+  return "blank";
+}
+
+/**
  * LeaseCreatePage
  *
  * Shared lease creation entry page.
@@ -38,30 +74,36 @@ function parseOptionalNumber(value: string | null): number | null {
  * - Tenant-first: /dashboard/leases/new?org=<slug>&tenantId=<id>
  * - Unit-first: /dashboard/leases/new?org=<slug>&unitId=<id>
  * - Prefilled both: /dashboard/leases/new?org=<slug>&tenantId=<id>&unitId=<id>
+ * - Optional building assist: /dashboard/leases/new?org=<slug>&buildingId=<id>
  *
- * For now this page is a shell so we can verify routing and query-param hydration
- * before wiring the full create form refactor.
+ * Responsibilities:
+ * - Parse URL search params
+ * - Build deterministic initial launch context
+ * - Guard missing org scope
+ * - Hand off context to the shared CreateLeaseForm
  */
 export default function LeaseCreatePage() {
   const [searchParams] = useSearchParams();
 
-  // Step 1: Read URL context
-  const orgSlug = searchParams.get("org") ?? "";
+  // Step 1: Read raw URL context
+  const orgSlug = (searchParams.get("org") ?? "").trim();
   const tenantId = parseOptionalNumber(searchParams.get("tenantId"));
   const unitId = parseOptionalNumber(searchParams.get("unitId"));
   const buildingId = parseOptionalNumber(searchParams.get("buildingId"));
 
-  // Step 2: Derive launch mode
-  const launchMode =
-    tenantId && unitId
-      ? "tenant-and-unit"
-      : tenantId
-        ? "tenant-first"
-        : unitId
-          ? "unit-first"
-          : "blank";
+  // Step 2: Derive shared launch mode
+  const launchMode = deriveLaunchMode(tenantId, unitId);
 
-  // Step 3: Guard missing org
+  // Step 3: Build initial context for the shared lease form
+  const initialContext: LeaseCreateInitialContext = {
+    orgSlug,
+    tenantId,
+    unitId,
+    buildingId,
+    launchMode,
+  };
+
+  // Step 4: Guard missing org scope
   if (!orgSlug) {
     return (
       <section className="space-y-5 sm:space-y-6">
@@ -102,7 +144,7 @@ export default function LeaseCreatePage() {
 
   return (
     <section className="space-y-5 sm:space-y-6">
-      {/* Step 4: Hero */}
+      {/* Step 5: Page hero */}
       <div className="rounded-3xl border border-white/10 bg-neutral-950/70 p-5 shadow-xl sm:p-6">
         <div className="flex flex-col gap-4 sm:gap-5 lg:flex-row lg:items-end lg:justify-between">
           <div className="flex items-start gap-3">
@@ -120,8 +162,8 @@ export default function LeaseCreatePage() {
               </h1>
 
               <p className="max-w-3xl text-sm leading-6 text-neutral-400">
-                Shared lease creation entry point. This page will support both
-                tenant-driven and unit-driven lease setup.
+                Create a lease using unit-first, tenant-first, combined, or
+                manual launch context without leaving the shared workspace.
               </p>
             </div>
           </div>
@@ -129,6 +171,10 @@ export default function LeaseCreatePage() {
           <div className="flex flex-wrap items-center gap-2">
             <span className="inline-flex items-center rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs font-medium text-neutral-300">
               Org: {orgSlug}
+            </span>
+
+            <span className="inline-flex items-center rounded-full border border-cyan-400/15 bg-cyan-500/10 px-3 py-1 text-xs font-medium text-cyan-200">
+              Mode: {launchMode}
             </span>
 
             <Link
@@ -141,57 +187,9 @@ export default function LeaseCreatePage() {
         </div>
       </div>
 
-      {/* Step 5: Context debug card */}
+      {/* Step 6: Shared form */}
       <div className="rounded-3xl border border-white/10 bg-neutral-950/70 p-5 shadow-xl sm:p-6">
-        <div className="space-y-4">
-          <div>
-            <h2 className="text-base font-semibold text-white sm:text-lg">
-              Launch Context
-            </h2>
-            <p className="mt-1 text-sm text-neutral-400">
-              This is a temporary verification panel so we can confirm route
-              hydration before wiring the full lease form.
-            </p>
-          </div>
-
-          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-            <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
-              <p className="text-xs uppercase tracking-[0.16em] text-neutral-500">
-                Mode
-              </p>
-              <p className="mt-2 text-sm font-medium text-white">
-                {launchMode}
-              </p>
-            </div>
-
-            <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
-              <p className="text-xs uppercase tracking-[0.16em] text-neutral-500">
-                Tenant ID
-              </p>
-              <p className="mt-2 text-sm font-medium text-white">
-                {tenantId ?? "—"}
-              </p>
-            </div>
-
-            <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
-              <p className="text-xs uppercase tracking-[0.16em] text-neutral-500">
-                Unit ID
-              </p>
-              <p className="mt-2 text-sm font-medium text-white">
-                {unitId ?? "—"}
-              </p>
-            </div>
-
-            <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
-              <p className="text-xs uppercase tracking-[0.16em] text-neutral-500">
-                Building ID
-              </p>
-              <p className="mt-2 text-sm font-medium text-white">
-                {buildingId ?? "—"}
-              </p>
-            </div>
-          </div>
-        </div>
+        <CreateLeaseForm initialContext={initialContext} />
       </div>
     </section>
   );

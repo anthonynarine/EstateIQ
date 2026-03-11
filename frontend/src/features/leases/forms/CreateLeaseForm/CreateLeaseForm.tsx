@@ -1,5 +1,5 @@
 // # Filename: src/features/leases/forms/CreateLeaseForm/CreateLeaseForm.tsx
-
+// ✅ New Code
 
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
@@ -8,20 +8,44 @@ import { AlertTriangle } from "lucide-react";
 import { formatApiFormErrors } from "../../../../api/formatApiFormErrors";
 import { useOrg } from "../../../tenancy/hooks/useOrg";
 import { useCreateLeaseMutation } from "../../queries/useCreateLeaseMutation";
+
 import FormActions from "../FormActions";
 import FormErrorSummary from "../FormErrorSummary";
 import LeaseTermsFields from "../LeaseTermsFields";
 import TenantSection from "../TenantSection/TenantSection";
+import UnitAssignmentSection from "../UnitAssignmentSection";
 import { useCreateLeaseForm } from "../useCreateLeaseForm";
+
 import {
   useLeaseOverlapUx,
   type LeaseOverlapMeta,
 } from "../useLeaseOverlapUx";
+
 import CreateLeaseCollapse from "./CreateLeaseCollapse";
 import CreateLeaseHeader from "./CreateLeaseHeader";
 
+/**
+ * Launch modes supported by LeaseCreatePage
+ */
+export type LeaseCreateLaunchMode =
+  | "blank"
+  | "tenant-first"
+  | "unit-first"
+  | "tenant-and-unit";
+
+/**
+ * Initial launch context passed from LeaseCreatePage
+ */
+export type LeaseCreateInitialContext = {
+  orgSlug: string;
+  tenantId: number | null;
+  unitId: number | null;
+  buildingId: number | null;
+  launchMode: LeaseCreateLaunchMode;
+};
+
 type Props = {
-  unitId: number;
+  initialContext: LeaseCreateInitialContext;
 };
 
 /**
@@ -29,8 +53,8 @@ type Props = {
  *
  * Safely narrows unknown normalized meta into a lease overlap meta object.
  *
- * @param meta Unknown normalized meta payload.
- * @returns LeaseOverlapMeta or null.
+ * @param meta Unknown normalized meta payload
+ * @returns LeaseOverlapMeta or null
  */
 function parseApiMeta(meta: unknown): LeaseOverlapMeta | null {
   // Step 1: Guard non-object values
@@ -40,6 +64,7 @@ function parseApiMeta(meta: unknown): LeaseOverlapMeta | null {
 
   // Step 2: Safely inspect kind
   const maybeMeta = meta as { kind?: unknown };
+
   if (maybeMeta.kind !== "lease_overlap") {
     return null;
   }
@@ -51,22 +76,23 @@ function parseApiMeta(meta: unknown): LeaseOverlapMeta | null {
 /**
  * CreateLeaseForm
  *
- * Premium unit-first lease creation workflow.
+ * Shared lease creation workflow supporting:
+ * - unit-first launch
+ * - tenant-first launch
+ * - combined tenant+unit launch
+ * - blank/manual launch
  *
  * Responsibilities:
- * - Orchestrate unit-scoped lease creation
  * - Own open/close UI state
+ * - Wire tenant workflow + building/unit assignment + lease terms
  * - Normalize API errors
- * - Wire tenant workflow + lease terms + footer actions
- *
- * Design goals:
- * - Keep this file as an orchestrator
- * - Push UI blocks into extracted components
- * - Stay mobile-first and easy to maintain
+ * - Submit the shared backend lease-create payload
  */
-export default function CreateLeaseForm({ unitId }: Props) {
+export default function CreateLeaseForm({ initialContext }: Props) {
   const { orgSlug } = useOrg();
   const navigate = useNavigate();
+
+  const { tenantId, unitId, buildingId } = initialContext;
 
   // Step 1: Local UI state
   const [isOpen, setIsOpen] = useState(false);
@@ -84,6 +110,8 @@ export default function CreateLeaseForm({ unitId }: Props) {
     tenantMode,
     tenantCreateDraft,
     localError,
+    selectedBuildingId,
+    selectedUnitId,
     setStartDate,
     setEndDate,
     setRentAmount,
@@ -97,15 +125,19 @@ export default function CreateLeaseForm({ unitId }: Props) {
     buildPayload,
     selectExistingTenant,
     onTenantModeChange,
-  } = useCreateLeaseForm();
+    onBuildingChange,
+    onUnitChange,
+  } = useCreateLeaseForm({
+    initialTenantId: tenantId,
+    initialBuildingId: buildingId,
+    initialUnitId: unitId,
+  });
 
   // Step 3: Basic render guard
-  const canRender =
-    Boolean(orgSlug && orgSlug.trim().length > 0) && Number.isFinite(unitId);
+  const canRender = Boolean(orgSlug && orgSlug.trim().length > 0);
 
   const mutation = useCreateLeaseMutation({
     orgSlug: orgSlug ?? "",
-    unitId,
   });
 
   const { mutateAsync, isPending, error } = mutation;
@@ -129,6 +161,11 @@ export default function CreateLeaseForm({ unitId }: Props) {
     setHideApiErrors,
   });
 
+  /**
+   * handleCancel
+   *
+   * Resets local workflow state and closes the form.
+   */
   const handleCancel = () => {
     // Step 1: Reset local workflow state
     reset();
@@ -136,26 +173,31 @@ export default function CreateLeaseForm({ unitId }: Props) {
     setIsOpen(false);
   };
 
+  /**
+   * handleSubmit
+   *
+   * Validates current form state and submits a lease create request.
+   */
   const handleSubmit = async () => {
     // Step 1: Re-enable API errors for a fresh submit
     setHideApiErrors(false);
 
     if (!orgSlug) {
-      setLocalError("Organization not selected. Add ?org=<slug> to the URL.");
+      setLocalError("Organization not selected.");
       return;
     }
 
-    if (!Number.isFinite(unitId)) {
-      setLocalError("Invalid unit id.");
-      return;
-    }
+    const result = validate({
+      unitId,
+    });
 
-    const result = validate();
     if (!result.ok) {
       return;
     }
 
-    const { payload } = buildPayload();
+    const { payload } = buildPayload({
+      unitId,
+    });
 
     try {
       await mutateAsync(payload);
@@ -178,11 +220,11 @@ export default function CreateLeaseForm({ unitId }: Props) {
 
           <div className="space-y-1">
             <p className="text-sm font-semibold text-red-100">
-              Lease creation is unavailable
+              Lease creation unavailable
             </p>
+
             <p className="text-sm text-red-200/80">
-              Cannot create a lease without a selected organization and a valid
-              unit.
+              Cannot create a lease without an organization context.
             </p>
           </div>
         </div>
@@ -204,8 +246,8 @@ export default function CreateLeaseForm({ unitId }: Props) {
               Ready to create a lease
             </p>
             <p className="text-sm text-neutral-400">
-              Open the form to assign a tenant and enter lease terms for this
-              unit.
+              Assign a tenant, select the building and unit, and define lease
+              terms.
             </p>
           </div>
         </div>
@@ -237,6 +279,15 @@ export default function CreateLeaseForm({ unitId }: Props) {
             selectExistingTenant={selectExistingTenant}
             onCreateDraftChange={setTenantCreateDraft}
             onTenantModeChange={onTenantModeChange}
+          />
+
+          <UnitAssignmentSection
+            orgSlug={orgSlug ?? ""}
+            initialUnitId={unitId}
+            selectedBuildingId={selectedBuildingId}
+            selectedUnitId={selectedUnitId}
+            onBuildingChange={onBuildingChange}
+            onUnitChange={onUnitChange}
           />
 
           <LeaseTermsFields

@@ -1,7 +1,8 @@
 // # Filename: src/features/leases/forms/useCreateLeaseForm.ts
 
-import { useState } from "react";
-import type { LeaseStatus } from "../api/leaseApi";
+
+import { useMemo, useState } from "react";
+import type { CreateLeaseInput, LeaseStatus } from "../api/leaseApi";
 import type { TenantCreateDraft, TenantMode } from "./TenantSection/tenantTypes";
 
 const EMPTY_TENANT_DRAFT: TenantCreateDraft = {
@@ -10,18 +11,31 @@ const EMPTY_TENANT_DRAFT: TenantCreateDraft = {
   phone: "",
 };
 
-type LeaseParty = { tenant_id: number; role: "primary" };
+type LeaseParty = {
+  tenant_id: number;
+  role: "primary";
+};
+
+type UseCreateLeaseFormArgs = {
+  initialTenantId?: number | null;
+  initialBuildingId?: number | null;
+  initialUnitId?: number | null;
+};
+
+type ResolveUnitArgs = {
+  unitId: number | null;
+};
+
+type BuildPayloadArgs = {
+  unitId: number | null;
+};
 
 type BuildPayloadResult = {
-  payload: {
-    start_date: string;
-    end_date: string | null;
-    rent_amount: string;
-    security_deposit_amount: string | null;
-    rent_due_day: number;
-    status: LeaseStatus;
-    parties?: LeaseParty[];
-  };
+  payload: CreateLeaseInput;
+};
+
+type ValidateArgs = {
+  unitId: number | null;
 };
 
 type ValidateResult =
@@ -32,11 +46,79 @@ type ValidateResult =
     };
 
 /**
+ * isValidPositiveInt
+ *
+ * Checks whether a value is a finite positive integer.
+ *
+ * @param value Candidate number
+ * @returns True when value is a positive integer
+ */
+function isValidPositiveInt(value: number | null | undefined): value is number {
+  return Number.isInteger(value) && Number(value) > 0;
+}
+
+/**
+ * resolveEffectiveUnitId
+ *
+ * Resolves the effective unit id for submit-time validation and payload build.
+ *
+ * Priority:
+ * 1. Route-prefilled unit id
+ * 2. Manually selected unit id
+ *
+ * @param args.unitId Route-prefilled unit id
+ * @param selectedUnitId Locally selected unit id
+ * @returns Effective unit id or null
+ */
+function resolveEffectiveUnitId(
+  { unitId }: ResolveUnitArgs,
+  selectedUnitId: number | null
+): number | null {
+  if (isValidPositiveInt(unitId)) {
+    return unitId;
+  }
+
+  if (isValidPositiveInt(selectedUnitId)) {
+    return selectedUnitId;
+  }
+
+  return null;
+}
+
+/**
  * useCreateLeaseForm
  *
  * Form-state + validation + payload builder for CreateLeaseForm.
+ *
+ * Supported launch modes:
+ * - unit-first
+ * - tenant-first
+ * - tenant-and-unit
+ * - blank/manual
+ *
+ * Current phase:
+ * - Supports route-prefilled tenant context
+ * - Supports route-prefilled building/unit context
+ * - Supports manual building/unit selection for tenant-first and blank flows
+ * - Preserves prefilled context on reset
  */
-export function useCreateLeaseForm() {
+export function useCreateLeaseForm({
+  initialTenantId = null,
+  initialBuildingId = null,
+  initialUnitId = null,
+}: UseCreateLeaseFormArgs = {}) {
+  const normalizedInitialTenantId = useMemo(() => {
+    return isValidPositiveInt(initialTenantId) ? initialTenantId : null;
+  }, [initialTenantId]);
+
+  const normalizedInitialBuildingId = useMemo(() => {
+    return isValidPositiveInt(initialBuildingId) ? initialBuildingId : null;
+  }, [initialBuildingId]);
+
+  const normalizedInitialUnitId = useMemo(() => {
+    return isValidPositiveInt(initialUnitId) ? initialUnitId : null;
+  }, [initialUnitId]);
+
   // Step 1: Lease term controlled state
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
@@ -46,14 +128,24 @@ export function useCreateLeaseForm() {
   const [status, setStatus] = useState<LeaseStatus>("active");
 
   // Step 2: Tenant selection state
-  const [primaryTenantId, setPrimaryTenantId] = useState<number | null>(null);
+  const [primaryTenantId, setPrimaryTenantId] = useState<number | null>(
+    normalizedInitialTenantId
+  );
 
   // Step 3: Tenant UX state
   const [tenantMode, setTenantMode] = useState<TenantMode>("select");
   const [tenantCreateDraft, setTenantCreateDraft] =
     useState<TenantCreateDraft>(EMPTY_TENANT_DRAFT);
 
-  // Step 4: Local validation message
+  // Step 4: Building + unit selection state
+  const [selectedBuildingId, setSelectedBuildingId] = useState<number | null>(
+    normalizedInitialBuildingId
+  );
+  const [selectedUnitId, setSelectedUnitId] = useState<number | null>(
+    normalizedInitialUnitId
+  );
+
+  // Step 5: Local validation message
   const [localError, setLocalError] = useState<string | null>(null);
 
   /**
@@ -73,6 +165,8 @@ export function useCreateLeaseForm() {
    * selectExistingTenant
    *
    * Switch UI into select mode and set the current tenant id.
+   *
+   * @param tenantId Selected tenant id
    */
   const selectExistingTenant = (tenantId: number | null) => {
     // Step 1: Switch to select mode
@@ -90,14 +184,11 @@ export function useCreateLeaseForm() {
    *
    * Single safe mode-switching API for the UI.
    *
-   * Why this exists:
-   * - Prevents the parent from using raw setTenantMode directly
-   * - Keeps select/create transitions consistent
-   * - Fixes toggle regressions when moving back from create -> select
-   *
    * Behavior:
    * - "create": clears selected tenant id
-   * - "select": keeps current selected tenant if any, and clears create draft
+   * - "select": preserves selected tenant if present and clears draft
+   *
+   * @param mode Next tenant mode
    */
   const onTenantModeChange = (mode: TenantMode) => {
     // Step 1: Move into create mode
@@ -112,6 +203,38 @@ export function useCreateLeaseForm() {
     setTenantCreateDraft(EMPTY_TENANT_DRAFT);
   };
 
+  /**
+   * onBuildingChange
+   *
+   * Updates the selected building and clears unit selection when the building changes.
+   *
+   * @param buildingId Selected building id
+   */
+  const onBuildingChange = (buildingId: number | null) => {
+    // Step 1: Update building selection
+    setSelectedBuildingId(buildingId);
+
+    // Step 2: Clear dependent unit selection when building changes
+    setSelectedUnitId(null);
+  };
+
+  /**
+   * onUnitChange
+   *
+   * Updates the selected unit.
+   *
+   * @param unitId Selected unit id
+   */
+  const onUnitChange = (unitId: number | null) => {
+    // Step 1: Update selected unit
+    setSelectedUnitId(unitId);
+  };
+
+  /**
+   * reset
+   *
+   * Resets the form but preserves route-prefilled launch context.
+   */
   const reset = () => {
     // Step 1: Reset lease fields
     setStartDate("");
@@ -121,20 +244,45 @@ export function useCreateLeaseForm() {
     setSecurityDeposit("");
     setStatus("active");
 
-    // Step 2: Reset tenant fields
-    setPrimaryTenantId(null);
+    // Step 2: Reset tenant fields back to initial launch context
+    setPrimaryTenantId(normalizedInitialTenantId);
     setTenantMode("select");
     setTenantCreateDraft(EMPTY_TENANT_DRAFT);
 
-    // Step 3: Reset local error
+    // Step 3: Reset building/unit back to initial launch context
+    setSelectedBuildingId(normalizedInitialBuildingId);
+    setSelectedUnitId(normalizedInitialUnitId);
+
+    // Step 4: Reset local error
     setLocalError(null);
   };
 
-  const validate = (): ValidateResult => {
+  /**
+   * validate
+   *
+   * Validates the current form state before submit.
+   *
+   * @param args.unitId Route-prefilled unit id
+   * @returns Validation result
+   */
+  const validate = ({ unitId }: ValidateArgs): ValidateResult => {
     // Step 1: Clear old local error
     setLocalError(null);
 
-    // Step 2: Lease required fields
+    // Step 2: Resolve effective unit
+    const effectiveUnitId = resolveEffectiveUnitId(
+      { unitId },
+      selectedUnitId
+    );
+
+    // Step 3: Unit validation
+    if (!isValidPositiveInt(effectiveUnitId)) {
+      const msg = "A valid unit must be selected before creating a lease.";
+      setLocalError(msg);
+      return { ok: false, message: msg };
+    }
+
+    // Step 4: Lease required fields
     if (!startDate.trim()) {
       const msg = "Start date is required.";
       setLocalError(msg);
@@ -147,8 +295,9 @@ export function useCreateLeaseForm() {
       return { ok: false, message: msg };
     }
 
-    // Step 3: Due day validation
+    // Step 5: Due day validation
     const dueDay = Number(rentDueDay);
+
     if (!Number.isFinite(dueDay)) {
       const msg = "Rent due day must be a valid number (1–28).";
       setLocalError(msg);
@@ -161,9 +310,23 @@ export function useCreateLeaseForm() {
       return { ok: false, message: msg };
     }
 
-    // Step 4: Tenant create-mode validation
-    if (tenantMode === "create" && !tenantCreateDraft.full_name.trim()) {
-      const msg = "Tenant full name is required.";
+    // Step 6: Optional date consistency
+    if (endDate.trim() && endDate.trim() < startDate.trim()) {
+      const msg = "End date cannot be earlier than start date.";
+      setLocalError(msg);
+      return { ok: false, message: msg };
+    }
+
+    // Step 7: Tenant validation
+    if (tenantMode === "create") {
+      const msg =
+        "Inline tenant creation is not yet supported in this shared lease flow. Select an existing tenant.";
+      setLocalError(msg);
+      return { ok: false, message: msg };
+    }
+
+    if (!isValidPositiveInt(primaryTenantId)) {
+      const msg = "A tenant must be selected before creating a lease.";
       setLocalError(msg);
       return { ok: false, message: msg };
     }
@@ -171,33 +334,60 @@ export function useCreateLeaseForm() {
     return { ok: true };
   };
 
-  const buildPayload = (): BuildPayloadResult => {
-    // Step 1: Normalize optional fields
+  /**
+   * buildPayload
+   *
+   * Builds the shared backend-supported lease create payload.
+   *
+   * @param args.unitId Route-prefilled unit id
+   * @returns Shared create payload
+   */
+  const buildPayload = ({ unitId }: BuildPayloadArgs): BuildPayloadResult => {
+    // Step 1: Resolve effective unit id
+    const effectiveUnitId = resolveEffectiveUnitId(
+      { unitId },
+      selectedUnitId
+    );
+
+    // Step 2: Guard required ids
+    if (!isValidPositiveInt(effectiveUnitId)) {
+      throw new Error("Cannot build lease payload without a valid unit id.");
+    }
+
+    if (!isValidPositiveInt(primaryTenantId)) {
+      throw new Error("Cannot build lease payload without a valid tenant id.");
+    }
+
+    // Step 3: Normalize optional fields
     const normalizedEndDate = endDate.trim() ? endDate.trim() : null;
     const normalizedDeposit = securityDeposit.trim()
       ? securityDeposit.trim()
       : null;
 
-    // Step 2: Normalize decimal-safe strings
+    // Step 4: Normalize decimal-safe strings
     const normalizedRent = rentAmount.trim();
 
-    // Step 3: Normalize due day
+    // Step 5: Normalize due day
     const dueDayNum = Number(rentDueDay);
 
-    // Step 4: Parties only when selecting an existing tenant
-    const parties: LeaseParty[] | undefined =
-      tenantMode === "select" && primaryTenantId !== null
-        ? [{ tenant_id: primaryTenantId, role: "primary" }]
-        : undefined;
+    // Step 6: Build parties from selected tenant
+    const parties: LeaseParty[] = [
+      {
+        tenant_id: primaryTenantId,
+        role: "primary",
+      },
+    ];
 
-    const payload = {
+    // Step 7: Build shared payload
+    const payload: CreateLeaseInput = {
+      unit: effectiveUnitId,
       start_date: startDate.trim(),
       end_date: normalizedEndDate,
       rent_amount: normalizedRent,
       security_deposit_amount: normalizedDeposit,
       rent_due_day: dueDayNum,
       status,
-      ...(parties ? { parties } : {}),
+      parties,
     };
 
     return { payload };
@@ -217,10 +407,14 @@ export function useCreateLeaseForm() {
     tenantMode,
     tenantCreateDraft,
 
-    // Step 3: Local error
+    // Step 3: Building + unit values
+    selectedBuildingId,
+    selectedUnitId,
+
+    // Step 4: Local error
     localError,
 
-    // Step 4: Setters
+    // Step 5: Setters
     setStartDate,
     setEndDate,
     setRentAmount,
@@ -230,14 +424,20 @@ export function useCreateLeaseForm() {
     setPrimaryTenantId,
     setTenantMode,
     setTenantCreateDraft,
+    setSelectedBuildingId,
+    setSelectedUnitId,
     setLocalError,
 
-    // Step 5: Tenant actions
+    // Step 6: Tenant actions
     enterCreateTenantMode,
     selectExistingTenant,
     onTenantModeChange,
 
-    // Step 6: Helpers
+    // Step 7: Unit actions
+    onBuildingChange,
+    onUnitChange,
+
+    // Step 8: Helpers
     reset,
     validate,
     buildPayload,
