@@ -1,5 +1,6 @@
 // # Filename: src/features/leases/components/CurrentLeasePanel.tsx
 
+
 import CreateLeaseForm from "../forms/CreateLeaseForm/CreateLeaseForm";
 import LeaseCard from "./LeaseCard";
 import type { Lease } from "../api/leaseApi";
@@ -136,7 +137,15 @@ export default function CurrentLeasePanel({
                 </div>
 
                 <div className="rounded-2xl border border-neutral-800 bg-neutral-900/30 p-4 sm:p-5">
-                  <CreateLeaseForm unitId={unitId} />
+                  <CreateLeaseForm
+                    initialContext={{
+                      orgSlug,
+                      tenantId: null,
+                      unitId,
+                      buildingId: null,
+                      launchMode: "unit-first",
+                    }}
+                  />
                 </div>
               </div>
             ) : (

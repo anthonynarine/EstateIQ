@@ -283,6 +283,7 @@ export default function CreateLeaseForm({ initialContext }: Props) {
 
           <UnitAssignmentSection
             orgSlug={orgSlug ?? ""}
+            initialBuildingId={buildingId}
             initialUnitId={unitId}
             selectedBuildingId={selectedBuildingId}
             selectedUnitId={selectedUnitId}
