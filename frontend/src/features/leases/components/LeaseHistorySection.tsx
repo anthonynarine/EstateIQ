@@ -1,11 +1,17 @@
 // # Filename: src/features/leases/components/LeaseHistorySection.tsx
-
+// ✅ New Code
 
 import { ChevronDown, Clock } from "lucide-react";
 import LeaseList from "./LeaseList";
 import CollectionPaginationFooter from "../../../components/pagination/CollectionPaginationFooter";
+
+type LeaseLike = {
+  id: number;
+  end_date?: string | null;
+};
+
 type Props = {
-  leases: any[];
+  leases: LeaseLike[];
   totalCount: number;
   page: number;
   pageSize: number;
@@ -28,6 +34,35 @@ type Props = {
   emptyMessage: string;
 };
 
+/**
+ * formatDatePreview
+ *
+ * Formats an ISO date into a compact preview label.
+ *
+ * @param value ISO date string
+ * @returns Human-friendly date string or null
+ */
+function formatDatePreview(value?: string | null): string | null {
+  // Step 1: Guard empty input
+  if (!value) {
+    return null;
+  }
+
+  // Step 2: Parse the date safely
+  const parsed = new Date(value);
+
+  if (Number.isNaN(parsed.getTime())) {
+    return value;
+  }
+
+  // Step 3: Return compact display format
+  return parsed.toLocaleDateString(undefined, {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  });
+}
+
 export default function LeaseHistorySection({
   leases,
   totalCount,
@@ -48,11 +83,26 @@ export default function LeaseHistorySection({
 }: Props) {
   const showPagination = totalCount > pageSize;
 
+  const mostRecentEndedDate = formatDatePreview(leases?.[0]?.end_date ?? null);
+
+  const primarySummary =
+    totalCount === 0
+      ? "No previous leases"
+      : `${totalCount} previous lease${totalCount > 1 ? "s" : ""}`;
+
+  const secondarySummary =
+    totalCount === 0
+      ? "Historical records will appear here once earlier leases exist."
+      : mostRecentEndedDate
+        ? `Most recent ended: ${mostRecentEndedDate}`
+        : "Historical records available for review.";
+
   return (
     <section className="rounded-3xl border border-neutral-800/80 bg-neutral-950 shadow-[0_0_0_1px_rgba(255,255,255,0.02)]">
-      {/* Accordion Header */}
       <button
+        type="button"
         onClick={onToggle}
+        aria-expanded={isOpen}
         className="
           w-full
           flex items-center justify-between
@@ -73,15 +123,11 @@ export default function LeaseHistorySection({
               {title}
             </p>
 
-            <p className="text-lg font-semibold text-white">
-              Lease history
-            </p>
+            <p className="text-lg font-semibold text-white">Lease history</p>
 
-            <p className="text-sm text-neutral-400">
-              {totalCount === 0
-                ? "No historical leases"
-                : `${totalCount} previous lease${totalCount > 1 ? "s" : ""}`}
-            </p>
+            <p className="text-sm text-neutral-300">{primarySummary}</p>
+
+            <p className="text-xs text-neutral-500">{secondarySummary}</p>
           </div>
         </div>
 
@@ -98,9 +144,8 @@ export default function LeaseHistorySection({
         </div>
       </button>
 
-      {/* Accordion Body */}
       {isOpen && (
-        <div className="border-t border-neutral-800/80 p-5 sm:p-6 space-y-5">
+        <div className="space-y-5 border-t border-neutral-800/80 p-5 sm:p-6">
           <LeaseList
             leases={leases}
             isLoading={isLoading}
@@ -116,9 +161,10 @@ export default function LeaseHistorySection({
               page={page}
               pageSize={pageSize}
               totalCount={totalCount}
-              totalPages={totalPages}
-              onPreviousPage={onPreviousPage}
-              onNextPage={onNextPage}
+              itemLabel="lease"
+              isFetching={isFetching}
+              onPrevious={onPreviousPage}
+              onNext={onNextPage}
             />
           )}
         </div>
