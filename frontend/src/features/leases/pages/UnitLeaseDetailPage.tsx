@@ -1,7 +1,7 @@
 // # Filename: src/features/leases/pages/UnitLeaseDetailPage.tsx
 
 
-import { useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useLocation, useParams } from "react-router-dom";
 
 import { useOrg } from "../../tenancy/hooks/useOrg";
@@ -54,6 +54,7 @@ type UnitDetailIdentityShape = {
  * - Fetch deterministic unit identity
  * - Fetch lease workspace data
  * - Derive current lease / draft lease / history / occupancy
+ * - Own lease history accordion + pagination state
  * - Pass clean props into presentational sections
  */
 export default function UnitLeaseDetailPage() {
@@ -155,18 +156,48 @@ export default function UnitLeaseDetailPage() {
           cls: "border-red-500/30 bg-red-500/10 text-red-200",
         };
 
+  // Step 9: History collection excluding the active/draft blocking lease
   const historyLeases = useMemo(() => {
-    if (!blockingLease) return leases;
+    if (!blockingLease) {
+      return leases;
+    }
 
     return leases.filter((lease) => lease.id !== blockingLease.id);
   }, [leases, blockingLease]);
 
   const unitLeaseCount = leases.length;
 
-  // Step 9: Guards
+  // Step 10: Accordion + pagination state
+  const [isHistoryOpen, setIsHistoryOpen] = useState(false);
+  const [historyPage, setHistoryPage] = useState(1);
+
+  // Step 11: Mobile/tablet-friendly page size
+  const HISTORY_PAGE_SIZE = 3;
+
+  const historyTotalCount = historyLeases.length;
+  const historyTotalPages = Math.max(
+    1,
+    Math.ceil(historyTotalCount / HISTORY_PAGE_SIZE),
+  );
+
+  const paginatedHistoryLeases = useMemo(() => {
+    const startIndex = (historyPage - 1) * HISTORY_PAGE_SIZE;
+    const endIndex = startIndex + HISTORY_PAGE_SIZE;
+
+    return historyLeases.slice(startIndex, endIndex);
+  }, [historyLeases, historyPage, HISTORY_PAGE_SIZE]);
+
+  // Step 12: Keep page in range when data changes
+  useEffect(() => {
+    if (historyPage > historyTotalPages) {
+      setHistoryPage(1);
+    }
+  }, [historyPage, historyTotalPages]);
+
+  // Step 13: Guards
   if (!orgSlug) {
     return (
-      <div className="p-6">
+      <div className="p-4 sm:p-6">
         <div className="rounded-xl border border-red-500/30 bg-red-500/5 p-4 text-sm text-red-300">
           Organization not selected. Add ?org=&lt;slug&gt; to the URL.
         </div>
@@ -176,7 +207,7 @@ export default function UnitLeaseDetailPage() {
 
   if (!unitIdNumber) {
     return (
-      <div className="p-6">
+      <div className="p-4 sm:p-6">
         <div className="rounded-xl border border-red-500/30 bg-red-500/5 p-4 text-sm text-red-300">
           Invalid unit ID.
         </div>
@@ -184,12 +215,8 @@ export default function UnitLeaseDetailPage() {
     );
   }
 
-  console.log("unitQuery.data", unitQuery.data);    
-  console.log("buildingName derived", buildingName);
-  console.log("buildingId derived", buildingId);
-
   return (
-    <div className="p-6">
+    <div className="p-4 sm:p-6">
       <div className="mx-auto w-full max-w-5xl space-y-6">
         <UnitLeaseHeader
           buildingName={buildingName}
@@ -219,7 +246,21 @@ export default function UnitLeaseDetailPage() {
         />
 
         <LeaseHistorySection
-          leases={historyLeases}
+          leases={paginatedHistoryLeases}
+          totalCount={historyTotalCount}
+          page={historyPage}
+          pageSize={HISTORY_PAGE_SIZE}
+          totalPages={historyTotalPages}
+          isOpen={isHistoryOpen}
+          onToggle={() => setIsHistoryOpen((previous) => !previous)}
+          onPreviousPage={() =>
+            setHistoryPage((previous) => Math.max(1, previous - 1))
+          }
+          onNextPage={() =>
+            setHistoryPage((previous) =>
+              Math.min(historyTotalPages, previous + 1),
+            )
+          }
           isLoading={leasesQuery.isLoading}
           isFetching={leasesQuery.isFetching}
           error={leasesQuery.error}
