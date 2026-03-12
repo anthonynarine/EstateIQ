@@ -6,14 +6,14 @@ import { Building2, Home, Lock } from "lucide-react";
 import { useBuildingsQuery } from "../../buildings/pages/BuildingPage/hooks/useBuildings";
 import { useUnitsQuery } from "../../buildings/pages/BuildingDetailPage/hooks/useUnitsQuery";
 
-
-
 type Props = {
   orgSlug: string;
   initialBuildingId: number | null;
+  initialBuildingName: string | null;
   initialUnitId: number | null;
   selectedBuildingId: number | null;
   selectedUnitId: number | null;
+  isLockedAssignment?: boolean;
   onBuildingChange: (buildingId: number | null) => void;
   onUnitChange: (unitId: number | null) => void;
 };
@@ -21,27 +21,30 @@ type Props = {
 export default function UnitAssignmentSection({
   orgSlug,
   initialBuildingId,
+  initialBuildingName,
   initialUnitId,
   selectedBuildingId,
   selectedUnitId,
+  isLockedAssignment = false,
   onBuildingChange,
   onUnitChange,
 }: Props) {
-  // Step 1: Local paging for lightweight dropdown population
+  // Step 1: Determine whether this workflow is locked to a specific unit
+  const isLockedContext = isLockedAssignment || Boolean(initialUnitId);
+
+  // Step 2: Local paging for lightweight dropdown population
   const [buildingPage] = useState(1);
   const [unitPage] = useState(1);
   const PAGE_SIZE = 100;
 
-  const unitLocked = Boolean(initialUnitId);
-
-  // Step 2: Resolve effective ids
+  // Step 3: Resolve effective ids
   const effectiveBuildingId = initialBuildingId ?? selectedBuildingId ?? null;
   const effectiveUnitId = initialUnitId ?? selectedUnitId ?? null;
 
-  // Step 3: Fetch buildings
+  // Step 4: Fetch buildings
   const buildingsQuery = useBuildingsQuery(orgSlug, buildingPage, PAGE_SIZE);
 
-  // Step 4: Fetch units for the effective building
+  // Step 5: Fetch units for the effective building
   const unitsQuery = useUnitsQuery({
     orgSlug,
     buildingId: effectiveBuildingId,
@@ -53,14 +56,16 @@ export default function UnitAssignmentSection({
   const buildings = buildingsQuery.data?.results ?? [];
   const rawUnits = unitsQuery.data?.results ?? [];
 
-  // Step 5: Prefer vacant units only in editable mode
+  // Step 6: Only show vacant units in editable mode
   const availableUnits = useMemo(() => {
     return rawUnits.filter((unit) => !unit.is_occupied);
   }, [rawUnits]);
 
-  // Step 6: Resolve display labels
+  // Step 7: Resolve display labels
   const selectedBuilding = useMemo(() => {
-    return buildings.find((building) => building.id === effectiveBuildingId) ?? null;
+    return (
+      buildings.find((building) => building.id === effectiveBuildingId) ?? null
+    );
   }, [buildings, effectiveBuildingId]);
 
   const selectedUnit = useMemo(() => {
@@ -98,14 +103,14 @@ export default function UnitAssignmentSection({
           </h3>
 
           <p className="text-sm text-neutral-400">
-            {unitLocked
+            {isLockedContext
               ? "This lease was launched from a specific unit, so assignment is locked."
               : "Select the building and vacant unit where this lease will be created."}
           </p>
         </div>
       </div>
 
-      {unitLocked ? (
+      {isLockedContext ? (
         <div className="mt-5 space-y-4">
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="rounded-2xl border border-white/10 bg-neutral-950/70 p-4">
@@ -115,8 +120,7 @@ export default function UnitAssignmentSection({
               </div>
 
               <p className="mt-3 text-sm text-white">
-                {selectedBuilding?.name ??
-                  (initialBuildingId ? `Building #${initialBuildingId}` : "Building locked")}
+                {initialBuildingName ?? selectedBuilding?.name ?? "Building"}
               </p>
             </div>
 
@@ -128,7 +132,7 @@ export default function UnitAssignmentSection({
 
               <p className="mt-3 text-sm text-white">
                 {selectedUnit?.label ??
-                  (initialUnitId ? `Unit #${initialUnitId}` : "Unit locked")}
+                  (initialUnitId ? `Unit #${initialUnitId}` : "Unit")}
               </p>
             </div>
           </div>
@@ -137,16 +141,16 @@ export default function UnitAssignmentSection({
             <div className="flex items-start gap-2">
               <Lock className="mt-0.5 h-4 w-4 shrink-0" />
               <p>
-                This lease is being created from the unit workspace, so building and
-                unit are fixed for this workflow.
+                This lease is being created from the unit workspace, so building
+                and unit are fixed for this workflow.
               </p>
             </div>
           </div>
 
-          {(buildingsQuery.isError || unitsQuery.isError) ? (
+          {buildingsQuery.isError || unitsQuery.isError ? (
             <p className="text-xs text-red-300">
-              Some assignment details could not be loaded. The lease can still proceed
-              because the unit context is already fixed.
+              Some assignment details could not be loaded. The lease can still
+              proceed because the unit context is already fixed.
             </p>
           ) : null}
         </div>
@@ -163,7 +167,9 @@ export default function UnitAssignmentSection({
                 value={selectedBuildingId ?? ""}
                 disabled={buildingsQuery.isLoading}
                 onChange={(e) =>
-                  onBuildingChange(e.target.value ? Number(e.target.value) : null)
+                  onBuildingChange(
+                    e.target.value ? Number(e.target.value) : null,
+                  )
                 }
                 className="
                   w-full rounded-xl border border-white/10 bg-neutral-950
@@ -197,7 +203,7 @@ export default function UnitAssignmentSection({
               <select
                 value={selectedUnitId ?? ""}
                 disabled={
-                  !selectedBuildingId ||
+                  !effectiveBuildingId ||
                   unitsQuery.isLoading ||
                   availableUnits.length === 0
                 }
@@ -220,7 +226,7 @@ export default function UnitAssignmentSection({
                 ))}
               </select>
 
-              {selectedBuildingId && unitsQuery.isError ? (
+              {effectiveBuildingId && unitsQuery.isError ? (
                 <p className="text-xs text-red-300">
                   Failed to load units for the selected building.
                 </p>
@@ -228,7 +234,7 @@ export default function UnitAssignmentSection({
             </div>
           </div>
 
-          {selectedBuildingId &&
+          {effectiveBuildingId &&
           !unitsQuery.isLoading &&
           availableUnits.length === 0 ? (
             <div className="mt-4 rounded-2xl border border-white/10 bg-neutral-950/60 p-3 text-sm text-neutral-300">

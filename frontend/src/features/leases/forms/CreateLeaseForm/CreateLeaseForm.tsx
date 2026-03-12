@@ -41,6 +41,7 @@ export type LeaseCreateInitialContext = {
   tenantId: number | null;
   unitId: number | null;
   buildingId: number | null;
+  buildingName?: string | null;
   launchMode: LeaseCreateLaunchMode;
 };
 
@@ -92,7 +93,11 @@ export default function CreateLeaseForm({ initialContext }: Props) {
   const { orgSlug } = useOrg();
   const navigate = useNavigate();
 
-  const { tenantId, unitId, buildingId } = initialContext;
+  const { tenantId, unitId, buildingId, buildingName, launchMode } =
+    initialContext;
+
+  const isUnitLockedContext =
+    launchMode === "unit-first" || launchMode === "tenant-and-unit";
 
   // Step 1: Local UI state
   const [isOpen, setIsOpen] = useState(false);
@@ -284,9 +289,11 @@ export default function CreateLeaseForm({ initialContext }: Props) {
           <UnitAssignmentSection
             orgSlug={orgSlug ?? ""}
             initialBuildingId={buildingId}
+            initialBuildingName={buildingName ?? null}
             initialUnitId={unitId}
             selectedBuildingId={selectedBuildingId}
             selectedUnitId={selectedUnitId}
+            isLockedAssignment={isUnitLockedContext}
             onBuildingChange={onBuildingChange}
             onUnitChange={onUnitChange}
           />

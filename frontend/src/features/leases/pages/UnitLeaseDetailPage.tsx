@@ -1,5 +1,6 @@
 // # Filename: src/features/leases/pages/UnitLeaseDetailPage.tsx
 
+
 import { useMemo } from "react";
 import { useLocation, useParams } from "react-router-dom";
 
@@ -29,6 +30,18 @@ type BuildingNavState = {
     id?: number;
     label?: string;
   };
+};
+
+type UnitDetailIdentityShape = {
+  id?: number;
+  label?: string | null;
+  unit_label?: string | null;
+  building?: {
+    id?: number | null;
+    name?: string | null;
+  } | null;
+  building_id?: number | null;
+  building_name?: string | null;
 };
 
 /**
@@ -73,7 +86,10 @@ export default function UnitLeaseDetailPage() {
     enabled: canRunQueries,
   });
 
-  // Step 5: Lease-derived workspace state
+  // Step 5: Normalize unit detail identity
+  const unitDetail = (unitQuery.data ?? null) as UnitDetailIdentityShape | null;
+
+  // Step 6: Lease-derived workspace state
   const todayISO = useMemo(() => getTodayISO(), []);
   const leases = leasesQuery.data ?? [];
 
@@ -92,19 +108,22 @@ export default function UnitLeaseDetailPage() {
   const blockingLease = currentLease ?? draftLease;
   const canCreateNewLease = !blockingLease;
 
-  // Step 6: Deterministic identity for header + back navigation
+  // Step 7: Deterministic identity for header + back navigation
   const buildingId =
-    unitQuery.data?.building?.id ??
+    unitDetail?.building?.id ??
+    unitDetail?.building_id ??
     navState?.building?.id ??
     null;
 
   const buildingName =
-    unitQuery.data?.building?.name ??
+    unitDetail?.building?.name ??
+    unitDetail?.building_name ??
     navState?.building?.name ??
     "Building";
 
   const unitLabel =
-    unitQuery.data?.label ??
+    unitDetail?.label ??
+    unitDetail?.unit_label ??
     navState?.unit?.label ??
     String(unitIdNumber ?? "");
 
@@ -112,7 +131,7 @@ export default function UnitLeaseDetailPage() {
     ? `/dashboard/buildings/${buildingId}${location.search || ""}`
     : null;
 
-  // Step 7: Display helpers
+  // Step 8: Display helpers
   const formatMoney = (raw: string | null | undefined) => {
     if (!raw) return "—";
 
@@ -144,7 +163,7 @@ export default function UnitLeaseDetailPage() {
 
   const unitLeaseCount = leases.length;
 
-  // Step 8: Guards
+  // Step 9: Guards
   if (!orgSlug) {
     return (
       <div className="p-6">
@@ -164,6 +183,10 @@ export default function UnitLeaseDetailPage() {
       </div>
     );
   }
+
+  console.log("unitQuery.data", unitQuery.data);    
+  console.log("buildingName derived", buildingName);
+  console.log("buildingId derived", buildingId);
 
   return (
     <div className="p-6">
@@ -189,6 +212,8 @@ export default function UnitLeaseDetailPage() {
           isLoading={leasesQuery.isLoading}
           error={leasesQuery.error}
           unitId={unitIdNumber}
+          buildingId={buildingId}
+          buildingName={buildingName}
           orgSlug={orgSlug}
           formatMoney={formatMoney}
         />

@@ -13,6 +13,8 @@ type Props = {
   canCreateNewLease: boolean;
   isLoading: boolean;
   error: unknown;
+  buildingId: number | null;
+  buildingName: string;
   unitId: number;
   orgSlug: string;
   formatMoney: (raw: string | null | undefined) => string;
@@ -32,6 +34,8 @@ export default function CurrentLeasePanel({
   isLoading,
   error,
   unitId,
+  buildingId,
+  buildingName,
   orgSlug,
   formatMoney,
 }: Props) {
@@ -142,7 +146,8 @@ export default function CurrentLeasePanel({
                       orgSlug,
                       tenantId: null,
                       unitId,
-                      buildingId: null,
+                      buildingId,
+                      buildingName,
                       launchMode: "unit-first",
                     }}
                   />

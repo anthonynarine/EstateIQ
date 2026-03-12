@@ -1,5 +1,4 @@
 // # Filename: src/features/buildings/queries/useUnitsQuery.ts
-// ✅ Updated for paginated Units API
 
 import { useQuery } from "@tanstack/react-query";
 import {
@@ -27,13 +26,13 @@ type UseUnitsQueryArgs = {
  * Canonical query key for Units under a Building.
  *
  * Shape:
- *   ["org", orgSlug, "units", buildingId, {page, pageSize}]
+ *   ["org", orgSlug, "units", buildingId, { page, pageSize }]
  */
 export function unitsQueryKey(
-  orgSlug: string,
-  buildingId: number,
+  orgSlug: string | null,
+  buildingId: number | null,
   page: number,
-  pageSize: number
+  pageSize: number,
 ) {
   return ["org", orgSlug, "units", buildingId, { page, pageSize }] as const;
 }
@@ -50,21 +49,16 @@ export function useUnitsQuery({
   pageSize,
   enabled,
 }: UseUnitsQueryArgs) {
+  // Step 1: Determine whether the query is allowed to run
   const canFetch =
     Boolean(enabled ?? true) && Boolean(orgSlug) && Boolean(buildingId);
 
   return useQuery<PaginatedResponse<Unit>, Error>({
-    queryKey: canFetch
-      ? unitsQueryKey(orgSlug as string, buildingId as number, page, pageSize)
-      : ([
-          "org",
-          orgSlug ?? "missing-org",
-          "units",
-          buildingId ?? "missing-building",
-          { page, pageSize },
-        ] as const),
+    // Step 2: Use a clean nullable key instead of fake sentinel values
+    queryKey: unitsQueryKey(orgSlug, buildingId, page, pageSize),
 
     queryFn: async () => {
+      // Step 3: Defensive fallback for disabled / incomplete context
       if (!orgSlug || !buildingId) {
         return {
           count: 0,
@@ -74,6 +68,7 @@ export function useUnitsQuery({
         };
       }
 
+      // Step 4: Fetch building-scoped units
       return listUnitsByBuilding({
         buildingId,
         page,
@@ -83,7 +78,7 @@ export function useUnitsQuery({
 
     enabled: canFetch,
 
-    // Keeps previous page visible while next loads
+    // Step 5: Keep previous page visible while next page loads
     placeholderData: (previous) => previous,
 
     staleTime: 10_000,
@@ -91,8 +86,11 @@ export function useUnitsQuery({
     refetchOnWindowFocus: false,
 
     retry: (failureCount, err) => {
-      const msg = String((err as any)?.message ?? "");
-      if (msg.includes("403") || msg.includes("401")) return false;
+      // Step 6: Do not retry auth / permission failures
+      const msg = String((err as { message?: string })?.message ?? "");
+      if (msg.includes("403") || msg.includes("401")) {
+        return false;
+      }
       return failureCount < 2;
     },
   });
