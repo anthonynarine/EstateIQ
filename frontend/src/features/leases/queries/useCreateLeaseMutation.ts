@@ -1,9 +1,12 @@
 // # Filename: src/features/leases/queries/useCreateLeaseMutation.ts
 
+
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import type { Lease, CreateLeaseInput } from "../api/leaseApi";
 import { createLease } from "../api/leaseApi";
+import type { CreateLeaseInput, Lease } from "../api/types";
 import { leasesByUnitQueryKey } from "./useLeasesByUnitQuery";
+import { createTenant } from "../../tenants/api/tenantsApi";
+import type { CreateTenantInput } from "../../tenants/api/types";
 
 /**
  * UseCreateLeaseMutationArgs
@@ -33,6 +36,40 @@ type UseCreateLeaseForUnitMutationArgs = {
 type CreateLeaseForUnitInput = Omit<CreateLeaseInput, "unit">;
 
 /**
+ * CreateLeaseWithExistingTenantInput
+ *
+ * Existing-tenant workflow:
+ * - form/hook already resolved a valid primary tenant
+ * - payload already contains `parties`
+ */
+type CreateLeaseWithExistingTenantInput = {
+  mode: "existing-tenant";
+  leasePayload: CreateLeaseInput;
+};
+
+/**
+ * CreateLeaseWithNewTenantInput
+ *
+ * New-tenant workflow:
+ * - tenant must be created first
+ * - mutation will inject returned tenant id into lease `parties`
+ */
+type CreateLeaseWithNewTenantInput = {
+  mode: "new-tenant";
+  leasePayload: Omit<CreateLeaseInput, "parties">;
+  tenantPayload: CreateTenantInput;
+};
+
+/**
+ * CreateLeaseWorkflowInput
+ *
+ * Unified mutation contract for create lease workflows.
+ */
+export type CreateLeaseWorkflowInput =
+  | CreateLeaseWithExistingTenantInput
+  | CreateLeaseWithNewTenantInput;
+
+/**
  * isValidPositiveInt
  *
  * Checks whether a value is a valid positive integer.
@@ -41,6 +78,7 @@ type CreateLeaseForUnitInput = Omit<CreateLeaseInput, "unit">;
  * @returns True when valid
  */
 function isValidPositiveInt(value: number | null | undefined): value is number {
+  // Step 1: Return true only for positive integers
   return Number.isInteger(value) && Number(value) > 0;
 }
 
@@ -64,19 +102,17 @@ async function invalidateLeaseCreateCaches(
   });
 
   // Step 2: Future expansion point
-  // Add tenant-scoped or building-scoped invalidations here later.
+  // Add building-scoped and tenant-scoped invalidations here later.
 }
 
 /**
  * useCreateLeaseMutation
  *
- * Shared mutation for the unified lease create page.
+ * Shared mutation for the unified lease create workflow.
  *
  * Supports:
- * - unit-first
- * - tenant-first
- * - combined
- * - blank/manual
+ * - existing tenant -> create lease directly
+ * - new tenant -> create tenant first, then create lease
  */
 export function useCreateLeaseMutation({
   orgSlug,
@@ -86,14 +122,40 @@ export function useCreateLeaseMutation({
   // Step 1: Normalize org slug
   const safeOrgSlug = orgSlug?.trim() ?? "";
 
-  return useMutation<Lease, unknown, CreateLeaseInput>({
+  return useMutation<Lease, unknown, CreateLeaseWorkflowInput>({
     mutationFn: async (input) => {
-      // Step 2: Submit shared create payload directly
-      return await createLease(input);
+      // Step 2: Existing-tenant workflow
+      if (input.mode === "existing-tenant") {
+        return await createLease(input.leasePayload);
+      }
+
+      // Step 3: Create tenant first for new-tenant workflow
+      const createdTenant = await createTenant(safeOrgSlug, input.tenantPayload);
+
+      // Step 4: Guard returned tenant id
+      if (!isValidPositiveInt(createdTenant.id)) {
+        throw new Error(
+          "Tenant creation succeeded but returned an invalid tenant id."
+        );
+      }
+
+      // Step 5: Build backend-safe lease payload with required primary tenant link
+      const finalLeasePayload: CreateLeaseInput = {
+        ...input.leasePayload,
+        parties: [
+          {
+            tenant_id: createdTenant.id,
+            role: "primary",
+          },
+        ],
+      };
+
+      // Step 6: Create lease using the newly created tenant
+      return await createLease(finalLeasePayload);
     },
 
     onSuccess: async (createdLease) => {
-      // Step 3: Invalidate from authoritative server response
+      // Step 7: Invalidate lease caches from authoritative server response
       await invalidateLeaseCreateCaches(
         queryClient,
         safeOrgSlug,

@@ -3,8 +3,8 @@
 
 import { useMemo, useState } from "react";
 import { Building2, Home, Lock } from "lucide-react";
-import { useBuildingsQuery } from "../../buildings/pages/BuildingPage/hooks/useBuildings";
-import { useUnitsQuery } from "../../buildings/pages/BuildingDetailPage/hooks/useUnitsQuery";
+import { useBuildingsQuery } from "../../../buildings/pages/BuildingPage/hooks/useBuildings";
+import { useUnitsQuery } from "../../../buildings/pages/BuildingDetailPage/hooks/useUnitsQuery";
 
 type Props = {
   orgSlug: string;

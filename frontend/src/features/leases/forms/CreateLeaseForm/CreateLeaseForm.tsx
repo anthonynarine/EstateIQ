@@ -1,5 +1,5 @@
 // # Filename: src/features/leases/forms/CreateLeaseForm/CreateLeaseForm.tsx
-// ✅ New Code
+
 
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
@@ -9,45 +9,22 @@ import { formatApiFormErrors } from "../../../../api/formatApiFormErrors";
 import { useOrg } from "../../../tenancy/hooks/useOrg";
 import { useCreateLeaseMutation } from "../../queries/useCreateLeaseMutation";
 
-import FormActions from "../FormActions";
-import FormErrorSummary from "../FormErrorSummary";
-import LeaseTermsFields from "../LeaseTermsFields";
+import FormActions from "../sectons/FormActions";
+import FormErrorSummary from "../sectons/FormErrorSummary";
+import LeaseTermsFields from "../sectons/LeaseTermsFields";
 import TenantSection from "../TenantSection/TenantSection";
-import UnitAssignmentSection from "../UnitAssignmentSection";
-import { useCreateLeaseForm } from "../useCreateLeaseForm";
+import UnitAssignmentSection from "../sectons/UnitAssignmentSection";
+import { useCreateLeaseForm } from "./useCreateLeaseForm";
+import { useCreateLeaseSubmit } from "./useCreateLeaseSubmit";
 
 import {
   useLeaseOverlapUx,
   type LeaseOverlapMeta,
-} from "../useLeaseOverlapUx";
+} from "./useLeaseOverlapUx";
 
 import CreateLeaseCollapse from "./CreateLeaseCollapse";
 import CreateLeaseHeader from "./CreateLeaseHeader";
-
-/**
- * Launch modes supported by LeaseCreatePage
- */
-export type LeaseCreateLaunchMode =
-  | "blank"
-  | "tenant-first"
-  | "unit-first"
-  | "tenant-and-unit";
-
-/**
- * Initial launch context passed from LeaseCreatePage
- */
-export type LeaseCreateInitialContext = {
-  orgSlug: string;
-  tenantId: number | null;
-  unitId: number | null;
-  buildingId: number | null;
-  buildingName?: string | null;
-  launchMode: LeaseCreateLaunchMode;
-};
-
-type Props = {
-  initialContext: LeaseCreateInitialContext;
-};
+import type { Props } from "./types";
 
 /**
  * parseApiMeta
@@ -87,7 +64,7 @@ function parseApiMeta(meta: unknown): LeaseOverlapMeta | null {
  * - Own open/close UI state
  * - Wire tenant workflow + building/unit assignment + lease terms
  * - Normalize API errors
- * - Submit the shared backend lease-create payload
+ * - Delegate submit orchestration to useCreateLeaseSubmit
  */
 export default function CreateLeaseForm({ initialContext }: Props) {
   const { orgSlug } = useOrg();
@@ -127,7 +104,8 @@ export default function CreateLeaseForm({ initialContext }: Props) {
     setLocalError,
     reset,
     validate,
-    buildPayload,
+    buildExistingTenantPayload,
+    buildNewTenantLeasePayload,
     selectExistingTenant,
     onTenantModeChange,
     onBuildingChange,
@@ -138,7 +116,7 @@ export default function CreateLeaseForm({ initialContext }: Props) {
     initialUnitId: unitId,
   });
 
-  // Step 3: Basic render guard
+  // Step 3: Render guard
   const canRender = Boolean(orgSlug && orgSlug.trim().length > 0);
 
   const mutation = useCreateLeaseMutation({
@@ -166,6 +144,21 @@ export default function CreateLeaseForm({ initialContext }: Props) {
     setHideApiErrors,
   });
 
+  const { handleSubmit } = useCreateLeaseSubmit({
+    orgSlug,
+    unitId,
+    tenantMode,
+    tenantCreateDraft,
+    setLocalError,
+    setHideApiErrors,
+    setIsOpen,
+    reset,
+    validate,
+    buildExistingTenantPayload,
+    buildNewTenantLeasePayload,
+    mutateAsync,
+  });
+
   /**
    * handleCancel
    *
@@ -176,43 +169,6 @@ export default function CreateLeaseForm({ initialContext }: Props) {
     reset();
     setHideApiErrors(false);
     setIsOpen(false);
-  };
-
-  /**
-   * handleSubmit
-   *
-   * Validates current form state and submits a lease create request.
-   */
-  const handleSubmit = async () => {
-    // Step 1: Re-enable API errors for a fresh submit
-    setHideApiErrors(false);
-
-    if (!orgSlug) {
-      setLocalError("Organization not selected.");
-      return;
-    }
-
-    const result = validate({
-      unitId,
-    });
-
-    if (!result.ok) {
-      return;
-    }
-
-    const { payload } = buildPayload({
-      unitId,
-    });
-
-    try {
-      await mutateAsync(payload);
-      reset();
-      setHideApiErrors(false);
-      setIsOpen(false);
-    } catch {
-      // Step 2: No-op
-      // Errors are rendered from mutation.error.
-    }
   };
 
   if (!canRender) {
@@ -251,8 +207,8 @@ export default function CreateLeaseForm({ initialContext }: Props) {
               Ready to create a lease
             </p>
             <p className="text-sm text-neutral-400">
-              Assign a tenant, select the building and unit, and define lease
-              terms.
+              Assign a primary tenant, select the building and unit, and define
+              lease terms.
             </p>
           </div>
         </div>
@@ -306,11 +262,15 @@ export default function CreateLeaseForm({ initialContext }: Props) {
             securityDeposit={securityDeposit}
             status={status}
             onStartDateChange={(value) => {
-              // Step 1: Manual change should re-enable API errors
+              // Step 1: Re-enable API errors on manual change
               setHideApiErrors(false);
               setStartDate(value);
             }}
-            onEndDateChange={setEndDate}
+            onEndDateChange={(value) => {
+              // Step 2: Re-enable API errors on manual change
+              setHideApiErrors(false);
+              setEndDate(value);
+            }}
             onRentAmountChange={setRentAmount}
             onRentDueDayChange={setRentDueDay}
             onSecurityDepositChange={setSecurityDeposit}

@@ -2,8 +2,8 @@
 
 
 import type { NavigateFunction } from "react-router-dom";
-import type { FormErrorAction } from "./FormErrorSummary";
-import { formatIsoDateLong, formatIsoDateShort } from "../utils/dateFormats";
+import type { FormErrorAction } from "../sectons/FormErrorSummary";
+import { formatIsoDateLong, formatIsoDateShort } from "../../utils/dateFormats";
 
 export type LeaseOverlapMeta = {
   kind: "lease_overlap";

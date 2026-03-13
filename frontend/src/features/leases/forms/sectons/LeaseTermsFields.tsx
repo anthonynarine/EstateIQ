@@ -1,7 +1,7 @@
 // # Filename: src/features/leases/forms/LeaseTermsFields.tsx
-// ✅ New Code
 
-import type { LeaseStatus } from "../api/leaseApi";
+
+import type { LeaseStatus } from "../../../api/leaseApi";
 import FieldError from "./FieldError";
 
 type FieldErrors = Record<string, string[] | undefined>;
