@@ -20,9 +20,14 @@ export type Unit = {
   bathrooms: number;
   sqft: number | null;
 
-  // Occupancy fields (computed server-side)
+  // Step 1: Occupancy fields (computed server-side)
   is_occupied: boolean;
   active_lease_id: number | null;
+
+  // Step 2: Active lease + tenant summary fields
+  active_lease_end_date: string | null;
+  active_tenant_id: number | null;
+  active_tenant_name: string | null;
 
   created_at: string;
   updated_at: string;
@@ -157,6 +162,8 @@ export async function listUnitsByBuilding({
     },
   });
 
+  // Step 1: Inspect raw API response
+  console.log("DEBUG - unitsApi raw response:", res.data);
   return normalizePaginatedResponse<Unit>(res.data);
 }
 

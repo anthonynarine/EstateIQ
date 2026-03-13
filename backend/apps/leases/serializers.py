@@ -1,3 +1,4 @@
+# Filename: backend/apps/leases/serializers.py
 
 from __future__ import annotations
 
@@ -21,20 +22,7 @@ from apps.leases.services import (
 
 
 def _normalize_validation_error(exc: Exception) -> DRFValidationError:
-    """Normalize various validation exceptions into a DRF ValidationError.
-
-    This function is intentionally the single normalization point so we never
-    depend on exception-internal attributes (like `error_list`) that vary
-    between Django and DRF types.
-
-    Rules:
-      - If the service already raised DRFValidationError, preserve it.
-      - If DjangoValidationError:
-          - preserve message_dict (field errors)
-          - preserve nested dicts (structured payloads)
-          - otherwise map messages into non_field_errors
-      - If ValueError or unknown exception: map to non_field_errors.
-    """
+    """Normalize various validation exceptions into a DRF ValidationError."""
     # Step 1: Already DRF
     if isinstance(exc, DRFValidationError):
         return exc
@@ -44,25 +32,23 @@ def _normalize_validation_error(exc: Exception) -> DRFValidationError:
         if hasattr(exc, "message_dict"):
             normalized: Dict[str, Any] = {}
             for field, messages in exc.message_dict.items():
-                # Step 2a: Preserve nested dict payloads (e.g., {"conflict": {...}})
                 if isinstance(messages, dict):
                     normalized[field] = messages
                     continue
 
-                # Step 2b: Normalize list/tuple -> list[str]
                 if isinstance(messages, (list, tuple)):
-                    normalized[field] = [str(m) for m in messages]
+                    normalized[field] = [str(message) for message in messages]
                 else:
                     normalized[field] = [str(messages)]
             return DRFValidationError(normalized)
 
         messages = getattr(exc, "messages", None)
         if messages:
-            return DRFValidationError({"non_field_errors": [str(m) for m in messages]})
+            return DRFValidationError({"non_field_errors": [str(message) for message in messages]})
 
         return DRFValidationError({"non_field_errors": ["Validation error."]})
 
-    # Step 3: ValueError or anything else
+    # Step 3: Fallback
     return DRFValidationError({"non_field_errors": [str(exc)]})
 
 
@@ -144,10 +130,9 @@ class LeaseSerializer(serializers.ModelSerializer):
         return LeasePartyDetailSerializer(qs, many=True, context=self.context).data
 
     def validate_unit(self, unit: Unit) -> Unit:
-        """Ensure the unit belongs to request.org (multi-tenant safety)."""
+        """Ensure the unit belongs to request.org."""
         org = self.context["request"].org
         if unit.organization_id != org.id:
-            # Field-level validator should raise a string/list, not {"unit": ...}
             raise serializers.ValidationError("Unit must belong to the active organization.")
         return unit
 
@@ -155,7 +140,7 @@ class LeaseSerializer(serializers.ModelSerializer):
         """Convert parties payload into service-layer inputs."""
         if parties_data is None:
             return None
-        return [LeasePartyInput(**p) for p in parties_data]
+        return [LeasePartyInput(**party) for party in parties_data]
 
     def create(self, validated_data):
         org = self.context["request"].org
@@ -169,13 +154,11 @@ class LeaseSerializer(serializers.ModelSerializer):
 
     def update(self, instance, validated_data):
         org = self.context["request"].org
-
         parties_data = validated_data.pop("parties", None)
         parties = self._parse_parties(parties_data)
 
-        unit = validated_data.pop("unit", None) or instance.unit
+        unit = validated_data.pop("unit", None)
 
-        # PATCH semantics (service expects sentinel)
         end_date = validated_data.pop("end_date", _MISSING)
         security_deposit_amount = validated_data.pop("security_deposit_amount", _MISSING)
 

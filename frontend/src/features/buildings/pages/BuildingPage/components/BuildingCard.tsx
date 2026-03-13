@@ -1,9 +1,18 @@
 // # Filename: src/features/buildings/pages/BuildingPage/components/BuildingCard.tsx
-// ✅ New Code
+
 
 import { useCallback } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
-import { Pencil, Trash2, ArrowRight } from "lucide-react";
+import {
+  Pencil,
+  Trash2,
+  ArrowRight,
+  Building2,
+  MapPin,
+  DoorOpen,
+  Users,
+  BedDouble,
+} from "lucide-react";
 import type { Building } from "../../../api/buildingsApi";
 
 type Props = {
@@ -20,7 +29,7 @@ type Props = {
  *
  * Responsibilities:
  * - Display building identity and address
- * - Display summary chips
+ * - Display unit occupancy summary
  * - Navigate to the building detail workspace
  * - Delegate edit/delete actions to parent orchestration
  */
@@ -63,72 +72,120 @@ export default function BuildingCard({
   const handleDelete = useCallback(
     (e: React.MouseEvent) => {
       e.stopPropagation();
-      if (disableDelete) return;
+      if (disableDelete) {
+        return;
+      }
       onDelete?.(building);
     },
     [building, disableDelete, onDelete]
   );
 
-  const Chip = ({
-    label,
-    value,
-    variant = "neutral",
-  }: {
-    label: string;
-    value: number;
-    variant?: "neutral" | "occupied" | "vacant";
-  }) => {
-    const base =
-      "inline-flex items-center rounded-full px-3 py-1 text-xs font-medium ring-1";
+  const addressLine = [
+    building.address_line1,
+    building.address_line2,
+  ]
+    .filter(Boolean)
+    .join(", ");
 
-    const styles: Record<typeof variant, string> = {
-      neutral: "bg-white/5 text-neutral-200 ring-white/10",
-      occupied: "bg-emerald-500/10 text-emerald-300 ring-emerald-400/20",
-      vacant: "bg-rose-500/10 text-rose-300 ring-rose-400/20",
-    };
+  const localityLine = [building.city, building.state, building.postal_code]
+    .filter(Boolean)
+    .join(", ")
+    .replace(", ", ", ");
 
-    return (
-      <span className={`${base} ${styles[variant]}`}>
-        {label}: <span className="ml-1 text-white">{value}</span>
-      </span>
-    );
-  };
+  const hasUnits = unitsCount > 0;
 
   return (
-    <article className="rounded-2xl border border-white/10 bg-white/5 p-5 shadow-[0_0_0_1px_rgba(255,255,255,0.03)]">
+    <article className="group flex h-full flex-col rounded-2xl border border-white/10 bg-gradient-to-br from-white/[0.06] to-white/[0.03] p-5 shadow-[0_10px_30px_rgba(0,0,0,0.22)] transition hover:border-cyan-400/20 hover:shadow-[0_14px_36px_rgba(0,0,0,0.28)]">
       <div className="flex items-start justify-between gap-4">
-        <div className="min-w-0 space-y-3">
-          <div className="space-y-1">
-            <h3 className="truncate text-xl font-semibold tracking-tight text-white">
-              {building.name}
-            </h3>
+        <div className="min-w-0 flex-1 space-y-4">
+          {/* Header */}
+          <div className="space-y-3">
+            <div className="flex items-start gap-3">
+              <div className="rounded-2xl bg-cyan-400/10 p-2.5 ring-1 ring-cyan-400/15">
+                <Building2 className="h-5 w-5 text-cyan-300" />
+              </div>
 
-            <p className="truncate text-sm text-neutral-300">
-              {building.address_line1}
-              {building.address_line2 ? `, ${building.address_line2}` : ""}
-            </p>
+              <div className="min-w-0 flex-1">
+                <h3 className="truncate text-xl font-semibold tracking-tight text-white">
+                  {building.name}
+                </h3>
 
-            <p className="truncate text-sm text-neutral-400">
-              {building.city}, {building.state} {building.postal_code}
-            </p>
-          </div>
+                <div className="mt-2 space-y-1">
+                  {addressLine ? (
+                    <div className="flex items-start gap-2 text-sm text-neutral-300">
+                      <MapPin className="mt-0.5 h-4 w-4 shrink-0 text-neutral-500" />
+                      <span className="truncate">{addressLine}</span>
+                    </div>
+                  ) : null}
 
-          <div className="flex flex-wrap gap-2">
-            {unitsCount === 0 ? (
-              <span className="inline-flex items-center rounded-full bg-white/5 px-3 py-1 text-xs font-medium text-neutral-200 ring-1 ring-white/10">
-                No units added
-              </span>
+                  {localityLine ? (
+                    <p className="pl-6 text-sm text-neutral-400">{localityLine}</p>
+                  ) : null}
+                </div>
+              </div>
+            </div>
+
+            {/* Summary rail */}
+            {hasUnits ? (
+              <div className="overflow-hidden rounded-2xl border border-white/10 bg-white/[0.03]">
+                <div className="grid gap-0 sm:grid-cols-3">
+                  <div className="flex items-center gap-3 px-4 py-3">
+                    <div className="rounded-xl bg-white/5 p-2">
+                      <DoorOpen className="h-4 w-4 text-neutral-300" />
+                    </div>
+                    <div className="min-w-0">
+                      <p className="text-[11px] uppercase tracking-wide text-neutral-500">
+                        Units
+                      </p>
+                      <p className="text-sm font-semibold text-white">{unitsCount}</p>
+                    </div>
+                  </div>
+
+                  <div className="border-t border-white/8 sm:border-l sm:border-t-0">
+                    <div className="flex items-center gap-3 px-4 py-3">
+                      <div className="rounded-xl bg-emerald-400/10 p-2">
+                        <Users className="h-4 w-4 text-emerald-300" />
+                      </div>
+                      <div className="min-w-0">
+                        <p className="text-[11px] uppercase tracking-wide text-neutral-500">
+                          Occupied
+                        </p>
+                        <p className="text-sm font-semibold text-emerald-300">
+                          {occupiedCount}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="border-t border-white/8 sm:border-l sm:border-t-0">
+                    <div className="flex items-center gap-3 px-4 py-3">
+                      <div className="rounded-xl bg-rose-400/10 p-2">
+                        <BedDouble className="h-4 w-4 text-rose-300" />
+                      </div>
+                      <div className="min-w-0">
+                        <p className="text-[11px] uppercase tracking-wide text-neutral-500">
+                          Vacant
+                        </p>
+                        <p className="text-sm font-semibold text-rose-300">
+                          {vacantCount}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
             ) : (
-              <>
-                <Chip label="Units" value={unitsCount} variant="neutral" />
-                <Chip label="Occupied" value={occupiedCount} variant="occupied" />
-                <Chip label="Vacant" value={vacantCount} variant="vacant" />
-              </>
+              <div className="rounded-2xl border border-white/10 bg-white/[0.03] px-4 py-3">
+                <p className="text-sm font-medium text-neutral-200">No units added yet</p>
+                <p className="mt-1 text-xs text-neutral-500">
+                  Add units to start tracking occupancy and lease activity.
+                </p>
+              </div>
             )}
           </div>
         </div>
 
-        {onEdit || onDelete ? (
+        {(onEdit || onDelete) ? (
           <div className="flex shrink-0 items-center gap-2">
             {onEdit ? (
               <button
@@ -160,20 +217,22 @@ export default function BuildingCard({
         ) : null}
       </div>
 
-      <div className="mt-5 border-t border-white/10 pt-4">
-        <div className="flex items-center justify-between gap-4">
-          <p className="max-w-xl text-sm text-neutral-400">
-            Open this building to manage units and lease activity.
-          </p>
+      <div className="mt-auto pt-5">
+        <div className="border-t border-white/10 pt-4">
+          <div className="flex items-center justify-between gap-4">
+            <p className="max-w-xl text-sm text-neutral-400">
+              Open this building to manage units, tenants, and lease activity.
+            </p>
 
-          <button
-            type="button"
-            onClick={onViewUnits}
-            className="inline-flex shrink-0 items-center gap-2 text-sm font-medium text-neutral-100 transition hover:text-white"
-          >
-            View units
-            <ArrowRight className="h-4 w-4" />
-          </button>
+            <button
+              type="button"
+              onClick={onViewUnits}
+              className="inline-flex shrink-0 items-center gap-2 rounded-xl bg-white/5 px-3 py-2 text-sm font-medium text-neutral-100 ring-1 ring-white/10 transition hover:bg-white/8 hover:text-white"
+            >
+              View units
+              <ArrowRight className="h-4 w-4" />
+            </button>
+          </div>
         </div>
       </div>
     </article>

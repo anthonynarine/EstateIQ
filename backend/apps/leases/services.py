@@ -19,12 +19,14 @@ from apps.leases.models import Lease, LeaseTenant, Tenant
 @dataclass(frozen=True)
 class LeasePartyInput:
     """Input for attaching a tenant to a lease."""
+
     tenant_id: int
     role: str = LeaseTenant.Role.PRIMARY
 
 
 class _Missing:
     """Sentinel for PATCH fields that were not provided."""
+
     pass
 
 
@@ -32,13 +34,7 @@ _MISSING = _Missing()
 
 
 def _raise_api_error(*, code: str, message: str, details: dict) -> None:
-    """Raise a DRFValidationError with a consistent structured payload.
-
-    We use DRFValidationError here (not Django ValidationError) because:
-      - We want to return a structured JSON payload to the frontend.
-      - Django ValidationError does NOT reliably support nested dict values.
-      - This avoids the `'ValidationError' object has no attribute 'error_list'` crash.
-    """
+    """Raise a DRFValidationError with a consistent structured payload."""
     # Step 1: Raise API-safe structured payload
     raise DRFValidationError(
         {
@@ -58,16 +54,7 @@ def _is_overlapping_end_exclusive(
     new_start: date,
     new_end: Optional[date],
 ) -> bool:
-    """Return True if two [start, end) intervals overlap (end-exclusive).
-
-    Business rule:
-      - Lease covers [start_date, end_date)
-      - end_date is exclusive (move-out date)
-      - None end_date means open-ended (+∞)
-
-    Overlap iff:
-      new_start < existing_end_or_inf  AND  new_end_or_inf > existing_start
-    """
+    """Return True if two [start, end) intervals overlap (end-exclusive)."""
     # Step 1: Compute left condition: new_start < existing_end_or_inf
     left = True if existing_end is None else (new_start < existing_end)
 
@@ -85,25 +72,18 @@ def _find_conflicting_lease(
     end_date: Optional[date],
     exclude_lease_id: Optional[int] = None,
 ) -> Optional[Lease]:
-    """Return the first lease that conflicts with the proposed interval [start, end).
-
-    This function enforces end-exclusive overlap logic and adjacency allowance.
-    """
+    """Return the first lease that conflicts with the proposed interval [start, end)."""
     # Step 1: Base queryset (org-safe)
     qs = Lease.objects.filter(organization=org, unit=unit).order_by("start_date", "id")
     if exclude_lease_id is not None:
         qs = qs.exclude(id=exclude_lease_id)
 
     # Step 2: Candidate DB filter (cheap; final decision in Python)
-    #
-    # Overlap conditions:
-    #   new_start < existing_end_or_inf  -> existing_end is null OR existing_end > new_start
-    #   new_end_or_inf > existing_start  -> if new_end exists, existing_start < new_end
     candidates = qs.filter(Q(end_date__isnull=True) | Q(end_date__gt=start_date))
     if end_date is not None:
         candidates = candidates.filter(start_date__lt=end_date)
 
-    # Step 3: Precise overlap check (handles adjacency correctly)
+    # Step 3: Precise overlap check
     for existing in candidates:
         if _is_overlapping_end_exclusive(
             existing_start=existing.start_date,
@@ -134,9 +114,7 @@ def _validate_lease_invariants(
             details={"unit_id": unit.id, "org_id": org.id},
         )
 
-    # Step 2: Date sanity (end-exclusive)
-    # end_date is the move-out date (tenant does NOT occupy on end_date),
-    # so it must be strictly AFTER start_date.
+    # Step 2: Date sanity
     if end_date is not None and end_date <= start_date:
         _raise_api_error(
             code="invalid_date_range",
@@ -144,7 +122,7 @@ def _validate_lease_invariants(
             details={"start_date": str(start_date), "end_date": str(end_date)},
         )
 
-    # Step 3: Overlap detection (end-exclusive)
+    # Step 3: Overlap detection
     conflict = _find_conflicting_lease(
         org=org,
         unit=unit,
@@ -153,7 +131,7 @@ def _validate_lease_invariants(
         exclude_lease_id=exclude_lease_id,
     )
     if conflict is not None:
-        suggested_start = conflict.end_date  # adjacency allowed under end-exclusive rule
+        suggested_start = conflict.end_date
         _raise_api_error(
             code="lease_overlap",
             message="Lease dates conflict with an existing lease for this unit.",
@@ -185,6 +163,64 @@ def _validate_lease_invariants(
                 message="This unit already has an active lease. End it before activating another.",
                 details={"unit_id": unit.id},
             )
+
+
+def _normalize_parties(parties: Iterable[LeasePartyInput]) -> list[LeasePartyInput]:
+    """Materialize party inputs into a list."""
+    # Step 1: Convert iterable to list so we can validate deterministically
+    return list(parties)
+
+
+def _validate_party_inputs(
+    *,
+    parties: list[LeasePartyInput],
+    require_primary: bool = True,
+) -> None:
+    """Validate authoritative lease party input before any destructive writes."""
+    # Step 1: Require at least one party
+    if not parties:
+        _raise_api_error(
+            code="primary_tenant_required",
+            message="A lease must have a primary tenant.",
+            details={},
+        )
+
+    # Step 2: Block duplicate tenant IDs
+    tenant_ids = [party.tenant_id for party in parties]
+    duplicate_ids = sorted({tenant_id for tenant_id in tenant_ids if tenant_ids.count(tenant_id) > 1})
+    if duplicate_ids:
+        _raise_api_error(
+            code="duplicate_lease_tenants",
+            message="Each tenant may only appear once on a lease.",
+            details={"tenant_ids": duplicate_ids},
+        )
+
+    # Step 3: Enforce exactly one primary tenant
+    primary_count = sum(1 for party in parties if party.role == LeaseTenant.Role.PRIMARY)
+    if require_primary and primary_count != 1:
+        _raise_api_error(
+            code="invalid_primary_tenant_count",
+            message="A lease must have exactly one primary tenant.",
+            details={"primary_count": primary_count},
+        )
+
+
+def _assert_lease_has_primary_tenant(*, org: Organization, lease: Lease) -> None:
+    """Ensure the persisted lease still has exactly one primary tenant link."""
+    # Step 1: Count primary links
+    primary_count = LeaseTenant.objects.filter(
+        organization=org,
+        lease=lease,
+        role=LeaseTenant.Role.PRIMARY,
+    ).count()
+
+    # Step 2: Enforce exact cardinality
+    if primary_count != 1:
+        _raise_api_error(
+            code="primary_tenant_required",
+            message="A lease must have exactly one primary tenant.",
+            details={"lease_id": lease.id, "primary_count": primary_count},
+        )
 
 
 @transaction.atomic
@@ -237,8 +273,12 @@ def create_lease(
     rent_due_day: int = 1,
     parties: Optional[Iterable[LeasePartyInput]] = None,
 ) -> Lease:
-    """Create a lease (org-safe) and optional parties."""
-    # Step 1: Validate invariants pre-save
+    """Create a lease and its tenant links atomically."""
+    # Step 1: Require and validate parties up front
+    normalized_parties = _normalize_parties(parties or [])
+    _validate_party_inputs(parties=normalized_parties)
+
+    # Step 2: Validate lease invariants before save
     _validate_lease_invariants(
         org=org,
         unit=unit,
@@ -248,7 +288,7 @@ def create_lease(
         exclude_lease_id=None,
     )
 
-    # Step 2: Persist lease
+    # Step 3: Persist lease
     lease = Lease(
         organization=org,
         unit=unit,
@@ -261,9 +301,11 @@ def create_lease(
     )
     lease.save()
 
-    # Step 3: Attach parties if present
-    if parties:
-        _set_lease_parties(org=org, lease=lease, parties=parties)
+    # Step 4: Persist authoritative parties
+    _set_lease_parties(org=org, lease=lease, parties=normalized_parties)
+
+    # Step 5: Final guardrail
+    _assert_lease_has_primary_tenant(org=org, lease=lease)
 
     return lease
 
@@ -282,7 +324,7 @@ def update_lease(
     rent_due_day: Optional[int] = None,
     parties: Optional[Iterable[LeasePartyInput]] = None,
 ) -> Lease:
-    """Update a lease (org-safe) with true PATCH semantics."""
+    """Update a lease atomically with true PATCH semantics."""
     # Step 1: Org integrity
     if lease.organization_id != org.id:
         _raise_api_error(
@@ -300,12 +342,12 @@ def update_lease(
             details={"unit_id": resolved_unit.id, "org_id": org.id},
         )
 
-    # Step 3: Compute effective values (PATCH semantics)
+    # Step 3: Compute effective values
     effective_start = start_date if start_date is not None else lease.start_date
     effective_end = lease.end_date if end_date is _MISSING else end_date
     effective_status = status if status is not None else lease.status
 
-    # Step 4: Validate invariants using effective values
+    # Step 4: Validate invariants
     _validate_lease_invariants(
         org=org,
         unit=resolved_unit,
@@ -315,7 +357,7 @@ def update_lease(
         exclude_lease_id=lease.id,
     )
 
-    # Step 5: Apply updates
+    # Step 5: Apply lease field updates
     if unit is not None:
         lease.unit = resolved_unit
     if start_date is not None:
@@ -333,9 +375,14 @@ def update_lease(
 
     lease.save()
 
-    # Step 6: Replace parties if explicitly provided
+    # Step 6: Replace parties only if explicitly provided
     if parties is not None:
-        _set_lease_parties(org=org, lease=lease, parties=parties)
+        normalized_parties = _normalize_parties(parties)
+        _validate_party_inputs(parties=normalized_parties)
+        _set_lease_parties(org=org, lease=lease, parties=normalized_parties)
+
+    # Step 7: Never allow the lease to remain in an invalid legacy state
+    _assert_lease_has_primary_tenant(org=org, lease=lease)
 
     return lease
 
@@ -356,8 +403,7 @@ def end_lease(
             details={"lease_id": lease.id, "org_id": org.id},
         )
 
-    # Step 2: End-exclusive date rule
-    # end_date is the move-out date, so it must be strictly after start_date.
+    # Step 2: End date sanity
     if end_date <= lease.start_date:
         _raise_api_error(
             code="invalid_end_date",
@@ -365,7 +411,7 @@ def end_lease(
             details={"start_date": str(lease.start_date), "end_date": str(end_date)},
         )
 
-    # Step 3: Apply end state deterministically
+    # Step 3: Apply end state
     lease.end_date = end_date
     lease.status = Lease.Status.ENDED
     lease.save()
@@ -379,34 +425,44 @@ def _set_lease_parties(
     lease: Lease,
     parties: Iterable[LeasePartyInput],
 ) -> None:
-    """Replace lease parties with the provided list (authoritative)."""
-    # Step 1: Delete existing parties
-    LeaseTenant.objects.filter(organization=org, lease=lease).delete()
+    """Replace lease parties authoritatively after validation."""
+    # Step 1: Materialize and validate before destructive work
+    normalized_parties = _normalize_parties(parties)
+    _validate_party_inputs(parties=normalized_parties)
 
     # Step 2: Resolve tenants within org
-    tenant_ids = [p.tenant_id for p in parties]
-    tenants: QuerySet[Tenant] = Tenant.objects.filter(organization=org, id__in=tenant_ids)
-    tenant_map = {t.id: t for t in tenants}
+    tenant_ids = [party.tenant_id for party in normalized_parties]
+    tenants: QuerySet[Tenant] = Tenant.objects.filter(
+        organization=org,
+        id__in=tenant_ids,
+    )
+    tenant_map = {tenant.id: tenant for tenant in tenants}
 
-    # Step 3: Build links
+    missing_tenant_ids = sorted(set(tenant_ids) - set(tenant_map.keys()))
+    if missing_tenant_ids:
+        _raise_api_error(
+            code="tenant_not_found",
+            message="One or more tenants were not found in this organization.",
+            details={"tenant_ids": missing_tenant_ids},
+        )
+
+    # Step 3: Remove existing party rows only after validation succeeds
+    LeaseTenant.objects.select_for_update().filter(
+        organization=org,
+        lease=lease,
+    ).delete()
+
+    # Step 4: Build new rows
     links: list[LeaseTenant] = []
-    for p in parties:
-        tenant = tenant_map.get(p.tenant_id)
-        if not tenant:
-            _raise_api_error(
-                code="tenant_not_found",
-                message="Tenant not found in this organization.",
-                details={"tenant_id": p.tenant_id},
-            )
-
+    for party in normalized_parties:
         links.append(
             LeaseTenant(
                 organization=org,
                 lease=lease,
-                tenant=tenant,
-                role=p.role,
+                tenant=tenant_map[party.tenant_id],
+                role=party.role,
             )
         )
 
-    # Step 4: Bulk create
+    # Step 5: Bulk create authoritative rows
     LeaseTenant.objects.bulk_create(links)

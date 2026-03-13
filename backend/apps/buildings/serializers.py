@@ -1,7 +1,9 @@
 # Filename: apps/buildings/serializers.py
 
 from __future__ import annotations
+
 from rest_framework import serializers
+
 from apps.buildings.models import Building, Unit
 
 
@@ -28,7 +30,7 @@ class BuildingSerializer(serializers.ModelSerializer):
         allow_null=True,
     )
 
-    # Step 2: Optional fields (adjust based on your model constraints)
+    # Step 2: Optional fields
     country = serializers.CharField(
         required=False,
         allow_blank=True,
@@ -68,11 +70,18 @@ class UnitSerializer(serializers.ModelSerializer):
         - organization is derived from request.org (never client-supplied).
         - building must belong to request.org.
         - building cannot be changed after creation (prevents silent unit transfers).
+
+    Computed contract:
+        - Occupancy and active lease/tenant summary fields are selector-driven.
+        - These fields are flat and read-only for frontend usability.
     """
 
     # Step 1: Computed/annotated fields (read-only; must be annotated in queryset)
     is_occupied = serializers.BooleanField(read_only=True)
     active_lease_id = serializers.IntegerField(read_only=True, allow_null=True)
+    active_lease_end_date = serializers.DateField(read_only=True, allow_null=True)
+    active_tenant_id = serializers.IntegerField(read_only=True, allow_null=True)
+    active_tenant_name = serializers.CharField(read_only=True, allow_null=True)
 
     class Meta:
         model = Unit
@@ -83,9 +92,12 @@ class UnitSerializer(serializers.ModelSerializer):
             "bedrooms",
             "bathrooms",
             "sqft",
-            # Step 2: Occupancy fields
+            # Step 2: Occupancy + active lease summary fields
             "is_occupied",
             "active_lease_id",
+            "active_lease_end_date",
+            "active_tenant_id",
+            "active_tenant_name",
             "created_at",
             "updated_at",
         ]
@@ -95,6 +107,9 @@ class UnitSerializer(serializers.ModelSerializer):
             "updated_at",
             "is_occupied",
             "active_lease_id",
+            "active_lease_end_date",
+            "active_tenant_id",
+            "active_tenant_name",
         ]
 
     def validate_building(self, building: Building) -> Building:
@@ -107,8 +122,8 @@ class UnitSerializer(serializers.ModelSerializer):
             The same building if valid.
 
         Raises:
-            serializers.ValidationError: if org context missing, cross-tenant, or
-            attempt to change building on update.
+            serializers.ValidationError: If org context missing, cross-tenant,
+                or attempt to change building on update.
         """
         # Step 1: Ensure request.org exists
         request = self.context.get("request")
@@ -129,14 +144,15 @@ class UnitSerializer(serializers.ModelSerializer):
             )
 
         return building
-    
-    
+
+
 class BuildingSummarySerializer(serializers.ModelSerializer):
     """Small nested building representation for unit detail responses."""
 
     class Meta:
         model = Building
         fields = ["id", "name"]
+
 
 class UnitDetailSerializer(UnitSerializer):
     """Detailed unit serializer for retrieve views.
@@ -158,6 +174,9 @@ class UnitDetailSerializer(UnitSerializer):
             "sqft",
             "is_occupied",
             "active_lease_id",
+            "active_lease_end_date",
+            "active_tenant_id",
+            "active_tenant_name",
             "created_at",
             "updated_at",
         ]
@@ -168,4 +187,7 @@ class UnitDetailSerializer(UnitSerializer):
             "updated_at",
             "is_occupied",
             "active_lease_id",
+            "active_lease_end_date",
+            "active_tenant_id",
+            "active_tenant_name",
         ]

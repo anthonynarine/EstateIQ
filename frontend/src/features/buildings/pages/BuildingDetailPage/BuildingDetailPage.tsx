@@ -1,6 +1,5 @@
 // # Filename: src/features/buildings/pages/BuildingDetailPage/BuildingDetailPage.tsx
 
-
 import { useEffect, useMemo, useState } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 
@@ -25,6 +24,7 @@ import CollectionPaginationFooter from "../../../../components/pagination/Collec
  * - Fetch building + paginated units (org-scoped)
  * - Render header + units grid
  * - Occupancy is computed server-side
+ * - Active tenant / lease summary is returned flat from the units API
  * - Delegate edit/delete to `useUnitActions`
  */
 export default function BuildingDetailPage() {
@@ -41,7 +41,7 @@ export default function BuildingDetailPage() {
   const [isAddUnitOpen, setIsAddUnitOpen] = useState(false);
   const [page, setPage] = useState(1);
 
-  const PAGE_SIZE = 6;
+  const PAGE_SIZE = 4;
 
   // Step 3: Building query
   const {
@@ -63,6 +63,9 @@ export default function BuildingDetailPage() {
   const units = pageData?.results ?? [];
   const totalCount = pageData?.count ?? 0;
   const totalPages = Math.max(1, Math.ceil(totalCount / PAGE_SIZE));
+
+  console.log("BuildingDetailPage units:", units);
+
 
   // Step 5: Clamp page if deletes or mutations reduce the page count
   useEffect(() => {
@@ -112,7 +115,13 @@ export default function BuildingDetailPage() {
     });
   };
 
-  // Step 10: Guards
+  // Step 10: Navigate to tenant detail page
+  const goToTenant = (tenantId: number) => {
+    const search = location.search || "";
+    navigate(`/dashboard/tenants/${tenantId}${search}`);
+  };
+
+  // Step 11: Guards
   if (!canQuery) {
     return (
       <div className="p-6 text-rose-300">
@@ -163,6 +172,9 @@ export default function BuildingDetailPage() {
               unit={u}
               isOccupied={u.is_occupied}
               onOpen={() => goToUnit({ id: u.id, label: u.label })}
+              onOpenTenant={
+                u.active_tenant_id ? () => goToTenant(u.active_tenant_id) : undefined
+              }
               onEdit={() => openEdit(u)}
               onDelete={() => openDelete(u)}
             />

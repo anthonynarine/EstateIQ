@@ -1,3 +1,4 @@
+# Filename: apps/leases/selectors.py
 
 from __future__ import annotations
 
@@ -81,22 +82,30 @@ def leases_for_building_qs(*, org: Organization, building_id: int) -> QuerySet[L
 
 
 def active_lease_today_q(*, today: date) -> Q:
-    """Return Q() for 'active on today' under end-exclusive semantics.
+    """Return Q() for leases active on `today` using end-inclusive semantics.
 
-    Lease interval: [start_date, end_date)
-    Active on today iff:
-        start_date <= today AND (end_date is null OR today < end_date)
+    Lease interval:
+        [start_date, end_date]
+
+    A lease is active on `today` iff:
+        start_date <= today AND (end_date is null OR end_date >= today)
+
+    Business rule:
+        - A lease ending on a date remains active through that date.
+        - Open-ended leases remain active when end_date is null.
     """
-    # Step 1: end_date is exclusive => use GT (not GTE)
-    return Q(end_date__isnull=True) | Q(end_date__gt=today)
+    # Step 1: end_date must include today
+    return Q(end_date__isnull=True) | Q(end_date__gte=today)
 
 
-def active_leases_today_qs(*, org: Organization, today: Optional[date] = None) -> QuerySet[Lease]:
-    """Return ACTIVE leases that are active on `today` under end-exclusive semantics."""
-    # Step 1: default date
+def active_leases_today_qs(
+    *, org: Organization, today: Optional[date] = None
+) -> QuerySet[Lease]:
+    """Return ACTIVE leases that are active on `today` under end-inclusive semantics."""
+    # Step 1: Default date
     d = today or timezone.localdate()
 
-    # Step 2: compose with the shared predicate helper
+    # Step 2: Compose with the shared predicate helper
     return (
         leases_qs(org=org)
         .filter(status=Lease.Status.ACTIVE, start_date__lte=d)
