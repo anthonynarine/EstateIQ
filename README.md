@@ -226,3 +226,5 @@ This project serves both as:
 
 -   a real operational tool for a family rental business
 -   a demonstration of production‑grade SaaS architecture
+
+- Made in USA

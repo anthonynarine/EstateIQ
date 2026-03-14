@@ -1,7 +1,7 @@
 // # Filename: src/features/leases/components/LeaseList.tsx
 
 
-import LeaseCard from "./LeaseCard";
+import LeaseCard from "./LeaseCard/LeaseCard";
 
 type Props = {
   leases: any[];
