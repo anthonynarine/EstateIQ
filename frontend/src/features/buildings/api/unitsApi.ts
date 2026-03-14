@@ -1,7 +1,22 @@
-// # Filename: src/features/buildings/api/unitsApi.ts
-// ✅ New Code
+// Filename: src/features/buildings/api/unitsApi.ts
 
 import api from "../../../api/axios";
+
+/**
+ * ActiveTenantSummary
+ *
+ * Lightweight tenant summary returned by the backend for occupied units.
+ *
+ * Notes:
+ * - This is intentionally compact for card + modal UX.
+ * - The backend remains the source of truth for resolving the active tenant.
+ */
+export type ActiveTenantSummary = {
+  id: number;
+  full_name: string;
+  email: string | null;
+  phone: string | null;
+};
 
 /**
  * Unit
@@ -11,6 +26,7 @@ import api from "../../../api/axios";
  * Notes:
  * - Keep this aligned with the backend Unit serializer fields.
  * - Nullable numeric fields represent "unknown/not provided".
+ * - Occupancy and tenant summary are server-derived read-model fields.
  */
 export type Unit = {
   id: number;
@@ -23,11 +39,17 @@ export type Unit = {
   // Step 1: Occupancy fields (computed server-side)
   is_occupied: boolean;
   active_lease_id: number | null;
-
-  // Step 2: Active lease + tenant summary fields
   active_lease_end_date: string | null;
+
+  // Step 2: Backward-compatible flat tenant summary fields
   active_tenant_id: number | null;
   active_tenant_name: string | null;
+  active_tenant_email: string | null;
+  active_tenant_phone: string | null;
+
+  // Step 3: Preferred richer read-model fields
+  active_tenant_summary?: ActiveTenantSummary | null;
+  occupancy_has_data_issue?: boolean;
 
   created_at: string;
   updated_at: string;
@@ -120,7 +142,6 @@ function normalizePaginatedResponse<T>(data: unknown): PaginatedResponse<T> {
   }
 
   // Step 2: Legacy/plain-list fallback
-  // This keeps the frontend from exploding if a non-paginated response slips through.
   if (Array.isArray(data)) {
     return {
       count: data.length,
@@ -162,8 +183,6 @@ export async function listUnitsByBuilding({
     },
   });
 
-  // Step 1: Inspect raw API response
-  console.log("DEBUG - unitsApi raw response:", res.data);
   return normalizePaginatedResponse<Unit>(res.data);
 }
 

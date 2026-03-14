@@ -1,14 +1,25 @@
-// # Filename: src/features/buildings/pages/BuildingDetailPage/components/UnitCard.tsx
+// Filename: src/features/buildings/pages/BuildingDetailPage/components/UnitCard.tsx
+
 
 import React from "react";
 import {
+  AlertTriangle,
+  CalendarDays,
   ChevronRight,
+  Home,
+  Mail,
   Pencil,
+  Phone,
   Trash2,
   User2,
-  CalendarDays,
-  Home,
 } from "lucide-react";
+
+type ActiveTenantSummary = {
+  id: number;
+  full_name: string;
+  email: string | null;
+  phone: string | null;
+};
 
 type UnitCardUnit = {
   id: number;
@@ -17,8 +28,16 @@ type UnitCardUnit = {
   bathrooms: number | string | null;
   sqft: number | string | null;
   active_lease_end_date?: string | null;
+
+  // Step 1: Backward-compatible flat fields
   active_tenant_id?: number | null;
   active_tenant_name?: string | null;
+  active_tenant_email?: string | null;
+  active_tenant_phone?: string | null;
+
+  // Step 2: Preferred richer fields
+  active_tenant_summary?: ActiveTenantSummary | null;
+  occupancy_has_data_issue?: boolean;
 };
 
 type Props = {
@@ -66,6 +85,26 @@ function formatLeaseEndDate(value?: string | null): string | null {
   }).format(parsed);
 }
 
+function getActiveTenantSummary(unit: UnitCardUnit): ActiveTenantSummary | null {
+  // Step 1: Prefer the richer backend summary when available
+  if (unit.active_tenant_summary?.id && unit.active_tenant_summary.full_name) {
+    return unit.active_tenant_summary;
+  }
+
+  // Step 2: Fall back to legacy flat fields for backward compatibility
+  if (unit.active_tenant_id && unit.active_tenant_name) {
+    return {
+      id: unit.active_tenant_id,
+      full_name: unit.active_tenant_name,
+      email: unit.active_tenant_email ?? null,
+      phone: unit.active_tenant_phone ?? null,
+    };
+  }
+
+  // Step 3: No valid tenant summary
+  return null;
+}
+
 export default function UnitCard({
   unit,
   isOccupied,
@@ -90,7 +129,11 @@ export default function UnitCard({
   const sqftText =
     unit.sqft === null ? null : `${formatDecimalLikeUser(unit.sqft)} sqft`;
 
-  const hasTenantSummary = Boolean(isOccupied && unit.active_tenant_name);
+  const tenantSummary = getActiveTenantSummary(unit);
+  const hasTenantSummary = Boolean(isOccupied && tenantSummary);
+  const hasOccupancyDataIssue = Boolean(
+    isOccupied && !tenantSummary && unit.occupancy_has_data_issue
+  );
   const canDelete = !(disableDeleteWhenOccupied && isOccupied);
 
   // Step 2: Event handlers
@@ -159,7 +202,7 @@ export default function UnitCard({
             </div>
           </div>
 
-          {hasTenantSummary ? (
+          {hasTenantSummary && tenantSummary ? (
             <div className="overflow-hidden rounded-2xl border border-emerald-400/12 bg-emerald-500/[0.045]">
               <div className="space-y-3 px-4 py-3">
                 <div className="flex items-start gap-3">
@@ -169,7 +212,7 @@ export default function UnitCard({
 
                   <div className="min-w-0 flex-1">
                     <p className="text-[11px] uppercase tracking-wide text-neutral-500">
-                      Active tenant
+                      Occupied by
                     </p>
 
                     {onOpenTenant ? (
@@ -178,13 +221,31 @@ export default function UnitCard({
                         onClick={handleOpenTenant}
                         className="truncate text-left text-sm font-semibold text-white transition hover:text-cyan-300"
                       >
-                        {unit.active_tenant_name}
+                        {tenantSummary.full_name}
                       </button>
                     ) : (
                       <p className="truncate text-sm font-semibold text-white">
-                        {unit.active_tenant_name}
+                        {tenantSummary.full_name}
                       </p>
                     )}
+
+                    {(tenantSummary.email || tenantSummary.phone) ? (
+                      <div className="mt-2 flex flex-wrap items-center gap-3 text-xs text-neutral-300">
+                        {tenantSummary.email ? (
+                          <span className="inline-flex items-center gap-1.5">
+                            <Mail className="h-3.5 w-3.5 text-cyan-300/80" />
+                            <span className="truncate">{tenantSummary.email}</span>
+                          </span>
+                        ) : null}
+
+                        {tenantSummary.phone ? (
+                          <span className="inline-flex items-center gap-1.5">
+                            <Phone className="h-3.5 w-3.5 text-cyan-300/80" />
+                            <span>{tenantSummary.phone}</span>
+                          </span>
+                        ) : null}
+                      </div>
+                    ) : null}
                   </div>
                 </div>
 
@@ -203,6 +264,25 @@ export default function UnitCard({
                       {leaseEndText ? `Ends ${leaseEndText}` : "Active lease on file"}
                     </p>
                   </div>
+                </div>
+              </div>
+            </div>
+          ) : null}
+
+          {hasOccupancyDataIssue ? (
+            <div className="rounded-2xl border border-amber-400/20 bg-amber-500/[0.06] px-4 py-3">
+              <div className="flex items-start gap-3">
+                <div className="mt-0.5 rounded-xl bg-amber-400/10 p-2">
+                  <AlertTriangle className="h-4 w-4 text-amber-300" />
+                </div>
+
+                <div className="min-w-0 flex-1">
+                  <p className="text-[11px] uppercase tracking-wide text-amber-200/70">
+                    Occupancy warning
+                  </p>
+                  <p className="text-sm text-amber-100">
+                    Active lease is missing a primary tenant.
+                  </p>
                 </div>
               </div>
             </div>

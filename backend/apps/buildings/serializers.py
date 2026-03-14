@@ -1,5 +1,6 @@
 # Filename: apps/buildings/serializers.py
 
+
 from __future__ import annotations
 
 from rest_framework import serializers
@@ -8,36 +9,30 @@ from apps.buildings.models import Building, Unit
 
 
 class BuildingSerializer(serializers.ModelSerializer):
-    """Serializer for Building objects.
+    """Serializer for building records.
 
     Multi-tenant rules:
-        - organization is derived from request.org (never client-supplied).
+        - organization is derived from request.org and never client-supplied.
 
-    API contract notes:
-        - address_line2 is optional and may be omitted or set to null.
-        - country is optional.
-
-    Aggregates (read-only):
+    Aggregates:
         - units_count
         - occupied_units_count
         - vacant_units_count
     """
 
-    # Step 1: Explicitly allow null / optional for address_line2
+    # Step 1: Optional address fields
     address_line2 = serializers.CharField(
         required=False,
         allow_blank=True,
         allow_null=True,
     )
-
-    # Step 2: Optional fields
     country = serializers.CharField(
         required=False,
         allow_blank=True,
         allow_null=True,
     )
 
-    # Step 3: Aggregate counts (annotated in queryset; read-only)
+    # Step 2: Annotated aggregate fields
     units_count = serializers.IntegerField(read_only=True)
     occupied_units_count = serializers.IntegerField(read_only=True)
     vacant_units_count = serializers.IntegerField(read_only=True)
@@ -64,24 +59,32 @@ class BuildingSerializer(serializers.ModelSerializer):
 
 
 class UnitSerializer(serializers.ModelSerializer):
-    """Serializer for Unit objects.
+    """Serializer for unit records plus occupancy read-model fields.
 
     Multi-tenant rules:
-        - organization is derived from request.org (never client-supplied).
-        - building must belong to request.org.
-        - building cannot be changed after creation (prevents silent unit transfers).
+        - organization is derived from request.org (never client-supplied)
+        - building must belong to request.org
+        - building cannot be reassigned after creation
 
     Computed contract:
-        - Occupancy and active lease/tenant summary fields are selector-driven.
-        - These fields are flat and read-only for frontend usability.
+        - The unit workspace consumes selector-driven occupancy fields
+        - Tenant summary data is exposed as read-only API fields
+        - The backend remains the source of truth for active-lease resolution
     """
 
-    # Step 1: Computed/annotated fields (read-only; must be annotated in queryset)
+    # Step 1: Selector-driven occupancy fields
     is_occupied = serializers.BooleanField(read_only=True)
     active_lease_id = serializers.IntegerField(read_only=True, allow_null=True)
     active_lease_end_date = serializers.DateField(read_only=True, allow_null=True)
+
+    # Step 2: Selector-driven active tenant summary fields
     active_tenant_id = serializers.IntegerField(read_only=True, allow_null=True)
     active_tenant_name = serializers.CharField(read_only=True, allow_null=True)
+    active_tenant_email = serializers.EmailField(read_only=True, allow_null=True)
+    active_tenant_phone = serializers.CharField(read_only=True, allow_null=True)
+
+    # Step 3: Read-model warning flag for malformed occupancy linkage
+    occupancy_has_data_issue = serializers.BooleanField(read_only=True)
 
     class Meta:
         model = Unit
@@ -92,12 +95,14 @@ class UnitSerializer(serializers.ModelSerializer):
             "bedrooms",
             "bathrooms",
             "sqft",
-            # Step 2: Occupancy + active lease summary fields
             "is_occupied",
             "active_lease_id",
             "active_lease_end_date",
             "active_tenant_id",
             "active_tenant_name",
+            "active_tenant_email",
+            "active_tenant_phone",
+            "occupancy_has_data_issue",
             "created_at",
             "updated_at",
         ]
@@ -110,34 +115,38 @@ class UnitSerializer(serializers.ModelSerializer):
             "active_lease_end_date",
             "active_tenant_id",
             "active_tenant_name",
+            "active_tenant_email",
+            "active_tenant_phone",
+            "occupancy_has_data_issue",
         ]
 
     def validate_building(self, building: Building) -> Building:
-        """Validate building org membership and immutability.
+        """Validate building membership and immutability.
 
         Args:
-            building: Candidate Building instance.
+            building: Candidate building instance.
 
         Returns:
-            The same building if valid.
+            Building: The same building if validation succeeds.
 
         Raises:
-            serializers.ValidationError: If org context missing, cross-tenant,
-                or attempt to change building on update.
+            serializers.ValidationError: If org context is missing, if the
+                building belongs to another org, or if an update tries to move
+                the unit to a different building.
         """
-        # Step 1: Ensure request.org exists
+        # Step 1: Resolve org from request context
         request = self.context.get("request")
         org = getattr(request, "org", None) if request else None
         if org is None:
             raise serializers.ValidationError("Organization context is missing.")
 
-        # Step 2: Prevent cross-tenant linking
+        # Step 2: Prevent cross-tenant assignment
         if building.organization_id != org.id:
             raise serializers.ValidationError(
                 "Building belongs to a different organization."
             )
 
-        # Step 3: Prevent changing building on update
+        # Step 3: Prevent silent building transfers on update
         if self.instance is not None and building.id != self.instance.building_id:
             raise serializers.ValidationError(
                 "Building cannot be changed after unit creation."
@@ -157,9 +166,8 @@ class BuildingSummarySerializer(serializers.ModelSerializer):
 class UnitDetailSerializer(UnitSerializer):
     """Detailed unit serializer for retrieve views.
 
-    This keeps the base UnitSerializer lean for list/create/update while
-    allowing the unit detail page to receive the parent building summary
-    needed for deterministic navigation and header rendering.
+    The detail view keeps the same occupancy contract as the list view but adds
+    a nested building summary for deterministic header/navigation rendering.
     """
 
     building = BuildingSummarySerializer(read_only=True)
@@ -177,6 +185,9 @@ class UnitDetailSerializer(UnitSerializer):
             "active_lease_end_date",
             "active_tenant_id",
             "active_tenant_name",
+            "active_tenant_email",
+            "active_tenant_phone",
+            "occupancy_has_data_issue",
             "created_at",
             "updated_at",
         ]
@@ -190,4 +201,7 @@ class UnitDetailSerializer(UnitSerializer):
             "active_lease_end_date",
             "active_tenant_id",
             "active_tenant_name",
+            "active_tenant_email",
+            "active_tenant_phone",
+            "occupancy_has_data_issue",
         ]
