@@ -27,7 +27,7 @@ import CollectionPaginationFooter from "../../../../components/pagination/Collec
 const PAGE_CONTAINER_CLASS =
   "mx-auto w-full max-w-6xl px-4 py-6 sm:px-6 lg:px-8";
 
-const BUILDINGS_PAGE_SIZE = 6;
+const BUILDINGS_PAGE_SIZE = 4;
 
 const EMPTY_FORM: BuildingFormValue = {
   name: "",

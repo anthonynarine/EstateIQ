@@ -1,29 +1,52 @@
+# Filename: apps/leases/views.py
 
 from __future__ import annotations
+
 from rest_framework import status, viewsets
 from rest_framework.decorators import action
 from rest_framework.filters import OrderingFilter
 from rest_framework.response import Response
+
 from apps.leases import selectors
 from apps.leases.serializers import (
     LeaseEndSerializer,
     LeaseSerializer,
-    TenantSerializer,
+    TenantDetailSerializer,
+    TenantDirectorySerializer,
+    TenantWriteSerializer,
 )
 from shared.auth.permissions import IsOrgMember
 
 
 class TenantViewSet(viewsets.ModelViewSet):
-    """CRUD for tenants (org-scoped, multi-tenant safe)."""
+    """CRUD for tenants plus read-model serializers for directory/detail views."""
 
     permission_classes = [IsOrgMember]
-    serializer_class = TenantSerializer
     filter_backends = [OrderingFilter]
     ordering_fields = ["full_name", "created_at"]
     ordering = ["-created_at"]
 
     def get_queryset(self):
+        """Return the correct tenant queryset for the current action."""
+        # Step 1: Use the detail selector for retrieve
+        if self.action == "retrieve":
+            return selectors.tenant_detail_qs(org=self.request.org)
+
+        # Step 2: Use the canonical tenant selector for list/write actions
         return selectors.tenants_qs(org=self.request.org)
+
+    def get_serializer_class(self):
+        """Return an action-appropriate serializer."""
+        # Step 1: Tenant directory list
+        if self.action == "list":
+            return TenantDirectorySerializer
+
+        # Step 2: Tenant detail page
+        if self.action == "retrieve":
+            return TenantDetailSerializer
+
+        # Step 3: Tenant write flows
+        return TenantWriteSerializer
 
 
 class LeaseViewSet(viewsets.ModelViewSet):
@@ -66,4 +89,7 @@ class LeaseViewSet(viewsets.ModelViewSet):
         serializer.is_valid(raise_exception=True)
         updated = serializer.save()
 
-        return Response(LeaseSerializer(updated, context={"request": request}).data, status=status.HTTP_200_OK)
+        return Response(
+            LeaseSerializer(updated, context={"request": request}).data,
+            status=status.HTTP_200_OK,
+        )

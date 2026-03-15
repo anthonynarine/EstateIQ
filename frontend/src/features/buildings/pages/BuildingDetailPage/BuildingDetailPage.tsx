@@ -1,4 +1,3 @@
-// # Filename: src/features/buildings/pages/BuildingDetailPage/BuildingDetailPage.tsx
 
 import { useEffect, useMemo, useState } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
@@ -41,8 +40,6 @@ export default function BuildingDetailPage() {
   const [isAddUnitOpen, setIsAddUnitOpen] = useState(false);
   const [page, setPage] = useState(1);
 
-  const PAGE_SIZE = 4;
-
   // Step 3: Building query
   const {
     data: building,
@@ -50,7 +47,21 @@ export default function BuildingDetailPage() {
     isError: buildingIsError,
   } = useBuildingQuery(orgSlug, buildingIdNumber, canQuery);
 
-  // Step 4: Units query (paginated)
+  // Step 4: First pass query to learn unit count
+  const unitsCountQuery = useUnitsQuery({
+    orgSlug,
+    buildingId: buildingIdNumber,
+    page: 1,
+    pageSize: 1,
+    enabled: canQuery,
+  });
+
+  const totalCount = unitsCountQuery.data?.count ?? 0;
+
+  // Step 5: Smart page sizing
+  const PAGE_SIZE = 3;
+
+  // Step 6: Units query (paginated)
   const unitsQuery = useUnitsQuery({
     orgSlug,
     buildingId: buildingIdNumber,
@@ -61,13 +72,9 @@ export default function BuildingDetailPage() {
 
   const pageData = unitsQuery.data;
   const units = pageData?.results ?? [];
-  const totalCount = pageData?.count ?? 0;
   const totalPages = Math.max(1, Math.ceil(totalCount / PAGE_SIZE));
 
-  console.log("BuildingDetailPage units:", units);
-
-
-  // Step 5: Clamp page if deletes or mutations reduce the page count
+  // Step 7: Clamp page if deletes or mutations reduce the page count
   useEffect(() => {
     if (!unitsQuery.isSuccess) {
       return;
@@ -78,7 +85,12 @@ export default function BuildingDetailPage() {
     }
   }, [page, totalPages, unitsQuery.isSuccess]);
 
-  // Step 6: Derived building header fields
+  // Step 8: Reset to first page when page size mode changes
+  useEffect(() => {
+    setPage(1);
+  }, [PAGE_SIZE]);
+
+  // Step 9: Derived building header fields
   const buildingForHeader = useMemo(() => {
     if (!building) {
       return null;
@@ -94,16 +106,16 @@ export default function BuildingDetailPage() {
     };
   }, [building]);
 
-  // Step 7: Occupancy count for currently loaded units
+  // Step 10: Occupancy count for currently loaded units
   const occupiedUnitsCount = useMemo(() => {
     return units.filter((u) => u.is_occupied).length;
   }, [units]);
 
-  // Step 8: Unit actions (edit/delete modals)
+  // Step 11: Unit actions (edit/delete modals)
   const { openEdit, openDelete, editModalProps, deleteModalProps } =
     useUnitActions(buildingIdNumber);
 
-  // Step 9: Navigate to unit detail page
+  // Step 12: Navigate to unit detail page
   const goToUnit = (unit: { id: number; label: string }) => {
     const search = location.search || "";
 
@@ -115,13 +127,13 @@ export default function BuildingDetailPage() {
     });
   };
 
-  // Step 10: Navigate to tenant detail page
+  // Step 13: Navigate to tenant detail page
   const goToTenant = (tenantId: number) => {
     const search = location.search || "";
     navigate(`/dashboard/tenants/${tenantId}${search}`);
   };
 
-  // Step 11: Guards
+  // Step 14: Guards
   if (!canQuery) {
     return (
       <div className="p-6 text-rose-300">
@@ -148,8 +160,8 @@ export default function BuildingDetailPage() {
       />
 
       <BuildingUnitsSection
-        isLoading={unitsQuery.isLoading}
-        isError={unitsQuery.isError}
+        isLoading={unitsQuery.isLoading || unitsCountQuery.isLoading}
+        isError={unitsQuery.isError || unitsCountQuery.isError}
         unitsCount={units.length}
         isAddOpen={isAddUnitOpen}
         onToggleAdd={() => setIsAddUnitOpen((prev) => !prev)}
@@ -181,15 +193,17 @@ export default function BuildingDetailPage() {
           ))
         }
         footer={
-          <CollectionPaginationFooter
-            page={page}
-            pageSize={PAGE_SIZE}
-            totalCount={totalCount}
-            itemLabel="unit"
-            isFetching={unitsQuery.isFetching}
-            onPrevious={() => setPage((prev) => Math.max(1, prev - 1))}
-            onNext={() => setPage((prev) => Math.min(totalPages, prev + 1))}
-          />
+          totalCount > PAGE_SIZE ? (
+            <CollectionPaginationFooter
+              page={page}
+              pageSize={PAGE_SIZE}
+              totalCount={totalCount}
+              itemLabel="unit"
+              isFetching={unitsQuery.isFetching}
+              onPrevious={() => setPage((prev) => Math.max(1, prev - 1))}
+              onNext={() => setPage((prev) => Math.min(totalPages, prev + 1))}
+            />
+          ) : null
         }
       />
 

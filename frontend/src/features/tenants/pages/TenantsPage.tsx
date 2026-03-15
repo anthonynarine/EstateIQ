@@ -1,46 +1,57 @@
 // # Filename: src/features/tenants/pages/TenantsPage.tsx
+// ✅ New Code
 
 import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { Building2, Users } from "lucide-react";
+import { Building2, Users, Plus } from "lucide-react";
 
 import type {
   CreateTenantInput,
   Tenant,
   UpdateTenantInput,
 } from "../api/types";
+import { TENANT_DIRECTORY_PAGE_SIZE } from "../constants/tenantConstants";
 import TenantCard from "../components/cards/TenantCard";
 import TenantDirectorySection from "../components/directory/TenantDirectorySection";
-import CreateTenantForm, { type TenantFormValue } from "../forms/CreateTenantForm";
+import CreateTenantForm, {
+  type TenantFormValue,
+} from "../forms/CreateTenantForm";
 import EditTenantModal from "../forms/EditTenantModal";
 import { useCreateTenantMutation } from "../hooks/useCreateTenantMutation";
 import { useTenantDirectoryUrlState } from "../hooks/useTenantDirectoryUrlState";
 import { useTenantsQuery } from "../hooks/useTenantsQuery";
 import { useUpdateTenantMutation } from "../hooks/useUpdateTenantMutation";
-import { TENANT_DIRECTORY_PAGE_SIZE } from "../constants/tenantConstants";
-
+import CollectionPaginationFooter from "../../../components/pagination/CollectionPaginationFooter";
 /**
  * normalizeOptionalText
  *
- * Converts a text input into:
- * - trimmed string
- * - null when empty
+ * Converts an input string into a trimmed nullable value.
+ *
+ * Args:
+ *   value: Raw form text value.
+ *
+ * Returns:
+ *   Trimmed string or null when empty.
  */
 function normalizeOptionalText(value: string): string | null {
   // Step 1: Trim whitespace
   const trimmed = value.trim();
 
-  // Step 2: Empty becomes null
+  // Step 2: Return null when empty
   return trimmed ? trimmed : null;
 }
 
 /**
  * getMutationErrorMessage
  *
- * Converts common mutation error shapes into a readable UI-safe string.
+ * Normalizes mutation errors into a user-safe message.
  *
- * Important:
- * - Return null when there is no error so we do not pre-populate error banners.
+ * Args:
+ *   error: Unknown error object from the mutation.
+ *   fallback: Stable fallback message.
+ *
+ * Returns:
+ *   A display-ready message or null.
  */
 function getMutationErrorMessage(
   error: unknown,
@@ -56,26 +67,26 @@ function getMutationErrorMessage(
     return error.message;
   }
 
-  // Step 3: Fall back to a stable user-facing message
+  // Step 3: Fallback to a stable message
   return fallback;
 }
 
 /**
  * TenantsPage
  *
- * Route-level orchestrator for the tenant directory workspace.
+ * Route-level orchestrator for the tenant directory.
  *
  * Responsibilities:
- * - Read org/page/search from URL-backed hook state.
- * - Fetch paginated tenant directory data.
- * - Own create/edit UI state.
- * - Launch tenant-driven lease creation.
- * - Keep the page thin by delegating layout to child components.
+ * - Own org/page/search URL state
+ * - Fetch the paginated tenant directory
+ * - Manage create/edit tenant workflows
+ * - Launch lease workflows from tenant cards
+ * - Inject standardized collection pagination footer
  */
 export default function TenantsPage() {
   const navigate = useNavigate();
 
-  // Step 1: Route-backed directory state
+  // Step 1: URL-backed directory state
   const {
     orgSlug,
     currentPage,
@@ -87,7 +98,7 @@ export default function TenantsPage() {
     goToNextPage,
   } = useTenantDirectoryUrlState();
 
-  // Step 2: Workspace-local UI state
+  // Step 2: Local UI state
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [editingTenant, setEditingTenant] = useState<Tenant | null>(null);
   const [editValue, setEditValue] = useState<TenantFormValue>({
@@ -96,32 +107,33 @@ export default function TenantsPage() {
     phone: "",
   });
 
-// Step 2: Fetch tenant directory data
-const {
-  data: tenantPage,
-  isLoading,
-  isError,
-  error,
-} = useTenantsQuery({
-  orgSlug,
-  page: currentPage,
-  pageSize: TENANT_DIRECTORY_PAGE_SIZE,
-  search,
-});
+  // Step 3: Fetch tenant directory data
+  const {
+    data: tenantPage,
+    isLoading,
+    isError,
+    error,
+    isFetching,
+  } = useTenantsQuery({
+    orgSlug,
+    page: currentPage,
+    pageSize: TENANT_DIRECTORY_PAGE_SIZE,
+    search,
+  });
 
-// Step 3: Org-scoped mutations
-const createTenantMutation = useCreateTenantMutation(orgSlug);
-const updateTenantMutation = useUpdateTenantMutation(orgSlug);
+  // Step 4: Org-scoped mutations
+  const createTenantMutation = useCreateTenantMutation(orgSlug);
+  const updateTenantMutation = useUpdateTenantMutation(orgSlug);
 
-// Step 4: Derive page data safely
-const tenants = tenantPage?.results ?? [];
-const totalCount = tenantPage?.count ?? 0;
-const totalPages = Math.max(
-  1,
-  Math.ceil(totalCount / TENANT_DIRECTORY_PAGE_SIZE)
-);
+  // Step 5: Derive page data safely
+  const tenants = tenantPage?.results ?? [];
+  const totalCount = tenantPage?.count ?? 0;
+  const totalPages = Math.max(
+    1,
+    Math.ceil(totalCount / TENANT_DIRECTORY_PAGE_SIZE)
+  );
 
-  // Step 6: Clamp stale/out-of-range page values
+  // Step 6: Clamp stale page values after filtering or mutation refresh
   useEffect(() => {
     if (!tenantPage) {
       return;
@@ -132,12 +144,12 @@ const totalPages = Math.max(
     }
   }, [tenantPage, currentPage, totalPages, goToPage]);
 
-  // Step 7: Keep a stable display order
+  // Step 7: Keep a stable alphabetical display order
   const sortedTenants = useMemo(() => {
     return [...tenants].sort((a, b) => a.full_name.localeCompare(b.full_name));
   }, [tenants]);
 
-  // Step 8: Sync edit form state when a tenant is selected for editing
+  // Step 8: Sync edit form state when a tenant is chosen
   useEffect(() => {
     if (!editingTenant) {
       return;
@@ -150,31 +162,67 @@ const totalPages = Math.max(
     });
   }, [editingTenant]);
 
-  // Step 9: View workflow
+  /**
+   * handleOpenLease
+   *
+   * Navigates to the active lease for the selected tenant.
+   */
   function handleOpenLease(tenant: Tenant) {
+    // Step 1: Guard missing active lease
     if (!tenant.active_lease?.id) {
       return;
     }
 
+    // Step 2: Navigate to lease detail
     navigate(`/dashboard/leases/${tenant.active_lease.id}?org=${orgSlug}`);
   }
 
-  // Step 10: Edit workflow
+  /**
+   * handleCreateLease
+   *
+   * Launches lease creation pre-seeded with the tenant id.
+   */
+  function handleCreateLease(tenant: Tenant) {
+    // Step 1: Navigate to new lease workflow
+    navigate(`/dashboard/leases/new?org=${orgSlug}&tenantId=${tenant.id}`);
+  }
+
+  /**
+   * handleEditTenant
+   *
+   * Opens the edit modal for the selected tenant.
+   */
   function handleEditTenant(tenant: Tenant) {
+    // Step 1: Reset stale mutation state
     updateTenantMutation.reset();
+
+    // Step 2: Open modal with selected tenant
     setEditingTenant(tenant);
   }
 
+  /**
+   * handleCloseEditModal
+   *
+   * Closes the edit modal when safe.
+   */
   function handleCloseEditModal() {
+    // Step 1: Prevent closing while save is pending
     if (updateTenantMutation.isPending) {
       return;
     }
 
+    // Step 2: Reset modal state
     updateTenantMutation.reset();
     setEditingTenant(null);
   }
 
+  /**
+   * handleUpdateTenant
+   *
+   * Saves the current edit form.
+   */
   async function handleUpdateTenant() {
+    // Step 1: Guard missing tenant
     if (!editingTenant) {
       return;
     }
@@ -185,40 +233,59 @@ const totalPages = Math.max(
       phone: normalizeOptionalText(editValue.phone),
     };
 
+    // Step 2: Submit update
     await updateTenantMutation.mutateAsync({
       tenantId: editingTenant.id,
       payload,
     });
 
+    // Step 3: Close modal after success
     setEditingTenant(null);
   }
 
-  // Step 11: Create workflow
+  /**
+   * handleOpenCreate
+   *
+   * Opens the create tenant panel.
+   */
   function handleOpenCreate() {
+    // Step 1: Reset stale mutation state
     createTenantMutation.reset();
+
+    // Step 2: Open create panel
     setIsCreateOpen(true);
   }
 
+  /**
+   * handleCloseCreate
+   *
+   * Closes the create tenant panel when safe.
+   */
   function handleCloseCreate() {
+    // Step 1: Prevent closing while save is pending
     if (createTenantMutation.isPending) {
       return;
     }
 
+    // Step 2: Reset panel state
     createTenantMutation.reset();
     setIsCreateOpen(false);
   }
 
+  /**
+   * handleCreateTenant
+   *
+   * Creates a new tenant record.
+   */
   async function handleCreateTenant(payload: CreateTenantInput) {
+    // Step 1: Submit create mutation
     await createTenantMutation.mutateAsync(payload);
+
+    // Step 2: Close panel after success
     setIsCreateOpen(false);
   }
 
-  // Step 12: Lease launch workflow
-  function handleCreateLease(tenant: Tenant) {
-    navigate(`/dashboard/leases/new?org=${orgSlug}&tenantId=${tenant.id}`);
-  }
-
-  // Step 13: Guard missing org context
+  // Step 9: Guard missing org context
   if (!orgSlug) {
     return (
       <section className="space-y-5 sm:space-y-6">
@@ -260,7 +327,7 @@ const totalPages = Math.max(
 
   return (
     <section className="space-y-5 sm:space-y-6">
-      {/* Step 14: Hero */}
+      {/* Step 10: Hero */}
       <div className="rounded-3xl border border-white/10 bg-neutral-950/70 p-5 shadow-xl sm:p-6">
         <div className="flex flex-col gap-4 sm:gap-5 lg:flex-row lg:items-end lg:justify-between">
           <div className="flex items-start gap-3">
@@ -300,7 +367,7 @@ const totalPages = Math.max(
         </div>
       </div>
 
-      {/* Step 15: Hidden-by-default create panel */}
+      {/* Step 11: Create tenant panel */}
       {isCreateOpen && (
         <CreateTenantForm
           isSaving={createTenantMutation.isPending}
@@ -313,25 +380,19 @@ const totalPages = Math.max(
         />
       )}
 
-      {/* Step 16: Directory section */}
+      {/* Step 12: Directory section */}
       <TenantDirectorySection
         tenantsCount={totalCount}
         searchValue={searchInput}
         onSearchChange={setSearchInput}
         onAddTenant={handleOpenCreate}
+        addButtonLabel="Add Tenant"
+        addButtonIcon={<Plus className="h-4 w-4" />}
         isLoading={isLoading}
         isError={isError}
         errorMessage={
-          error instanceof Error
-            ? error.message
-            : "Unable to load tenants."
+          error instanceof Error ? error.message : "Unable to load tenants."
         }
-        currentPage={currentPage}
-        totalPages={totalPages}
-        hasPreviousPage={currentPage > 1}
-        hasNextPage={currentPage < totalPages}
-        onPreviousPage={goToPreviousPage}
-        onNextPage={goToNextPage}
         isEmpty={sortedTenants.length === 0}
         emptyStateTitle={
           search.trim() ? "No tenants matched your search." : "No tenants yet."
@@ -340,6 +401,19 @@ const totalPages = Math.max(
           search.trim()
             ? "Try a different name, email, or phone number."
             : "Create your first tenant to begin building your directory."
+        }
+        footer={
+          totalCount > TENANT_DIRECTORY_PAGE_SIZE ? (
+            <CollectionPaginationFooter
+              page={currentPage}
+              pageSize={TENANT_DIRECTORY_PAGE_SIZE}
+              totalCount={totalCount}
+              itemLabel="tenant"
+              isFetching={isFetching}
+              onPrevious={goToPreviousPage}
+              onNext={goToNextPage}
+            />
+          ) : null
         }
       >
         {sortedTenants.map((tenant) => (
@@ -357,7 +431,7 @@ const totalPages = Math.max(
         ))}
       </TenantDirectorySection>
 
-      {/* Step 17: Edit modal */}
+      {/* Step 13: Edit tenant modal */}
       <EditTenantModal
         isOpen={Boolean(editingTenant)}
         tenantDisplayName={editingTenant?.full_name ?? "Tenant"}

@@ -1,10 +1,9 @@
 // # Filename: src/features/tenants/hooks/useUpdateTenantMutation.ts
 
-
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 
 import { updateTenant } from "../api/tenantsApi";
-import type { Tenant, UpdateTenantInput } from "../api/types";
+import type { TenantWriteResponse, UpdateTenantInput } from "../api/types";
 import { tenantQueryKeys } from "../utils/tenantQueryKeys";
 
 type UpdateTenantMutationInput = {
@@ -17,18 +16,14 @@ type UpdateTenantMutationInput = {
  *
  * Mutation hook for partially updating a tenant within the current organization.
  *
- * Responsibilities:
- * - Call the tenant PATCH endpoint.
- * - Invalidate all org-scoped tenant directory cache variants on success.
- *
  * Important:
- * - We invalidate the org tenant namespace instead of one exact list key
- *   because the directory now supports pagination and search.
+ * - The mutation returns the lean write response.
+ * - Directory/detail read-model fields should come from refetched queries.
  */
 export function useUpdateTenantMutation(orgSlug: string) {
   const queryClient = useQueryClient();
 
-  return useMutation<Tenant, Error, UpdateTenantMutationInput>({
+  return useMutation<TenantWriteResponse, Error, UpdateTenantMutationInput>({
     mutationFn: async ({ tenantId, payload }) => {
       // Step 1: Patch the tenant in the current org
       return await updateTenant(orgSlug, tenantId, payload);

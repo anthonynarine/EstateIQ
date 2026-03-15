@@ -6,7 +6,6 @@ import type { ReactNode } from "react";
 import TenantDirectoryEmptyState from "./TenantDirectoryEmptyState";
 import TenantDirectoryGrid from "./TenantDirectoryGrid";
 import TenantDirectoryToolbar from "./TenantDirectoryToolbar";
-import TenantPagination from "./TenantPagination";
 
 type Props = {
   tenantsCount: number;
@@ -14,21 +13,18 @@ type Props = {
   onSearchChange: (value: string) => void;
   onAddTenant: () => void;
 
+  addButtonLabel?: string;
+  addButtonIcon?: ReactNode;
+
   isLoading: boolean;
   isError: boolean;
   errorMessage?: string;
-
-  currentPage: number;
-  totalPages: number;
-  hasPreviousPage: boolean;
-  hasNextPage: boolean;
-  onPreviousPage: () => void;
-  onNextPage: () => void;
 
   isEmpty: boolean;
   emptyStateTitle: string;
   emptyStateDescription: string;
 
+  footer?: ReactNode;
   children: ReactNode;
 };
 
@@ -38,37 +34,32 @@ type Props = {
  * Presentational workspace shell for the tenant directory.
  *
  * Responsibilities:
- * - Render section header + tenant count.
- * - Compose toolbar, body states, card grid, and pagination.
- * - Keep the page layer thin by centralizing section layout.
+ * - Render section header + tenant count
+ * - Compose toolbar, body states, card grid, and footer slot
+ * - Keep the page layer thin by centralizing section layout
  *
  * Important:
- * - This component does not fetch data.
- * - This component does not own modal state.
- * - This component does not own route/query logic.
+ * - This component does not fetch data
+ * - This component does not own modal state
+ * - This component does not own route/query logic
+ * - Pagination is injected from the page layer through `footer`
  */
 export default function TenantDirectorySection({
   tenantsCount,
   searchValue,
   onSearchChange,
   onAddTenant,
+  addButtonLabel,
+  addButtonIcon,
   isLoading,
   isError,
   errorMessage,
-  currentPage,
-  totalPages,
-  hasPreviousPage,
-  hasNextPage,
-  onPreviousPage,
-  onNextPage,
   isEmpty,
   emptyStateTitle,
   emptyStateDescription,
+  footer,
   children,
 }: Props) {
-  const shouldShowPagination =
-    !isLoading && !isError && !isEmpty && totalPages > 1;
-
   return (
     <section className="rounded-3xl border border-white/10 bg-neutral-950/70 p-5 shadow-xl sm:p-6">
       <div className="space-y-5">
@@ -101,12 +92,14 @@ export default function TenantDirectorySection({
           searchValue={searchValue}
           onSearchChange={onSearchChange}
           onAddTenant={onAddTenant}
+          addButtonLabel={addButtonLabel}
+          addButtonIcon={addButtonIcon}
         />
 
         {/* Step 3: Loading state */}
         {isLoading && (
           <TenantDirectoryGrid>
-            {Array.from({ length: 6 }).map((_, index) => (
+            {Array.from({ length: 3 }).map((_, index) => (
               <div
                 key={index}
                 className="
@@ -151,17 +144,10 @@ export default function TenantDirectorySection({
           <TenantDirectoryGrid>{children}</TenantDirectoryGrid>
         )}
 
-        {/* Step 7: Pagination */}
-        {shouldShowPagination && (
-          <TenantPagination
-            currentPage={currentPage}
-            totalPages={totalPages}
-            hasPreviousPage={hasPreviousPage}
-            hasNextPage={hasNextPage}
-            onPreviousPage={onPreviousPage}
-            onNextPage={onNextPage}
-          />
-        )}
+        {/* Step 7: Footer slot */}
+        {!isLoading && !isError && !isEmpty && footer ? (
+          <div className="pt-2">{footer}</div>
+        ) : null}
       </div>
     </section>
   );

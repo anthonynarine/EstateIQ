@@ -136,8 +136,10 @@ export default function BuildingUnitsSection({
             </div>
           </div>
         ) : (
-          <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
-            {renderUnits()}
+          <div className="min-h-[560px]">
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
+              {renderUnits()}
+            </div>
           </div>
         )}
       </div>

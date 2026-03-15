@@ -9,7 +9,73 @@ from django.db.models import Prefetch, Q, QuerySet
 from django.utils import timezone
 
 from apps.core.models import Organization
-from apps.leases.models import Lease, LeaseTenant
+from apps.leases.models import Lease, LeaseTenant, Tenant
+
+
+def tenants_qs(*, org: Organization) -> QuerySet[Tenant]:
+    """Return the canonical org-scoped tenant queryset for read APIs.
+
+    This selector prepares the relationship graph needed for tenant
+    directory/detail read models without storing residency history directly
+    on the Tenant model.
+
+    Derived fields supported by this queryset:
+        - active_lease
+        - occupancy_status
+        - current_residence
+        - lease_history
+
+    Args:
+        org: Organization that owns the tenant records.
+
+    Returns:
+        QuerySet[Tenant]: Org-scoped tenant queryset with lease links,
+        leases, units, and buildings prefetched.
+    """
+    # Step 1: Prefetch tenant-to-lease links with the full lease chain
+    lease_links_prefetch = Prefetch(
+        "lease_links",
+        queryset=(
+            LeaseTenant.objects.filter(organization=org)
+            .select_related(
+                "tenant",
+                "lease",
+                "lease__unit",
+                "lease__unit__building",
+            )
+            .order_by(
+                "-lease__start_date",
+                "-lease__id",
+                "role",
+                "id",
+            )
+        ),
+        to_attr="prefetched_lease_links",
+    )
+
+    # Step 2: Return the canonical tenant queryset
+    return (
+        Tenant.objects.filter(organization=org)
+        .prefetch_related(lease_links_prefetch)
+        .order_by("full_name", "id")
+    )
+
+
+def tenant_detail_qs(*, org: Organization) -> QuerySet[Tenant]:
+    """Return the tenant detail queryset.
+
+    This currently reuses the canonical tenant selector. It exists as a
+    separate function so detail-specific prefetching can be expanded later
+    without changing list-query behavior.
+
+    Args:
+        org: Organization that owns the tenant records.
+
+    Returns:
+        QuerySet[Tenant]: Org-scoped tenant queryset for detail views.
+    """
+    # Step 1: Reuse the canonical tenant selector
+    return tenants_qs(org=org)
 
 
 def leases_qs(*, org: Organization) -> QuerySet[Lease]:

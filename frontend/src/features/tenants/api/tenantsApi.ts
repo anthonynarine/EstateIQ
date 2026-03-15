@@ -1,12 +1,13 @@
 // # Filename: src/features/tenants/api/tenantsApi.ts
-// ✅ New Code
 
 import api from "../../../api/axios";
 import type {
   CreateTenantInput,
   PaginatedResponse,
   Tenant,
+  TenantDetail,
   TenantListParams,
+  TenantWriteResponse,
   UpdateTenantInput,
 } from "./types";
 
@@ -14,11 +15,6 @@ import type {
  * buildTenantListParams
  *
  * Builds a clean query param object for the tenant list endpoint.
- *
- * Why this helper exists:
- * - Keeps org scoping mandatory and centralized.
- * - Prevents undefined/empty query noise from leaking into requests.
- * - Makes future filtering additions safer.
  */
 function buildTenantListParams(orgSlug: string, params?: TenantListParams) {
   // Step 1: Start with required org scope
@@ -51,7 +47,7 @@ function buildTenantListParams(orgSlug: string, params?: TenantListParams) {
 /**
  * withOrg
  *
- * Simple helper for non-list endpoints that only require org scoping.
+ * Simple helper for org-scoped non-list endpoints.
  */
 function withOrg(orgSlug: string) {
   return {
@@ -65,20 +61,12 @@ function withOrg(orgSlug: string) {
  * listTenants
  *
  * Fetches the org-scoped tenant directory using page-number pagination.
- *
- * Expected backend response shape:
- * {
- *   count: number,
- *   next: string | null,
- *   previous: string | null,
- *   results: Tenant[]
- * }
  */
 export async function listTenants(
   orgSlug: string,
   params?: TenantListParams
 ): Promise<PaginatedResponse<Tenant>> {
-  // Step 1: GET /api/v1/tenants/?org=<slug>&page=1&page_size=12&search=john
+  // Step 1: Fetch the paginated tenant list
   const res = await api.get<PaginatedResponse<Tenant>>(
     "/api/v1/tenants/",
     buildTenantListParams(orgSlug, params)
@@ -88,16 +76,38 @@ export async function listTenants(
 }
 
 /**
+ * getTenantById
+ *
+ * Fetches a single enriched tenant detail record.
+ */
+export async function getTenantById(
+  orgSlug: string,
+  tenantId: number
+): Promise<TenantDetail> {
+  // Step 1: Fetch the tenant detail payload
+  const res = await api.get<TenantDetail>(
+    `/api/v1/tenants/${tenantId}/`,
+    withOrg(orgSlug)
+  );
+
+  return res.data;
+}
+
+/**
  * createTenant
  *
- * Creates a new tenant within the current organization.
+ * Creates a new tenant in the current organization.
+ *
+ * Important:
+ * - This returns the lean write response.
+ * - The full directory/detail read model should be refreshed via invalidated queries.
  */
 export async function createTenant(
   orgSlug: string,
   payload: CreateTenantInput
-): Promise<Tenant> {
-  // Step 1: POST /api/v1/tenants/?org=<slug>
-  const res = await api.post<Tenant>(
+): Promise<TenantWriteResponse> {
+  // Step 1: Create the tenant
+  const res = await api.post<TenantWriteResponse>(
     "/api/v1/tenants/",
     payload,
     withOrg(orgSlug)
@@ -109,15 +119,19 @@ export async function createTenant(
 /**
  * updateTenant
  *
- * Partially updates an existing tenant within the current organization.
+ * Partially updates an existing tenant in the current organization.
+ *
+ * Important:
+ * - This returns the lean write response.
+ * - The full read model should come from refetched queries.
  */
 export async function updateTenant(
   orgSlug: string,
   tenantId: number,
   payload: UpdateTenantInput
-): Promise<Tenant> {
-  // Step 1: PATCH /api/v1/tenants/:id/?org=<slug>
-  const res = await api.patch<Tenant>(
+): Promise<TenantWriteResponse> {
+  // Step 1: Patch the tenant
+  const res = await api.patch<TenantWriteResponse>(
     `/api/v1/tenants/${tenantId}/`,
     payload,
     withOrg(orgSlug)
