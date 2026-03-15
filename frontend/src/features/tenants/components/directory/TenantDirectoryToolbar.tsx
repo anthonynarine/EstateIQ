@@ -1,5 +1,7 @@
 // # Filename: src/features/tenants/components/directory/TenantDirectoryToolbar.tsx
+// ✅ New Code
 
+import type { ReactNode } from "react";
 import { Plus, Search } from "lucide-react";
 
 type Props = {
@@ -7,6 +9,8 @@ type Props = {
   onSearchChange: (value: string) => void;
   onAddTenant: () => void;
   isAddDisabled?: boolean;
+  addButtonLabel?: string;
+  addButtonIcon?: ReactNode;
 };
 
 /**
@@ -28,6 +32,8 @@ export default function TenantDirectoryToolbar({
   onSearchChange,
   onAddTenant,
   isAddDisabled = false,
+  addButtonLabel = "Add Tenant",
+  addButtonIcon,
 }: Props) {
   return (
     <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -72,8 +78,8 @@ export default function TenantDirectoryToolbar({
           sm:w-auto
         "
       >
-        <Plus className="h-4 w-4" />
-        <span>Add Tenant</span>
+        {addButtonIcon ?? <Plus className="h-4 w-4" />}
+        <span>{addButtonLabel}</span>
       </button>
     </div>
   );

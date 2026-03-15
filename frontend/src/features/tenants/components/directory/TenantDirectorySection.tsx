@@ -145,9 +145,7 @@ export default function TenantDirectorySection({
         )}
 
         {/* Step 7: Footer slot */}
-        {!isLoading && !isError && !isEmpty && footer ? (
-          <div className="pt-2">{footer}</div>
-        ) : null}
+{!isLoading && !isError && !isEmpty && footer ? footer : null}
       </div>
     </section>
   );
