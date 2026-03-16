@@ -2,6 +2,7 @@
 // ✅ New Code
 
 import type { ReactNode } from "react";
+import { Plus } from "lucide-react";
 
 import TenantDirectoryEmptyState from "./TenantDirectoryEmptyState";
 import TenantDirectoryGrid from "./TenantDirectoryGrid";
@@ -34,22 +35,21 @@ type Props = {
  * Presentational workspace shell for the tenant directory.
  *
  * Responsibilities:
- * - Render section header + tenant count
- * - Compose toolbar, body states, card grid, and footer slot
- * - Keep the page layer thin by centralizing section layout
+ * - Render header identity and primary action
+ * - Render centered search workspace
+ * - Render loading/error/empty/content/footer states
  *
  * Important:
- * - This component does not fetch data
- * - This component does not own modal state
- * - This component does not own route/query logic
- * - Pagination is injected from the page layer through `footer`
+ * - No fetching
+ * - No routing logic
+ * - No modal ownership
  */
 export default function TenantDirectorySection({
   tenantsCount,
   searchValue,
   onSearchChange,
   onAddTenant,
-  addButtonLabel,
+  addButtonLabel = "Add Tenant",
   addButtonIcon,
   isLoading,
   isError,
@@ -60,14 +60,16 @@ export default function TenantDirectorySection({
   footer,
   children,
 }: Props) {
+  const hasActiveSearch = searchValue.trim().length > 0;
+
   return (
     <section className="rounded-3xl border border-white/10 bg-neutral-950/70 p-5 shadow-xl sm:p-6">
-      <div className="space-y-5">
-        {/* Step 1: Section heading */}
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <div className="min-w-0 space-y-1">
+      <div className="space-y-4">
+        {/* Step 1: Header */}
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+          <div className="min-w-0">
             <div className="flex items-center gap-3">
-              <h2 className="text-base font-semibold text-white sm:text-lg">
+              <h2 className="text-xl font-semibold tracking-tight text-white">
                 Tenants
               </h2>
 
@@ -81,19 +83,34 @@ export default function TenantDirectorySection({
               </span>
             </div>
 
-            <p className="text-sm text-neutral-400">
+            <p className="mt-2 max-w-2xl text-sm leading-6 text-neutral-400">
               Search tenants, review occupancy context, and launch lease actions.
             </p>
           </div>
+
+          <div className="shrink-0">
+            <button
+              type="button"
+              onClick={onAddTenant}
+              className="
+                inline-flex min-h-11 items-center justify-center gap-2 rounded-2xl
+                border border-cyan-400/20 bg-cyan-500/10 px-4 py-2.5 text-sm
+                font-medium text-cyan-200 transition
+                hover:border-cyan-300/30 hover:bg-cyan-500/15
+                focus:outline-none focus:ring-2 focus:ring-cyan-500/20
+              "
+            >
+              {addButtonIcon ?? <Plus className="h-4 w-4" />}
+              <span>{addButtonLabel}</span>
+            </button>
+          </div>
         </div>
 
-        {/* Step 2: Toolbar */}
+        {/* Step 2: Centered search */}
         <TenantDirectoryToolbar
           searchValue={searchValue}
           onSearchChange={onSearchChange}
-          onAddTenant={onAddTenant}
-          addButtonLabel={addButtonLabel}
-          addButtonIcon={addButtonIcon}
+          onClearSearch={hasActiveSearch ? () => onSearchChange("") : undefined}
         />
 
         {/* Step 3: Loading state */}
@@ -144,8 +161,8 @@ export default function TenantDirectorySection({
           <TenantDirectoryGrid>{children}</TenantDirectoryGrid>
         )}
 
-        {/* Step 7: Footer slot */}
-{!isLoading && !isError && !isEmpty && footer ? footer : null}
+        {/* Step 7: Footer */}
+        {!isLoading && !isError && !isEmpty && footer ? footer : null}
       </div>
     </section>
   );
