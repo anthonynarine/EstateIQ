@@ -1,6 +1,6 @@
 # Django Backend Architecture Pattern
 
-### Modular Monolith Design for Serious SaaS Systems
+### Modular Monolith Design for a SaaS Systems
 
 Author: Anthony Narine\
 Purpose: Reusable backend architecture pattern for scalable Django
@@ -10,7 +10,7 @@ applications.
 
 # Overview
 
-This architecture pattern is designed for **serious backend systems**
+This architecture pattern is designed for **backend systems**
 with:
 
 -   multi‑tenant SaaS architecture

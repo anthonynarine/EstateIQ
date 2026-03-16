@@ -1,7 +1,7 @@
 // # Filename: src/features/tenants/components/cards/TenantCard.tsx
 // ✅ New Code
 
-import { useCallback } from "react";
+import { useCallback, type ReactNode } from "react";
 import {
   Pencil,
   PlusCircle,
@@ -21,6 +21,13 @@ type Props = {
   onEdit: () => void;
   onCreateLease: () => void;
   onOpenLease?: () => void;
+};
+
+type TenantInfoRowProps = {
+  icon: ReactNode;
+  label: string;
+  value: string;
+  valueClassName?: string;
 };
 
 /**
@@ -89,6 +96,46 @@ function getResidenceLabel(tenant: Tenant): string {
 }
 
 /**
+ * TenantInfoRow
+ *
+ * Reusable row for tenant operational context.
+ *
+ * Args:
+ *   icon: Leading icon.
+ *   label: Small uppercase row label.
+ *   value: Main row value.
+ *   valueClassName: Optional value styling override.
+ *
+ * Returns:
+ *   A structured info row.
+ */
+function TenantInfoRow({
+  icon,
+  label,
+  value,
+  valueClassName = "text-white",
+}: TenantInfoRowProps) {
+  return (
+    <div className="flex items-start gap-3 px-4 py-3.5">
+      <div className="rounded-xl bg-white/[0.04] p-2 ring-1 ring-white/[0.05]">
+        {icon}
+      </div>
+
+      <div className="min-w-0 flex-1">
+        <p className="text-[11px] uppercase tracking-wide text-neutral-500">
+          {label}
+        </p>
+        <p
+          className={`mt-1 break-words text-sm font-semibold leading-6 ${valueClassName}`}
+        >
+          {value}
+        </p>
+      </div>
+    </div>
+  );
+}
+
+/**
  * TenantCard
  *
  * Tenant directory card aligned with the app's premium card language, but
@@ -111,7 +158,6 @@ export default function TenantCard({
   );
 
   const residenceLabel = getResidenceLabel(tenant);
-  const leaseStatusLabel = hasActiveLease ? "Current lease" : "No current lease";
   const leaseStartLabel = hasActiveLease
     ? formatDisplayDate(tenant.active_lease?.start_date)
     : "—";
@@ -138,90 +184,38 @@ export default function TenantCard({
               <div className="mt-2 space-y-1.5">
                 <div className="flex items-start gap-2 text-sm text-neutral-300">
                   <Mail className="mt-0.5 h-4 w-4 shrink-0 text-neutral-500" />
-                  <span className="truncate">
+                  <span className="break-all">
                     {tenant.email || "Email not provided"}
                   </span>
                 </div>
 
                 <div className="flex items-start gap-2 text-sm text-neutral-300">
                   <Phone className="mt-0.5 h-4 w-4 shrink-0 text-neutral-500" />
-                  <span className="truncate">
-                    {tenant.phone || "Phone not provided"}
-                  </span>
+                  <span>{tenant.phone || "Phone not provided"}</span>
                 </div>
               </div>
             </div>
           </div>
 
-          {/* Step 2: Tenant-specific info panel */}
-          <div className="overflow-hidden rounded-2xl border border-white/10 bg-white/[0.03]">
-            <div className="grid gap-0 sm:grid-cols-[1.6fr_1fr]">
-              {/* Step 2A: Residence gets the most space */}
-              <div className="px-4 py-3">
-                <div className="flex items-start gap-3">
-                  <div className="rounded-xl bg-white/5 p-2">
-                    <Home className="h-4 w-4 text-neutral-300" />
-                  </div>
+          {/* Step 2: Operational context panel */}
+          <div className="overflow-hidden rounded-2xl border border-white/[0.06] bg-white/[0.025]">
+            <TenantInfoRow
+              icon={<Home className="h-4 w-4 text-neutral-300" />}
+              label="Residence"
+              value={residenceLabel}
+              valueClassName={
+                hasActiveLease ? "text-white" : "text-neutral-100"
+              }
+            />
 
-                  <div className="min-w-0">
-                    <p className="text-[11px] uppercase tracking-wide text-neutral-500">
-                      Residence
-                    </p>
-                    <p className="mt-1 break-words text-sm font-semibold leading-5 text-white">
-                      {residenceLabel}
-                    </p>
-                  </div>
-                </div>
-              </div>
+            <div className="h-px bg-white/[0.04]" />
 
-              {/* Step 2B: Lease status stays compact */}
-              <div className="border-t border-white/8 px-4 py-3 sm:border-l sm:border-t-0">
-                <div className="flex items-start gap-3">
-                  <div
-                    className={`rounded-xl p-2 ${
-                      hasActiveLease ? "bg-emerald-400/10" : "bg-rose-400/10"
-                    }`}
-                  >
-                    <FileText
-                      className={`h-4 w-4 ${
-                        hasActiveLease ? "text-emerald-300" : "text-rose-300"
-                      }`}
-                    />
-                  </div>
-
-                  <div className="min-w-0">
-                    <p className="text-[11px] uppercase tracking-wide text-neutral-500">
-                      Lease status
-                    </p>
-                    <p
-                      className={`mt-1 text-sm font-semibold ${
-                        hasActiveLease ? "text-emerald-300" : "text-rose-300"
-                      }`}
-                    >
-                      {leaseStatusLabel}
-                    </p>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* Step 2C: Second row for date only */}
-            <div className="border-t border-white/8 px-4 py-3">
-              <div className="flex items-start gap-3">
-                <div className="rounded-xl bg-white/5 p-2">
-                  <CalendarDays className="h-4 w-4 text-neutral-300" />
-                </div>
-
-                <div className="min-w-0">
-                  <p className="text-[11px] uppercase tracking-wide text-neutral-500">
-                    Lease start
-                  </p>
-                  <p className="mt-1 text-sm font-semibold text-white">
-                    {leaseStartLabel}
-                  </p>
-                </div>
-              </div>
-            </div>
+            <TenantInfoRow
+              icon={<CalendarDays className="h-4 w-4 text-neutral-300" />}
+              label="Lease start"
+              value={leaseStartLabel}
+              valueClassName={hasActiveLease ? "text-white" : "text-neutral-400"}
+            />
           </div>
         </div>
 
