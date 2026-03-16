@@ -1,0 +1,39 @@
+sequenceDiagram
+    participant FE as Frontend
+    participant URL as Router
+    participant VIEW as Expense / Reporting ViewSet
+    participant MIXIN as Org Scoped Mixin
+    participant SER as Serializer
+    participant SVC as Service Layer
+    participant SEL as Selector Layer
+    participant DB as Database
+
+    Note over FE,DB: Write Flow
+    FE->>URL: POST /api/v1/expenses/
+    URL->>VIEW: route request
+    VIEW->>MIXIN: resolve request.organization
+    VIEW->>SER: validate write payload
+    SER->>SVC: build payload + call service
+    SVC->>DB: create/update/archive expense
+    VIEW-->>FE: serialized expense response
+
+    Note over FE,DB: Read Flow
+    FE->>URL: GET /api/v1/expenses/
+    URL->>VIEW: route request
+    VIEW->>MIXIN: resolve org + filters
+    VIEW->>SEL: list_expenses(...)
+    SEL->>DB: query org-scoped expenses
+    DB-->>SEL: result rows
+    VIEW->>SER: shape read contract
+    VIEW-->>FE: list/detail response
+
+    Note over FE,DB: Reporting Flow
+    FE->>URL: GET /api/v1/expense-reporting/dashboard/
+    URL->>VIEW: route request
+    VIEW->>MIXIN: resolve org + reporting filters
+    VIEW->>SEL: compute monthly/category/building aggregates
+    SEL->>DB: grouped aggregate query
+    DB-->>SEL: grouped totals
+    VIEW->>SVC: assemble dashboard payload
+    VIEW->>SER: shape chart contracts
+    VIEW-->>FE: reporting JSON

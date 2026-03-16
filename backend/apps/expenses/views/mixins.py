@@ -102,3 +102,53 @@ class OrganizationScopedViewMixin:
             "due_date_to": query_params.get("due_date_to"),
             "search": query_params.get("search"),
         }
+        
+    def _parse_int_query_param(self, value: str | None) -> int | None:
+        """Parse an integer-like query parameter value.
+
+        Args:
+            value: Raw query param value.
+
+        Returns:
+            int | None: Parsed integer or None when empty/missing.
+
+        Raises:
+            ValidationError: If the value cannot be parsed as an integer.
+        """
+        if value is None or value == "":
+            return None
+
+        try:
+            parsed_value = int(value)
+        except (TypeError, ValueError) as exc:
+            raise ValidationError(
+                f"Invalid integer query parameter value: {value}"
+            ) from exc
+
+        if parsed_value <= 0:
+            raise ValidationError(
+                "Integer query parameter must be greater than zero."
+            )
+
+        return parsed_value
+
+    def _build_reporting_filters(self) -> dict[str, Any]:
+        """Normalize reporting filters from request query params.
+
+        Reporting excludes archived expenses by default unless explicitly
+        overridden. This keeps charts aligned with active operating data.
+        """
+        filters = self._build_expense_filters()
+
+        if filters["is_archived"] is None:
+            filters["is_archived"] = False
+
+        return filters
+
+    def _build_reporting_options(self) -> dict[str, Any]:
+        """Normalize reporting-specific options from query params."""
+        query_params = self.request.query_params
+
+        return {
+            "top_n": self._parse_int_query_param(query_params.get("top_n")),
+        }

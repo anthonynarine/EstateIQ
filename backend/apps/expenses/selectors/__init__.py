@@ -1,3 +1,4 @@
+# ✅ New Code
 """
 Public selector exports for the expenses domain.
 
@@ -11,9 +12,10 @@ from apps.expenses.selectors.expense_list_selectors import (
 )
 from apps.expenses.selectors.expense_queryset import get_expense_base_queryset
 from apps.expenses.selectors.expense_reporting_selectors import (
-    summarize_expenses_by_category,
-    summarize_expenses_by_vendor,
-    summarize_monthly_expenses,
+    expense_totals_by_building,
+    expense_totals_by_category,
+    monthly_expense_trend,
+    summarize_expenses,
 )
 from apps.expenses.selectors.lookup_selectors import (
     list_expense_categories,
@@ -27,7 +29,8 @@ __all__ = [
     "list_expenses",
     "list_unpaid_expenses",
     "list_vendors",
-    "summarize_expenses_by_category",
-    "summarize_expenses_by_vendor",
-    "summarize_monthly_expenses",
+    "expense_totals_by_building",
+    "expense_totals_by_category",
+    "monthly_expense_trend",
+    "summarize_expenses",
 ]

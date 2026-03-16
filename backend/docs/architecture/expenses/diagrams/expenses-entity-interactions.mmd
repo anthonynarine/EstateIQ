@@ -1,0 +1,38 @@
+flowchart TD
+    ORG[Organization]
+    BLDG[Building]
+    UNIT[Unit]
+    LEASE[Lease]
+    CAT[ExpenseCategory]
+    VENDOR[Vendor]
+    EXP[Expense]
+    ATTACH[ExpenseAttachment]
+    REPORT[Expense Reporting]
+
+    ORG --> BLDG
+    ORG --> UNIT
+    ORG --> LEASE
+    ORG --> CAT
+    ORG --> VENDOR
+    ORG --> EXP
+
+    BLDG --> UNIT
+    UNIT --> LEASE
+
+    CAT --> EXP
+    VENDOR --> EXP
+    BLDG --> EXP
+    UNIT --> EXP
+    LEASE --> EXP
+
+    EXP --> ATTACH
+    EXP --> REPORT
+
+    subgraph Rules["Scope Rules"]
+        R1[Organization scope = no building/unit/lease]
+        R2[Building scope = building only]
+        R3[Unit scope = building + unit]
+        R4[Lease scope = lease derives unit + building]
+    end
+
+    EXP --> Rules

@@ -23,8 +23,8 @@ class TenantViewSet(viewsets.ModelViewSet):
 
     permission_classes = [IsOrgMember]
     filter_backends = [OrderingFilter]
-    ordering_fields = ["full_name", "created_at"]
-    ordering = ["-created_at"]
+    ordering_fields = ["full_name", "created_at", "id"]
+    ordering = ["full_name", "id"]
 
     def get_queryset(self):
         """Return the correct tenant queryset for the current action."""
@@ -32,7 +32,14 @@ class TenantViewSet(viewsets.ModelViewSet):
         if self.action == "retrieve":
             return selectors.tenant_detail_qs(org=self.request.org)
 
-        # Step 2: Use the canonical tenant selector for list/write actions
+        # Step 2: Apply list-only search filtering for the tenant directory
+        if self.action == "list":
+            return selectors.tenants_qs(
+                org=self.request.org,
+                search=self.request.query_params.get("search"),
+            )
+
+        # Step 3: Use the canonical tenant selector for write actions/object lookup
         return selectors.tenants_qs(org=self.request.org)
 
     def get_serializer_class(self):

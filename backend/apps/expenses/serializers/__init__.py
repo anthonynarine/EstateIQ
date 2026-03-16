@@ -1,3 +1,8 @@
+
+"""
+Public serializer exports for the expenses domain.
+"""
+
 from apps.expenses.serializers.attachment_serializers import (
     ExpenseAttachmentCreateSerializer,
     ExpenseAttachmentSerializer,
@@ -11,6 +16,14 @@ from apps.expenses.serializers.expense_write_serializers import (
     ExpenseArchiveSerializer,
     ExpenseCreateSerializer,
     ExpenseUpdateSerializer,
+)
+from apps.expenses.serializers.reporting_serializers import (
+    ExpenseBuildingBreakdownSerializer,
+    ExpenseCategoryBreakdownSerializer,
+    ExpenseDashboardChartsSerializer,
+    ExpenseDashboardSerializer,
+    ExpenseMonthlyTrendPointSerializer,
+    ExpenseReportingSummarySerializer,
 )
 from apps.expenses.serializers.summary_serializers import (
     BuildingSummarySerializer,

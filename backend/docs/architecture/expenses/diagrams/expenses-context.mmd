@@ -1,0 +1,29 @@
+flowchart LR
+    FE[React Frontend]
+    API[Django + DRF API]
+    EXP[Expenses Domain]
+    PROP[Buildings + Units]
+    LEASE[Leases Domain]
+    BILL[Billing / Ledger]
+    REP[Reporting Surface]
+    DB[(PostgreSQL)]
+    OBJ[(Object Storage / Receipts)]
+
+    FE --> API
+    API --> EXP
+    EXP --> PROP
+    EXP --> LEASE
+    EXP --> REP
+    EXP --> DB
+    EXP --> OBJ
+    BILL --> REP
+    EXP --> REP
+
+    subgraph Scope["Expense Scope Types"]
+        ORG[Organization Scope]
+        BLDG[Building Scope]
+        UNIT[Unit Scope]
+        LSE[Lease Scope]
+    end
+
+    EXP --> Scope

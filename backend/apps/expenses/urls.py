@@ -11,6 +11,7 @@ from rest_framework.routers import DefaultRouter
 
 from apps.expenses.views import (
     ExpenseCategoryViewSet,
+    ExpenseReportingViewSet,
     ExpenseViewSet,
     VendorViewSet,
 )
@@ -19,28 +20,30 @@ app_name = "expenses"
 
 router = DefaultRouter()
 
-# Step 1: Register expense endpoints.
 router.register(
     r"expenses",
     ExpenseViewSet,
     basename="expense",
 )
 
-# Step 2: Register expense category endpoints.
 router.register(
     r"expense-categories",
     ExpenseCategoryViewSet,
     basename="expense-category",
 )
 
-# Step 3: Register vendor endpoints.
 router.register(
     r"vendors",
     VendorViewSet,
     basename="vendor",
 )
 
+router.register(
+    r"expense-reporting",
+    ExpenseReportingViewSet,
+    basename="expense-reporting",
+)
+
 urlpatterns = [
-    # Step 4: Expose router-generated API routes for this domain.
     path("", include(router.urls)),
 ]

@@ -12,7 +12,80 @@ from apps.core.models import Organization
 from apps.leases.models import Lease, LeaseTenant, Tenant
 
 
-def tenants_qs(*, org: Organization) -> QuerySet[Tenant]:
+def normalize_tenant_directory_search(search: Optional[str]) -> str:
+    """Normalize free-text tenant directory search input.
+
+    Args:
+        search: Raw search string from the request.
+
+    Returns:
+        str: Trimmed search string with repeated whitespace collapsed.
+    """
+    # Step 1: Guard empty values
+    if not search:
+        return ""
+
+    # Step 2: Collapse repeated whitespace and trim edges
+    return " ".join(search.split())
+
+
+def apply_tenant_directory_search(
+    *,
+    qs: QuerySet[Tenant],
+    search: Optional[str],
+) -> QuerySet[Tenant]:
+    """Apply production-safe tenant directory search filters.
+
+    Search contract for now:
+    - full_name
+    - email
+    - phone
+
+    Matching behavior:
+    - case-insensitive
+    - repeated whitespace normalized
+    - multiple search terms are AND-ed together
+    - each term may match any supported field
+
+    Examples:
+        "anthony" -> matches full_name/email/phone containing "anthony"
+        "anthony 555" -> must match both terms across supported fields
+
+    Args:
+        qs: Base org-scoped tenant queryset.
+        search: Raw search string from request query params.
+
+    Returns:
+        QuerySet[Tenant]: Filtered queryset when search is present,
+        otherwise the original queryset.
+    """
+    # Step 1: Normalize incoming search text
+    normalized_search = normalize_tenant_directory_search(search)
+
+    # Step 2: Return the original queryset when search is empty
+    if not normalized_search:
+        return qs
+
+    # Step 3: Split into terms for more robust matching
+    terms = normalized_search.split(" ")
+
+    # Step 4: Require every term to match at least one supported field
+    filtered_qs = qs
+    for term in terms:
+        filtered_qs = filtered_qs.filter(
+            Q(full_name__icontains=term)
+            | Q(email__icontains=term)
+            | Q(phone__icontains=term)
+        )
+
+    return filtered_qs
+
+
+def tenants_qs(
+    *,
+    org: Organization,
+    search: Optional[str] = None,
+) -> QuerySet[Tenant]:
     """Return the canonical org-scoped tenant queryset for read APIs.
 
     This selector prepares the relationship graph needed for tenant
@@ -27,10 +100,11 @@ def tenants_qs(*, org: Organization) -> QuerySet[Tenant]:
 
     Args:
         org: Organization that owns the tenant records.
+        search: Optional free-text tenant directory search query.
 
     Returns:
-        QuerySet[Tenant]: Org-scoped tenant queryset with lease links,
-        leases, units, and buildings prefetched.
+        QuerySet[Tenant]: Org-scoped tenant queryset with optional search,
+        lease links, leases, units, and buildings prefetched.
     """
     # Step 1: Prefetch tenant-to-lease links with the full lease chain
     lease_links_prefetch = Prefetch(
@@ -53,12 +127,14 @@ def tenants_qs(*, org: Organization) -> QuerySet[Tenant]:
         to_attr="prefetched_lease_links",
     )
 
-    # Step 2: Return the canonical tenant queryset
-    return (
-        Tenant.objects.filter(organization=org)
-        .prefetch_related(lease_links_prefetch)
-        .order_by("full_name", "id")
-    )
+    # Step 2: Start with the org-scoped tenant base queryset
+    qs = Tenant.objects.filter(organization=org)
+
+    # Step 3: Apply search before prefetch/pagination
+    qs = apply_tenant_directory_search(qs=qs, search=search)
+
+    # Step 4: Attach relationship graph and return stable ordering
+    return qs.prefetch_related(lease_links_prefetch).order_by("full_name", "id")
 
 
 def tenant_detail_qs(*, org: Organization) -> QuerySet[Tenant]:
@@ -74,7 +150,7 @@ def tenant_detail_qs(*, org: Organization) -> QuerySet[Tenant]:
     Returns:
         QuerySet[Tenant]: Org-scoped tenant queryset for detail views.
     """
-    # Step 1: Reuse the canonical tenant selector
+    # Step 1: Reuse the canonical tenant selector without list search filters
     return tenants_qs(org=org)
 
 

@@ -1,5 +1,5 @@
 // # Filename: src/features/tenants/components/directory/TenantDirectorySection.tsx
-// ✅ New Code
+
 
 import type { ReactNode } from "react";
 import { Plus } from "lucide-react";
@@ -12,12 +12,14 @@ type Props = {
   tenantsCount: number;
   searchValue: string;
   onSearchChange: (value: string) => void;
+  onClearSearch?: () => void;
   onAddTenant: () => void;
 
   addButtonLabel?: string;
   addButtonIcon?: ReactNode;
 
   isLoading: boolean;
+  isSearching?: boolean;
   isError: boolean;
   errorMessage?: string;
 
@@ -48,6 +50,7 @@ export default function TenantDirectorySection({
   tenantsCount,
   searchValue,
   onSearchChange,
+  onClearSearch,
   onAddTenant,
   addButtonLabel = "Add Tenant",
   addButtonIcon,
@@ -60,8 +63,6 @@ export default function TenantDirectorySection({
   footer,
   children,
 }: Props) {
-  const hasActiveSearch = searchValue.trim().length > 0;
-
   return (
     <section className="rounded-3xl border border-white/10 bg-neutral-950/70 p-5 shadow-xl sm:p-6">
       <div className="space-y-4">
@@ -106,11 +107,12 @@ export default function TenantDirectorySection({
           </div>
         </div>
 
-        {/* Step 2: Centered search */}
+        {/* Step 2: Search workspace */}
         <TenantDirectoryToolbar
           searchValue={searchValue}
           onSearchChange={onSearchChange}
-          onClearSearch={hasActiveSearch ? () => onSearchChange("") : undefined}
+          onClearSearch={onClearSearch}
+          isSearching={isSearching}
         />
 
         {/* Step 3: Loading state */}

@@ -1,0 +1,30 @@
+flowchart LR
+    FE[Frontend Charts / Dashboards]
+    RV[ExpenseReportingViewSet]
+    MIXIN[OrganizationScopedViewMixin]
+    SEL[expense_reporting_selectors.py]
+    SVC[ExpenseReportingService]
+    SER[reporting_serializers.py]
+    DB[(Expense Data)]
+
+    FE --> RV
+    RV --> MIXIN
+    MIXIN --> RV
+    RV --> SEL
+    SEL --> DB
+    DB --> SEL
+    SEL --> RV
+    RV --> SVC
+    SVC --> RV
+    RV --> SER
+    SER --> RV
+    RV --> FE
+
+    subgraph Charts["Current Reporting Outputs"]
+        C1[monthly_expense_trend]
+        C2[expense_by_category]
+        C3[expense_by_building]
+        C4[dashboard summary]
+    end
+
+    SER --> Charts
