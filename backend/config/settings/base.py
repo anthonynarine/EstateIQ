@@ -106,6 +106,7 @@ INSTALLED_APPS = [
     "apps.buildings",
     "apps.leases",
     "apps.billing",
+    "apps.expenses", 
 ]
 
 # Step 8: Middleware (ORDER MATTERS)
