@@ -1,6 +1,6 @@
-# PortfolioOS / EstateIQ — Enterprise Entity Diagram
+# PortfolioOS / EstateIQ — Entity Diagram
 
-This ERD models the current enterprise domain in a way that is consistent with the architecture decisions already made for PortfolioOS / EstateIQ.
+This ERD models the current domain in a way that is consistent with the architecture decisions already made for PortfolioOS / EstateIQ.
 
 ## Entity design principles
 
