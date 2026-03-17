@@ -10,6 +10,7 @@ from typing import Any
 from django.db import transaction
 
 from apps.expenses.models import Expense
+from apps.expenses.choices import ExpenseSource
 from apps.expenses.services.expense_payloads import ExpenseWritePayload
 from apps.expenses.services.expense_validation_service import (
     ExpenseValidationService,
@@ -73,14 +74,7 @@ class ExpenseWriteService:
 
     @classmethod
     def _normalize_payload(cls, *, payload: ExpenseWritePayload) -> dict[str, Any]:
-        """Convert dataclass payload into normalized model-ready data.
-
-        Args:
-            payload: Incoming structured payload.
-
-        Returns:
-            dict[str, Any]: Model-ready expense data.
-        """
+        """Convert dataclass payload into normalized model-ready data."""
         return {
             "organization": payload.organization,
             "scope": payload.scope,
@@ -101,7 +95,7 @@ class ExpenseWriteService:
             "invoice_number": payload.invoice_number,
             "external_reference": payload.external_reference,
             "notes": payload.notes,
-            "source": payload.source,
+            "source": payload.source or ExpenseSource.MANUAL,
             "created_by": payload.created_by,
             "updated_by": payload.updated_by,
         }
@@ -114,16 +108,7 @@ class ExpenseWriteService:
         updates: dict[str, Any],
         updated_by: Any | None = None,
     ) -> dict[str, Any]:
-        """Build normalized update data from an existing expense and patch set.
-
-        Args:
-            expense: Existing expense instance.
-            updates: Partial update values.
-            updated_by: User performing the update.
-
-        Returns:
-            dict[str, Any]: Complete normalized expense data for validation.
-        """
+        """Build normalized update data from an existing expense and patch set."""
         return {
             "organization": expense.organization,
             "scope": updates.get("scope", expense.scope),
@@ -156,7 +141,7 @@ class ExpenseWriteService:
                 expense.external_reference,
             ),
             "notes": updates.get("notes", expense.notes),
-            "source": updates.get("source", expense.source),
+            "source": updates.get("source", expense.source) or ExpenseSource.MANUAL,
             "created_by": expense.created_by,
             "updated_by": updated_by or expense.updated_by,
         }

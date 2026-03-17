@@ -1,23 +1,19 @@
+# Filename: apps/expenses/services/expense_payloads.py
 
-"""
-Structured payload objects for expense write workflows.
-"""
-
-from __future__ import annotations
 
 from dataclasses import dataclass
 from typing import Any
 
-from apps.expenses.choices import ExpenseStatus, ReimbursementStatus
+from apps.expenses.choices import (
+    ExpenseSource,
+    ExpenseStatus,
+    ReimbursementStatus,
+)
 
 
 @dataclass(frozen=True)
 class ExpenseWritePayload:
-    """Normalized payload for create/update expense workflows.
-
-    This dataclass gives the service layer a stable internal structure so that
-    serializer-specific details do not leak into business logic.
-    """
+    """Normalized payload for create/update expense workflows."""
 
     organization: Any
     scope: str
@@ -38,6 +34,6 @@ class ExpenseWritePayload:
     invoice_number: str = ""
     external_reference: str = ""
     notes: str = ""
-    source: str = ""
+    source: str = ExpenseSource.MANUAL
     created_by: Any | None = None
     updated_by: Any | None = None

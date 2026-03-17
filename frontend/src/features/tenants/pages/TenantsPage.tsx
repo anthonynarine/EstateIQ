@@ -1,4 +1,5 @@
 // # Filename: src/features/tenants/pages/TenantsPage.tsx
+// ✅ New Code
 
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
@@ -172,6 +173,7 @@ export default function TenantsPage() {
     return [...tenants].sort((a, b) => a.full_name.localeCompare(b.full_name));
   }, [tenants]);
 
+  // Step 7: Separate initial load from pagination/search refetches
   const isInitialDirectoryLoad = tenantsQuery.isLoading && !tenantPage;
   const isPaginationFetching =
     tenantsQuery.isFetching && !isSearching && !isInitialDirectoryLoad;
@@ -197,7 +199,7 @@ export default function TenantsPage() {
     setSearchParams(nextParams);
   }
 
-  // Step 7: Clamp invalid page numbers after backend count changes
+  // Step 8: Clamp invalid page numbers after backend count changes
   useEffect(() => {
     if (!tenantsQuery.isSuccess) {
       return;
@@ -208,7 +210,7 @@ export default function TenantsPage() {
     }
   }, [tenantsQuery.isSuccess, currentPage, totalPages]);
 
-  // Step 8: Sync edit form state
+  // Step 9: Sync edit form state
   useEffect(() => {
     if (!editingTenant) {
       return;
@@ -222,11 +224,14 @@ export default function TenantsPage() {
   }, [editingTenant]);
 
   function handleOpenLease(tenant: Tenant) {
-    if (!tenant.active_lease?.id) {
+    // Step 1: Guard missing active lease
+    const leaseId = tenant.active_lease?.id;
+    if (!leaseId) {
       return;
     }
 
-    navigate(`/dashboard/leases/${tenant.active_lease.id}?org=${orgSlug}`);
+    // Step 2: Navigate to the implemented lease ledger page
+    navigate(`/dashboard/leases/${leaseId}/ledger?org=${orgSlug}`);
   }
 
   function handleCreateLease(tenant: Tenant) {
@@ -284,7 +289,7 @@ export default function TenantsPage() {
     await createTenantMutation.mutateAsync(payload);
     setIsCreateOpen(false);
 
-    // Step 9: Return to first page while preserving org/search route structure
+    // Step 10: Return to first page while preserving org/search route structure
     setSearchParams(buildRouteParams({ page: 1 }));
   }
 
@@ -297,7 +302,6 @@ export default function TenantsPage() {
           tenantsCount={0}
           searchValue=""
           onSearchChange={() => undefined}
-          isSearching={isSearching}
           onClearSearch={undefined}
           onAddTenant={() => undefined}
           isLoading={false}
@@ -334,6 +338,7 @@ export default function TenantsPage() {
         onSearchChange={setSearchInput}
         onClearSearch={clearSearch}
         onAddTenant={handleOpenCreate}
+        isSearching={isSearching}
         isLoading={isInitialDirectoryLoad}
         isError={tenantsQuery.isError}
         errorMessage={

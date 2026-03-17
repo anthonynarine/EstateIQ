@@ -1,6 +1,5 @@
 // # Filename: src/features/tenants/components/directory/TenantDirectorySection.tsx
 
-
 import type { ReactNode } from "react";
 import { Plus } from "lucide-react";
 
@@ -14,12 +13,12 @@ type Props = {
   onSearchChange: (value: string) => void;
   onClearSearch?: () => void;
   onAddTenant: () => void;
+  isSearching?: boolean;
 
   addButtonLabel?: string;
   addButtonIcon?: ReactNode;
 
   isLoading: boolean;
-  isSearching?: boolean;
   isError: boolean;
   errorMessage?: string;
 
@@ -52,6 +51,7 @@ export default function TenantDirectorySection({
   onSearchChange,
   onClearSearch,
   onAddTenant,
+  isSearching = false,
   addButtonLabel = "Add Tenant",
   addButtonIcon,
   isLoading,
