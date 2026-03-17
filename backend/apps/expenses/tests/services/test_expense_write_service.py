@@ -8,7 +8,12 @@ from decimal import Decimal
 import pytest
 from django.core.exceptions import ValidationError
 
-from apps.expenses.choices import ExpenseScope, ExpenseStatus, ReimbursementStatus
+from apps.expenses.choices import (
+    ExpenseScope,
+    ExpenseSource,
+    ExpenseStatus,
+    ReimbursementStatus,
+)
 from apps.expenses.services import ExpenseService, ExpenseWritePayload
 
 pytestmark = pytest.mark.django_db

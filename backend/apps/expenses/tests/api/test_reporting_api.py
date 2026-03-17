@@ -1,3 +1,6 @@
+# Filename: apps/expenses/tests/api/test_reporting_api.py
+
+
 """Reporting API tests for the expenses domain.
 
 These tests dispatch ViewSet actions directly with APIRequestFactory so they do
@@ -14,7 +17,6 @@ from rest_framework.test import force_authenticate
 
 from apps.expenses.choices import ExpenseScope
 from apps.expenses.views.reporting_views import ExpenseReportingViewSet
-
 from apps.expenses.tests.factories import create_category, create_expense
 from apps.expenses.tests.helpers import assert_decimal_equal
 
@@ -144,12 +146,14 @@ def test_breakdown_endpoints_honor_top_n(
         organization=organization_a,
         scope=ExpenseScope.BUILDING,
         building=building_a1,
+        category=category_a,
         amount="300.00",
     )
     create_expense(
         organization=organization_a,
         scope=ExpenseScope.BUILDING,
         building=building_a2,
+        category=category_a,
         amount="100.00",
     )
 
@@ -170,13 +174,40 @@ def test_breakdown_endpoints_honor_top_n(
 
     assert category_response.status_code == 200
     assert len(category_response.data) == 1
-    assert category_response.data[0]["category_name"] == "Utilities"
+    assert category_response.data[0]["category_name"] == "Repairs"
+    assert_decimal_equal(category_response.data[0]["amount"], Decimal("450.00"))
+
     assert building_response.status_code == 200
     assert len(building_response.data) == 1
     assert building_response.data[0]["building_id"] == building_a1.id
+    assert_decimal_equal(building_response.data[0]["amount"], Decimal("300.00"))
 
 
-# Step 4: Reporting API should exclude archived rows by default.
+# Step 4: Category reporting should include an Uncategorized bucket for null categories.
+def test_by_category_includes_uncategorized_bucket(
+    api_rf,
+    user_a,
+    organization_a,
+):
+    create_expense(
+        organization=organization_a,
+        amount="125.00",
+    )
+
+    response = _call_reporting_action(
+        api_rf=api_rf,
+        user=user_a,
+        organization=organization_a,
+        action_name="by-category",
+    )
+
+    assert response.status_code == 200
+    assert len(response.data) == 1
+    assert response.data[0]["category_name"] == "Uncategorized"
+    assert_decimal_equal(response.data[0]["amount"], Decimal("125.00"))
+
+
+# Step 5: Reporting API should exclude archived rows by default.
 def test_reporting_api_excludes_archived_by_default(
     api_rf,
     user_a,
@@ -201,7 +232,7 @@ def test_reporting_api_excludes_archived_by_default(
     assert_decimal_equal(response.data["summary"]["total_amount"], Decimal("100.00"))
 
 
-# Step 5: Reporting API should never leak cross-org rows.
+# Step 6: Reporting API should never leak cross-org rows.
 def test_reporting_api_does_not_leak_cross_org_data(
     api_rf,
     user_a,
