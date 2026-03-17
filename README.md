@@ -1,172 +1,243 @@
-# EstateIQ
+# PortfolioOS / EstateIQ
 
-**EstateIQ** is a production-grade **Financial Operating System for Small Real Estate Portfolios (1–50 units)**.
+**AI-native Financial Operating System for Small Real Estate Portfolios**
 
-Built by **Anthony Narine** — Solo Full-Stack Developer  
-**Made in America** for real landlords who need financial clarity, not software bloat.
-
----
-
-## Why EstateIQ Exists
-
-Most property tools are built around rent collection, lightweight bookkeeping, and generic property management workflows.
-
-EstateIQ is being built around a different idea:
-
-> Small landlords deserve the same level of financial visibility, operational structure, and decision support that larger operators get from expensive internal systems.
-
-This project started from a real family rental business need. The goal is not to build another rent tracker. The goal is to build a trustworthy operating system that helps owners understand:
-
-- what the portfolio earns
-- what tenants owe
-- what each building costs to operate
-- which units and buildings are underperforming
-- where financial risk is building before it becomes a problem
+Built by **Anthony Narine**  
+Made in America.
 
 ---
 
-## Product Positioning
+## What this project is
 
-EstateIQ is **not** a tenant-first portal in its current form.
+PortfolioOS / EstateIQ is a production-grade, finance-first platform for small real estate portfolio owners.
 
-It is a **landlord and operator financial system** built around structured, organization-scoped data.
+It is not a rent tracker.
+It is not a lightweight property directory.
+It is not built around tenant self-service first.
 
-The product is designed to support:
+It is being designed as a **financial operating system** where the core system produces structured, reliable portfolio data and AI sits on top of that data to explain risk, performance, delinquency, and portfolio health.
 
-- lease-driven occupancy
-- portfolio financial visibility
-- expense and property cost tracking
-- rent receivables and delinquency operations
-- future AI explanations grounded in deterministic ledger data
+The target user is the small landlord or operator who needs institutional-grade financial clarity without enterprise software bloat.
 
 ---
 
-## Current Platform Shape
+## Product stance
 
-The platform is centered around a multi-tenant real estate data model where all records belong to an `Organization`, and operational truth flows through buildings, units, leases, and tenants.
+Most property software starts with portals, rent collection, and surface-level operations.
 
-```text
-Organization
- └── Building
-      └── Unit
-           └── Lease
-                └── Tenant
+PortfolioOS starts with the harder and more defensible layer:
+
+- property structure
+- lease structure
+- expense structure
+- billing ledger structure
+- reporting structure
+- org-scoped data safety
+
+The long-term goal is simple:
+
+> Give small portfolio owners the kind of financial visibility, discipline, and decision support that larger operators already have.
+
+---
+
+## High-level platform overview
+
+```mermaid
+flowchart TD
+    A[Portfolio Owner / Manager] --> B[React + TypeScript Frontend]
+    B --> C[Django + DRF Modular Monolith]
+    C --> D[(PostgreSQL)]
+    C --> E[Redis / Background Jobs]
+    C --> F[Object Storage / Documents]
+
+    C --> G[Core / Organizations / Auth]
+    C --> H[Properties]
+    C --> I[Leasing]
+    C --> J[Expenses]
+    C --> K[Billing Ledger]
+    C --> L[Reporting]
+    C --> M[AI Insight Layer]
+
+    H --> L
+    I --> K
+    J --> L
+    K --> L
+    L --> M
+    D --> M
 ```
 
-On top of that foundation, EstateIQ is being shaped into a finance-first platform with these core areas:
-
-- organization-scoped access and security
-- buildings and units management
-- tenant and lease lifecycle management
-- lease-driven occupancy
-- expenses and reporting inputs
-- billing / ledger infrastructure for receivables
-- portfolio dashboard and reporting direction
+This architecture keeps the mathematical and operational system separate from the interpretation layer. The core application creates trusted financial data first. AI explains it second.
 
 ---
 
-## Core Principles
+## Core domain model
 
-These are the rules the product is being built around:
+```mermaid
+flowchart TD
+    Org[Organization]
+    Bld[Building]
+    Unit[Unit]
+    Lease[Lease]
+    Tenant[Tenant / Lease Party]
+    Exp[Expense]
+    Charge[Charge]
+    Payment[Payment]
+    Allocation[Allocation]
 
-1. **Multi-tenant by design**  
-   Every record belongs to an organization boundary.
-
-2. **Lease-driven occupancy**  
-   Units are occupied because an active lease exists, not because a manual flag was flipped.
-
-3. **Ledger-first financial truth**  
-   Money should be derived from charges, payments, and allocations, not from fragile mutable balance fields.
-
-4. **Service-layer backend architecture**  
-   Business logic belongs in services. Query logic belongs in selectors. Views stay thin.
-
-5. **Strict org scoping and security**  
-   EstateIQ is designed so cross-tenant leakage is treated as unacceptable.
-
-6. **Explainable future AI**  
-   AI should sit on top of structured financial truth, not replace it.
-
----
-
-## Domain Model
-
-The current domain foundation is:
-
-### Organization
-Represents the landlord business operating inside the SaaS boundary.
-
-### Building
-A physical property owned or managed by the organization.
-
-### Unit
-A rentable space within a building.
-
-### Tenant
-A person or household associated with lease participation.
-
-### Lease
-The legal and financial contract connecting a unit to tenant occupancy.
-
-### Lease Party
-The relationship layer that connects one or more tenants to a lease.
-
-### Lease Documents
-File-backed lease artifacts and versioned records.
-
-### Expenses
-Organization-scoped operating costs attached to buildings, units, vendors, and in some cases lease context.
-
-### Mortgage Accounts
-Lightweight property debt tracking for profitability and future portfolio intelligence.
-
----
-
-## Billing / Ledger Direction
-
-The next major financial layer is the lease-scoped billing system.
-
-This is being designed as **accounts receivable infrastructure**, not as a simple rent reminder feature.
-
-```text
-Charge → Payment → Allocation
+    Org --> Bld
+    Bld --> Unit
+    Unit --> Lease
+    Lease --> Tenant
+    Bld --> Exp
+    Unit --> Exp
+    Lease --> Charge
+    Lease --> Payment
+    Payment --> Allocation
+    Charge --> Allocation
 ```
 
-### Charge
-Represents an obligation owed under a lease.
+### Why this model matters
 
-### Payment
-Represents money already received externally and then recorded by the owner or manager.
+- **Organization** is the tenant boundary for the SaaS.
+- **Buildings** and **units** define the physical portfolio structure.
+- **Leases** define occupancy and financial obligation history.
+- **Expenses** are asset-scoped operational outflows.
+- **Charges, payments, and allocations** form a lease-scoped receivables ledger.
 
-### Allocation
-Represents how part of a payment is applied to one or more charges.
-
-### Derived Balance
-Lease balance is calculated from ledger records:
-
-```text
-sum(charges) - sum(allocations)
-```
-
-This model is the right foundation for:
-
-- delinquency reporting
-- aging buckets
-- lease ledger pages
-- payment application workflows
-- internal billing alerts
-- later AI explanations grounded in real numbers
-
-### Important product stance
-For MVP, billing is being built as an **explicit and idempotent** workflow.
-
-That means the system should not silently invent financial history. Monthly rent posting should be deterministic, auditable, and safe.
+That separation is intentional. Expenses should not become billing, and billing should not be reduced to a simple reminder feature.
 
 ---
 
-## Architecture
+## Financial architecture
+
+PortfolioOS uses a **ledger-first** approach for money.
+
+```mermaid
+flowchart LR
+    Charge[Charge<br/>What is owed] --> Balance[Lease Balance]
+    Allocation[Allocation<br/>Applied amount] --> Balance
+    Payment[Payment<br/>Cash received] --> Allocation
+```
+
+### Core billing truth
+
+- **Charge** = obligation owed
+- **Payment** = money received externally and recorded internally
+- **Allocation** = how a payment is applied to one or more charges
+- **Lease balance** = derived from charges and allocations
+
+That means the system avoids the most dangerous shortcuts:
+
+- no mutable stored balance as financial truth
+- no simplistic paid/unpaid booleans as accounting truth
+- no silent financial assumptions
+- no accounting logic buried in views
+
+This is the right foundation for delinquency, reporting, future automation, and AI explanation.
+
+---
+
+## Current architecture approach
+
+```mermaid
+flowchart LR
+    UI[Frontend UI] --> API[DRF Views / API Contracts]
+    API --> S[Services<br/>business rules]
+    API --> Q[Selectors<br/>read/query logic]
+    S --> DB[(PostgreSQL)]
+    Q --> DB
+    S --> Audit[Audit Events]
+    DB --> Reports[Reporting / Dashboards]
+    Reports --> AI[AI Insight Layer]
+```
+
+### Architectural principles
+
+- **Modular monolith first** for speed, correctness, and transactional safety
+- **Strict organization scoping** across reads and writes
+- **Thin views** with business logic in services
+- **Selectors for read paths** and reporting-oriented queries
+- **Ledger-derived financial state** instead of mutable shortcuts
+- **Auditability** for sensitive financial mutations
+- **AI on top of structured truth**, never replacing deterministic core logic
+
+---
+
+## What exists now
+
+The current platform direction and implemented foundation already support the real shape of the product.
+
+### Current foundation
+
+- organization-scoped platform model
+- buildings and units domain
+- lease-driven occupancy model
+- tenant / lease relationship flows
+- expense domain and reporting-oriented architecture
+- React + TypeScript frontend shell and provider structure
+- Django + DRF backend with layered architecture patterns
+
+### Actively being formalized now
+
+- full **billing ledger domain**
+  - charge
+  - payment
+  - allocation
+  - lease ledger views
+  - delinquency selectors
+  - internal billing alerts
+
+This is important: billing is being built as **accounts receivable infrastructure**, not as a tenant portal.
+
+---
+
+## Why the modular monolith is the right move
+
+At this phase, a modular monolith is stronger than forcing microservices too early.
+
+It gives the project:
+
+- faster iteration
+- shared transactional boundaries
+- easier local development
+- simpler testing
+- safer refactors across leasing, expenses, billing, and reporting
+
+That matters because the core product value is not service sprawl. It is trustworthy financial behavior.
+
+---
+
+## Request lifecycle
+
+```mermaid
+sequenceDiagram
+    participant U as User
+    participant F as React Frontend
+    participant V as DRF View
+    participant S as Service Layer
+    participant Q as Selector Layer
+    participant D as Database
+    participant A as Audit / Reporting
+
+    U->>F: Perform action or open page
+    F->>V: Send org-scoped API request
+    V->>S: Validate + execute business rule
+    S->>D: Write deterministic state
+    S->>A: Emit audit event if needed
+    V->>Q: Build read model response
+    Q->>D: Fetch org-scoped records
+    D-->>Q: Return structured data
+    Q-->>V: Return response payload
+    V-->>F: JSON response
+    F-->>U: Render UI / dashboard / ledger
+```
+
+---
+
+## Technology stack
 
 ### Frontend
+
 - React
 - TypeScript
 - TanStack Query
@@ -174,98 +245,125 @@ That means the system should not silently invent financial history. Monthly rent
 - Tailwind CSS
 
 ### Backend
+
 - Django
 - Django REST Framework
-- Modular monolith architecture
-- Service layer + selector pattern
+- Service + Selector backend architecture
 
-### Database
+### Data and infrastructure
+
 - PostgreSQL
+- Redis
+- background job support
+- object storage for documents and receipts
 
-### Security / Access
+### Security and auth
+
 - organization-scoped access model
-- role-based authorization
-- JWT-based authentication flow
-- production-safe cookie strategy
+- JWT-based authentication strategy
+- role-aware access controls
+- production-safe session and cookie patterns
 
 ---
 
-## Backend Philosophy
+## Security model
 
-EstateIQ is being built as a **modular monolith** because it gives the project the right balance of speed, safety, and maintainability.
+Security is built around strict organization isolation.
+
+### Non-negotiables
+
+- all reads are organization-scoped
+- all writes are organization-scoped
+- users only operate inside authorized organizations
+- financial domains must never leak across tenants
+- audit events exist for sensitive billing actions
+- AI insights must respect org boundaries
+
+For this product, cross-tenant mistakes are not minor bugs. They are trust-killers.
+
+---
+
+## AI philosophy
+
+PortfolioOS is being built so AI becomes a moat, not a gimmick.
+
+### The rule
+
+**AI interprets structured financial data. It does not replace the system of record.**
 
 That means:
 
-- domains stay separated
-- financial logic stays testable
-- read logic and write logic are not mixed together
-- organization scoping is enforced consistently
-- future extraction into services remains possible without overengineering too early
+- core features must produce high-quality structured data
+- AI should explain trends, risk, anomalies, and performance
+- AI outputs should remain grounded in ledger and portfolio truth
+- deterministic logic comes before AI interpretation
 
-Typical backend structure follows this pattern:
-
-```text
-views -> serializers -> services -> selectors -> models/database
-```
-
-With an important rule:
-
-- **services** own business logic and state changes
-- **selectors** own queries, aggregates, and reporting reads
-- **serializers** define API contracts
-- **views** orchestrate request/response flow only
+This is what makes future features like executive summaries, delinquency risk explanations, and portfolio health insights credible.
 
 ---
 
-## What Makes EstateIQ Different
+## Product roadmap
 
-EstateIQ is not being built as generic property management software.
+### Phase 1 — Financial foundation
 
-It is being built as a **financial intelligence foundation** for small portfolio owners.
+- properties, units, leases, and tenants
+- expense tracking
+- billing ledger domain
+- lease ledger views
+- delinquency reporting
+- internal operational alerts
 
-That difference shows up everywhere:
+### Phase 2 — Structured intelligence
 
-- occupancy is derived from leases
-- expenses are modeled for reporting, not just storage
-- billing is lease-scoped and ledger-first
-- dashboards are intended to answer real financial questions
-- future AI is expected to explain numbers, not fabricate them
+- monthly executive summaries
+- anomaly surfacing
+- portfolio health views
+- billing workbench and review queues
+- richer reporting outputs
 
----
+### Phase 3 — AI-native decision support
 
-## Near-Term Product Scope
-
-The current MVP direction includes:
-
-1. organization-scoped platform foundation
-2. buildings and units management
-3. tenants and leases
-4. expenses and reporting-ready expense data
-5. billing / ledger domain
-6. delinquency and lease ledger visibility
-7. portfolio reporting and dashboard views
-
-After that, the platform expands toward:
-
-- scenario simulation
-- executive summaries
-- internal alerts and automations
-- richer reporting exports
-- AI explanations over structured portfolio data
+- simulation workflows
+- underperformance analysis
+- vacancy and rent stress scenarios
+- AI explanation layer across reports and dashboards
 
 ---
 
-## Why This Matters
+## Why this project exists
 
-Small landlords are often forced to choose between:
+This system started from a real operational problem: small landlords often do not have access to software that treats their portfolio like a serious financial business.
 
-- overly simple tools that hide financial truth
-- bloated enterprise products built for much larger operators
-- spreadsheets that become fragile over time
+Too many tools in this market optimize for:
 
-EstateIQ is being built to close that gap.
+- rent collection first
+- tenant portal workflows first
+- generic property CRUD
+- shallow reporting
 
-It aims to give smaller portfolio owners a system that feels disciplined, modern, and financially trustworthy.
+PortfolioOS is being built from the opposite direction:
+
+- financial truth first
+- reporting readiness first
+- multi-tenant SaaS discipline first
+- AI-ready structured data first
+
+That is what makes it more durable.
+
+---
+
+## Repository direction
+
+This repository is the home of a serious vertical SaaS build.
+
+The standard is:
+
+- production-grade architecture
+- clean domain separation
+- maintainable code
+- testable business logic
+- GitHub-friendly documentation
+- real product thinking, not demo-only scaffolding
 
 ---
 
@@ -274,13 +372,9 @@ It aims to give smaller portfolio owners a system that feels disciplined, modern
 **Anthony Narine**  
 Full-Stack Software Engineer
 
-EstateIQ is both:
+PortfolioOS / EstateIQ is both:
 
-- a real operating system being shaped around a family rental business
-- a serious demonstration of production-grade SaaS architecture, financial domain modeling, and product thinking
+- a real operating platform for small real estate portfolios
+- a demonstration of enterprise-grade SaaS architecture, financial systems design, and product discipline
 
----
-
-## Build Statement
-
-**Made in America. Built with a finance-first mindset. Designed for trustworthy portfolio operations.**
+Designed and built in America.
