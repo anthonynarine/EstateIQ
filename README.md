@@ -1,4 +1,4 @@
-# PortfolioOS / EstateIQ
+# EstateIQ
 
 **AI-native Financial Operating System for Small Real Estate Portfolios**
 
@@ -9,7 +9,7 @@ Made in America.
 
 ## What this project is
 
-PortfolioOS / EstateIQ is a production-grade, finance-first platform for small real estate portfolio owners.
+ EstateIQ is a finance-first platform for small real estate portfolio owners.
 
 It is not a rent tracker.
 It is not a lightweight property directory.
@@ -25,7 +25,7 @@ The target user is the small landlord or operator who needs institutional-grade 
 
 Most property software starts with portals, rent collection, and surface-level operations.
 
-PortfolioOS starts with the harder and more defensible layer:
+EstateIQ starts with the harder and more defensible layer:
 
 - property structure
 - lease structure
