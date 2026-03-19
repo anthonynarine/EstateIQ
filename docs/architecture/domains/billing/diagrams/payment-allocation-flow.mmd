@@ -1,0 +1,18 @@
+sequenceDiagram
+    participant FE as Frontend
+    participant API as Payment Service
+    participant DB as Database
+    participant AUTO as Auto-allocation Rule
+    participant AUDIT as Audit Log
+
+    FE->>API: submit payment
+    API->>DB: create payment record
+    alt explicit allocations provided
+        API->>DB: validate charge ownership + amounts
+        API->>DB: create allocations
+    else no allocations provided
+        API->>AUTO: oldest open charge first
+        AUTO->>DB: create allocations until payment exhausted
+    end
+    API->>AUDIT: record payment/allocation events
+    API-->>FE: updated ledger response

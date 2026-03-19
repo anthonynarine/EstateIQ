@@ -1,0 +1,23 @@
+sequenceDiagram
+    participant U as User
+    participant FE as Frontend
+    participant API as Auth API / Backend
+    participant MEM as In-Memory Access Token
+    participant COOKIE as HttpOnly Refresh Cookie
+
+    U->>FE: submit credentials
+    FE->>API: POST /auth/login
+    API-->>FE: access token + refresh cookie
+    FE->>MEM: store access token in memory
+    API->>COOKIE: set secure refresh cookie
+
+    FE->>API: authenticated request with access token
+    API-->>FE: response
+
+    FE->>API: POST /auth/refresh
+    COOKIE-->>API: refresh cookie automatically sent
+    API-->>FE: new access token
+    FE->>MEM: replace access token
+
+    FE->>API: POST /auth/logout
+    API-->>FE: revoke refresh token / blacklist

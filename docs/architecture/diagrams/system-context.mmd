@@ -1,0 +1,17 @@
+flowchart LR
+    USER[Landlord / Manager / Accountant]
+    FE[React + TypeScript Frontend]
+    API[Django + DRF Modular Monolith]
+    DB[(PostgreSQL)]
+    REDIS[(Redis)]
+    WORKERS[Celery Workers]
+    STORAGE[(Object Storage / S3 / MinIO)]
+
+    USER --> FE
+    FE -->|HTTPS REST| API
+    API --> DB
+    API --> REDIS
+    API --> WORKERS
+    API --> STORAGE
+    WORKERS --> DB
+    WORKERS --> REDIS
