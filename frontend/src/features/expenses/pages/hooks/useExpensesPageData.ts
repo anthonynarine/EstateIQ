@@ -16,8 +16,15 @@ import {
   useExpenseVendors,
 } from "../../hooks/useExpenseQueries";
 import type {
+  ExpenseByBuildingResponse,
+  ExpenseByCategoryResponse,
+  ExpenseCategoryOption,
+  ExpenseDashboardResponse,
+  ExpenseDetail,
   ExpenseListFilters,
   ExpenseListItem,
+  ExpenseMonthlyTrendResponse,
+  ExpenseVendorOption,
 } from "../../api/expensesTypes";
 import type { UseExpensesPageStateResult } from "./useExpensesPageState";
 
@@ -29,14 +36,14 @@ export interface UseExpensesPageDataResult {
   reportingFilters: ExpenseListFilters;
   expenses: ExpenseListItem[];
   totalExpenseCount: number;
-  categories: Array<{ id: number; name: string }>;
-  vendors: Array<{ id: number; name: string }>;
+  categories: ExpenseCategoryOption[];
+  vendors: ExpenseVendorOption[];
   formMode: "create" | "edit";
   formInitialValues: Partial<ExpenseFormValues>;
-  dashboard: unknown;
-  monthlyTrend: unknown;
-  byCategory: unknown;
-  byBuilding: unknown;
+  dashboard: ExpenseDashboardResponse | null;
+  monthlyTrend: ExpenseMonthlyTrendResponse | null;
+  byCategory: ExpenseByCategoryResponse | null;
+  byBuilding: ExpenseByBuildingResponse | null;
   isReportingLoading: boolean;
   reportingErrorMessage: string | null;
   listErrorMessage: string | null;
@@ -51,18 +58,7 @@ export interface UseExpensesPageDataResult {
   byBuildingQuery: ReturnType<typeof useExpenseByBuilding>;
 }
 
-/**
- * Composes all read/query state needed by the Expenses page.
- *
- * Responsibilities:
- * - build list/reporting filters
- * - call read and reporting hooks
- * - expose derived page-friendly values
- * - centralize page-level loading/error aggregation
- *
- * @param pageState Local page state.
- * @returns Aggregated data contract for the page layer.
- */
+// ✅ New Code
 export function useExpensesPageData(
   pageState: UseExpensesPageStateResult,
 ): UseExpensesPageDataResult {
@@ -112,7 +108,7 @@ export function useExpensesPageData(
     }
 
     return mapExpenseToFormValues(
-      (expenseDetailQuery.data as Partial<ExpenseListItem> | undefined) ?? null,
+      (expenseDetailQuery.data as ExpenseDetail | undefined) ?? null,
     );
   }, [expenseDetailQuery.data, pageState.editingExpenseId]);
 
@@ -158,10 +154,10 @@ export function useExpensesPageData(
     vendors,
     formMode,
     formInitialValues,
-    dashboard: dashboardQuery.data,
-    monthlyTrend: monthlyTrendQuery.data,
-    byCategory: byCategoryQuery.data,
-    byBuilding: byBuildingQuery.data,
+    dashboard: dashboardQuery.data ?? null,
+    monthlyTrend: monthlyTrendQuery.data ?? null,
+    byCategory: byCategoryQuery.data ?? null,
+    byBuilding: byBuildingQuery.data ?? null,
     isReportingLoading,
     reportingErrorMessage,
     listErrorMessage,

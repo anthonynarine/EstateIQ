@@ -24,10 +24,10 @@ import type {
  *
  * Update these paths here only if your DRF router names differ.
  */
-export const EXPENSES_READ_ENDPOINTS = {
+ export const EXPENSES_READ_ENDPOINTS = {
   expenses: "/expenses/",
   categories: "/expense-categories/",
-  vendors: "/expense-vendors/",
+  vendors: "/vendors/",
 } as const;
 
 /**

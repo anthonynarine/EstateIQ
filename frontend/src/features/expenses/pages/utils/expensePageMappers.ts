@@ -1,35 +1,64 @@
 // # Filename: src/features/expenses/pages/utils/expensePageMappers.ts
 
 import type { ExpenseFormValues } from "../components/ExpensesFormSection";
-import type { ExpenseListItem } from "../../api/expensesTypes";
+import type { ExpenseDetail, ExpenseListItem } from "../../api/expensesTypes";
+
+type ExpenseRecord = ExpenseDetail | ExpenseListItem;
+
+/**
+ * Safely resolves a nested or direct relation id from an expense record.
+ *
+ * @param record Expense record.
+ * @param relationKey Nested relation key.
+ * @param directKey Optional direct id key.
+ * @returns Relation id or null.
+ */
+function getRelationId(
+  record: ExpenseRecord,
+  relationKey: "category" | "vendor",
+  directKey: "category_id" | "vendor_id",
+): number | null {
+  const nestedRelation = record[relationKey];
+
+  if (
+    nestedRelation &&
+    typeof nestedRelation === "object" &&
+    "id" in nestedRelation &&
+    typeof nestedRelation.id === "number"
+  ) {
+    return nestedRelation.id;
+  }
+
+  const directValue = (record as Record<string, unknown>)[directKey];
+  return typeof directValue === "number" ? directValue : null;
+}
 
 /**
  * Maps an expense record into form-friendly initial values.
  *
- * The form only owns a subset of the full expense record, so this mapper
- * keeps page orchestration clean and prevents inline translation logic.
- *
- * @param expense Expense record from list/detail queries.
- * @returns Partial form values suitable for edit mode initialization.
+ * @param expense Expense detail or list item.
+ * @returns Partial form values for edit mode.
  */
 export function mapExpenseToFormValues(
-  expense: Partial<ExpenseListItem> | null | undefined,
+  expense: ExpenseRecord | null,
 ): Partial<ExpenseFormValues> {
-  // # Step 1: Guard against missing expense input.
+  // # Step 1: Return an empty shape when there is no record.
   if (!expense) {
     return {};
   }
 
-  // # Step 2: Map only the fields currently owned by the form.
+  // # Step 2: Normalize data for the reusable form panel.
   return {
     description: expense.description ?? "",
     amount:
-      expense.amount !== undefined && expense.amount !== null
-        ? String(expense.amount)
-        : "",
-    expense_date: expense.expense_date ?? "",
+      expense.amount === null || expense.amount === undefined
+        ? ""
+        : String(expense.amount),
+    expense_date: expense.expense_date
+      ? expense.expense_date.slice(0, 10)
+      : "",
     notes: expense.notes ?? "",
-    category_id: expense.category?.id ?? null,
-    vendor_id: expense.vendor?.id ?? null,
+    category_id: getRelationId(expense, "category", "category_id"),
+    vendor_id: getRelationId(expense, "vendor", "vendor_id"),
   };
 }

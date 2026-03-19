@@ -1,58 +1,56 @@
 // # Filename: src/features/expenses/pages/utils/expensePageErrors.ts
 
+import { isAxiosError } from "axios";
 
 /**
- * Safely extracts a readable error message from unknown error input.
+ * Extracts a page-friendly error message from an unknown thrown value.
  *
- * Supports:
- * - standard Error instances
- * - Axios-like `response.data.detail`
- * - Axios-like `response.data.message`
- * - Axios-like `response.data.non_field_errors`
- *
- * @param error Unknown thrown value.
- * @param fallbackMessage Message used when no better error can be derived.
- * @returns User-friendly error string.
+ * @param error Unknown error value.
+ * @param fallbackMessage Fallback message when nothing useful can be extracted.
+ * @returns Best available human-readable message.
  */
 export function getExpensePageErrorMessage(
   error: unknown,
   fallbackMessage: string,
 ): string {
-  // # Step 1: Handle empty error input.
-  if (!error) {
-    return fallbackMessage;
+  // # Step 1: Handle axios-shaped errors.
+  if (isAxiosError(error)) {
+    const responseData = error.response?.data as
+      | {
+          detail?: string;
+          message?: string;
+          non_field_errors?: string[];
+        }
+      | undefined;
+
+    if (typeof responseData?.detail === "string" && responseData.detail.trim()) {
+      return responseData.detail;
+    }
+
+    if (
+      typeof responseData?.message === "string" &&
+      responseData.message.trim()
+    ) {
+      return responseData.message;
+    }
+
+    if (
+      Array.isArray(responseData?.non_field_errors) &&
+      responseData.non_field_errors.length > 0
+    ) {
+      return responseData.non_field_errors.join(", ");
+    }
+
+    if (typeof error.message === "string" && error.message.trim()) {
+      return error.message;
+    }
   }
 
-  // # Step 2: Handle standard Error instances.
-  if (error instanceof Error && error.message) {
+  // # Step 2: Handle native Error objects.
+  if (error instanceof Error && error.message.trim()) {
     return error.message;
   }
 
-  // # Step 3: Handle Axios-like nested API errors.
-  const maybeError = error as {
-    response?: {
-      data?: {
-        detail?: string;
-        message?: string;
-        non_field_errors?: string[];
-      };
-    };
-  };
-
-  const detailMessage = maybeError.response?.data?.detail;
-  if (detailMessage) {
-    return detailMessage;
-  }
-
-  const apiMessage = maybeError.response?.data?.message;
-  if (apiMessage) {
-    return apiMessage;
-  }
-
-  const nonFieldErrors = maybeError.response?.data?.non_field_errors;
-  if (nonFieldErrors?.length) {
-    return nonFieldErrors.join(", ");
-  }
-
+  // # Step 3: Fall back to the provided message.
   return fallbackMessage;
 }

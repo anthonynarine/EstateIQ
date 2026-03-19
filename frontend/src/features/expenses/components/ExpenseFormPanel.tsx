@@ -1,7 +1,12 @@
 // # Filename: src/features/expenses/components/ExpenseFormPanel.tsx
 
-
-import { useCallback, useEffect, useMemo, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useState,
+  type FormEvent,
+} from "react";
 
 import type {
   CreateExpensePayload,
@@ -11,9 +16,6 @@ import type {
 
 /**
  * Form values used by the ExpenseFormPanel component.
- *
- * This stays close to the create payload shape so the page layer does not
- * need a large translation step before submitting mutations.
  */
 export interface ExpenseFormValues {
   description: string;
@@ -24,9 +26,6 @@ export interface ExpenseFormValues {
   vendor_id: number | null;
 }
 
-/**
- * Props for the ExpenseFormPanel component.
- */
 interface ExpenseFormPanelProps {
   mode: "create" | "edit";
   initialValues?: Partial<ExpenseFormValues>;
@@ -38,11 +37,6 @@ interface ExpenseFormPanelProps {
   onCancel?: () => void;
 }
 
-/**
- * Returns a stable empty form state.
- *
- * @returns Empty expense form values.
- */
 function getEmptyFormValues(): ExpenseFormValues {
   return {
     description: "",
@@ -54,19 +48,11 @@ function getEmptyFormValues(): ExpenseFormValues {
   };
 }
 
-/**
- * Builds the initial form state from optional incoming values.
- *
- * @param initialValues Partial incoming form values.
- * @returns Fully normalized form state object.
- */
 function buildInitialFormState(
   initialValues?: Partial<ExpenseFormValues>,
 ): ExpenseFormValues {
-  // # Step 1: Start from the known empty state.
   const emptyState = getEmptyFormValues();
 
-  // # Step 2: Overlay any provided values in a normalized way.
   return {
     ...emptyState,
     ...initialValues,
@@ -79,26 +65,7 @@ function buildInitialFormState(
   };
 }
 
-/**
- * ExpenseFormPanel
- *
- * Presentational form component for creating and editing expense records.
- *
- * Responsibilities:
- * - manage local form field state
- * - render category/vendor lookup selects
- * - validate basic required fields before submission
- * - emit a payload shaped for the write API layer
- *
- * Non-responsibilities:
- * - data fetching
- * - mutation ownership
- * - route transitions
- * - global toast/notification orchestration
- *
- * @param props Component props.
- * @returns Expense form panel UI.
- */
+// ✅ New Code
 export default function ExpenseFormPanel({
   mode,
   initialValues,
@@ -114,41 +81,26 @@ export default function ExpenseFormPanel({
   );
   const [validationError, setValidationError] = useState<string | null>(null);
 
-  /**
-   * Derived title for the form panel.
-   */
   const panelTitle = useMemo(() => {
     return mode === "create" ? "Add Expense" : "Edit Expense";
   }, [mode]);
 
-  /**
-   * Derived helper text for the form panel header.
-   */
   const panelDescription = useMemo(() => {
     return mode === "create"
       ? "Create a new expense record for the portfolio."
       : "Update the selected expense record.";
   }, [mode]);
 
-  /**
-   * Resets the form whenever the parent switches create/edit targets.
-   */
   useEffect(() => {
-    // # Step 1: Rebuild local state from new incoming values.
     setFormValues(buildInitialFormState(initialValues));
-
-    // # Step 2: Clear stale validation errors when the record changes.
     setValidationError(null);
   }, [initialValues]);
 
-  /**
-   * Updates a single form field in local state.
-   *
-   * @param field Target field name.
-   * @param value New field value.
-   */
   const updateField = useCallback(
-    <K extends keyof ExpenseFormValues>(field: K, value: ExpenseFormValues[K]) => {
+    (
+      field: keyof ExpenseFormValues,
+      value: ExpenseFormValues[keyof ExpenseFormValues],
+    ) => {
       // # Step 1: Update the target field immutably.
       setFormValues((previousState) => ({
         ...previousState,
@@ -161,23 +113,15 @@ export default function ExpenseFormPanel({
     [],
   );
 
-  /**
-   * Validates the current form state before submit.
-   *
-   * @returns Validation error message or null when valid.
-   */
   const validateForm = useCallback((values: ExpenseFormValues): string | null => {
-    // # Step 1: Enforce required description.
     if (!values.description.trim()) {
       return "Description is required.";
     }
 
-    // # Step 2: Enforce required amount.
     if (!values.amount.trim()) {
       return "Amount is required.";
     }
 
-    // # Step 3: Validate numeric amount.
     const numericAmount = Number.parseFloat(values.amount);
     if (Number.isNaN(numericAmount)) {
       return "Amount must be a valid number.";
@@ -187,7 +131,6 @@ export default function ExpenseFormPanel({
       return "Amount cannot be negative.";
     }
 
-    // # Step 4: Enforce required expense date.
     if (!values.expense_date.trim()) {
       return "Expense date is required.";
     }
@@ -195,12 +138,6 @@ export default function ExpenseFormPanel({
     return null;
   }, []);
 
-  /**
-   * Converts local form state into the API payload shape.
-   *
-   * @param values Current local form values.
-   * @returns Create/update payload for the expense write API.
-   */
   const buildSubmitPayload = useCallback(
     (values: ExpenseFormValues): CreateExpensePayload => {
       return {
@@ -215,13 +152,8 @@ export default function ExpenseFormPanel({
     [],
   );
 
-  /**
-   * Handles form submission.
-   *
-   * @param event Form submit event.
-   */
   const handleSubmit = useCallback(
-    async (event: React.FormEvent<HTMLFormElement>) => {
+    async (event: FormEvent<HTMLFormElement>) => {
       event.preventDefault();
 
       // # Step 1: Validate current form values.
@@ -237,8 +169,14 @@ export default function ExpenseFormPanel({
 
       // # Step 3: Delegate the mutation to the page layer.
       await onSubmit(payload);
+
+      // # Step 4: Clear the local form after successful create flow.
+      if (mode === "create") {
+        setFormValues(getEmptyFormValues());
+        setValidationError(null);
+      }
     },
-    [buildSubmitPayload, formValues, onSubmit, validateForm],
+    [buildSubmitPayload, formValues, mode, onSubmit, validateForm],
   );
 
   return (
@@ -249,7 +187,7 @@ export default function ExpenseFormPanel({
       </div>
 
       <form onSubmit={handleSubmit} className="flex flex-col gap-6 p-6">
-        {(validationError || submitError) ? (
+        {validationError || submitError ? (
           <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
             {validationError ?? submitError}
           </div>

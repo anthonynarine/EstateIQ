@@ -1,7 +1,7 @@
 // # Filename: src/features/expenses/pages/ExpensesPage.tsx
 
 import ExpenseReportingSection from "../components/ExpenseReportingSection";
-import ExpensesContent from "../pages/components/ ExpensesContent";
+import ExpensesContent from "../pages/components/ ExpensesContent"
 import ExpensesFiltersBar from "./components/ExpensesFiltersBar";
 import ExpensesFormSection from "./components/ExpensesFormSection";
 import ExpensesHeader from "./components/ExpensesHeader";
@@ -10,18 +10,7 @@ import { useExpensesPageActions } from "./hooks/useExpensesPageActions";
 import { useExpensesPageData } from "./hooks/useExpensesPageData";
 import { useExpensesPageState } from "./hooks/useExpensesPageState";
 
-/**
- * ExpensesPage
- *
- * Thin orchestration page for the Expenses feature.
- *
- * Responsibilities:
- * - compose page state, data, and actions hooks
- * - render page composition components
- * - keep the page file focused on assembly rather than implementation detail
- *
- * @returns Expenses page UI.
- */
+
 export default function ExpensesPage() {
   const pageState = useExpensesPageState();
   const pageData = useExpensesPageData(pageState);
@@ -51,10 +40,10 @@ export default function ExpensesPage() {
       />
 
       <ExpenseReportingSection
-        dashboard={pageData.dashboard as never}
-        monthlyTrend={pageData.monthlyTrend as never}
-        byCategory={pageData.byCategory as never}
-        byBuilding={pageData.byBuilding as never}
+        dashboard={pageData.dashboard}
+        monthlyTrend={pageData.monthlyTrend}
+        byCategory={pageData.byCategory}
+        byBuilding={pageData.byBuilding}
         isLoading={pageData.isReportingLoading}
         errorMessage={pageData.reportingErrorMessage}
       />
