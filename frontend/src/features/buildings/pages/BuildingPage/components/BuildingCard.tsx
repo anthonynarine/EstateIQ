@@ -1,18 +1,19 @@
 // # Filename: src/features/buildings/pages/BuildingPage/components/BuildingCard.tsx
+// ✅ New Code
 
-
-import { useCallback } from "react";
+import { useCallback, type MouseEvent, type ReactNode } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import {
+  ArrowRight,
+  BedDouble,
+  Building2,
+  DoorOpen,
+  MapPin,
   Pencil,
   Trash2,
-  ArrowRight,
-  Building2,
-  MapPin,
-  DoorOpen,
   Users,
-  BedDouble,
 } from "lucide-react";
+
 import type { Building } from "../../../api/buildingsApi";
 
 type Props = {
@@ -22,16 +23,55 @@ type Props = {
   disableDelete?: boolean;
 };
 
+type SummaryItemProps = {
+  icon: ReactNode;
+  label: string;
+  value: number;
+  valueClassName?: string;
+  iconWrapperClassName?: string;
+};
+
+type BuildingWithSummary = Building & {
+  units_count?: number;
+  occupied_units_count?: number;
+  vacant_units_count?: number;
+};
+
+function SummaryItem({
+  icon,
+  label,
+  value,
+  valueClassName = "text-white",
+  iconWrapperClassName = "bg-white/5",
+}: SummaryItemProps) {
+  return (
+    <div className="min-w-0">
+      <div className="flex flex-col items-center justify-center gap-1.5 px-3 py-2.5 text-center">
+        <div className={`rounded-lg p-2 ${iconWrapperClassName}`}>{icon}</div>
+
+        <div className="min-w-0">
+          <p className="text-[10px] uppercase tracking-[0.16em] text-neutral-500">
+            {label}
+          </p>
+          <p className={`text-base font-semibold leading-none ${valueClassName}`}>
+            {value}
+          </p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 /**
  * BuildingCard
  *
- * Presentational + navigation card for a Building record.
+ * Presentational card for a building record.
  *
  * Responsibilities:
- * - Display building identity and address
- * - Display unit occupancy summary
- * - Navigate to the building detail workspace
- * - Delegate edit/delete actions to parent orchestration
+ * - Show building identity and address
+ * - Show a compact unit/occupancy summary
+ * - Allow edit/delete actions
+ * - Navigate to the building detail page
  */
 export default function BuildingCard({
   building,
@@ -42,146 +82,84 @@ export default function BuildingCard({
   const navigate = useNavigate();
   const location = useLocation();
 
-  const summary = building as Building & {
-    units_count?: number;
-    occupied_units_count?: number;
-    vacant_units_count?: number;
-  };
+  const summary = building as BuildingWithSummary;
 
   const unitsCount = summary.units_count ?? 0;
   const occupiedCount = summary.occupied_units_count ?? 0;
   const vacantCount =
     summary.vacant_units_count ?? Math.max(0, unitsCount - occupiedCount);
 
-  const onViewUnits = useCallback(() => {
-    navigate({
-      pathname: `/dashboard/buildings/${building.id}`,
-      search: location.search,
-      state: { building },
-    });
-  }, [building, location.search, navigate]);
+  const hasUnits = unitsCount > 0;
 
-  const handleEdit = useCallback(
-    (e: React.MouseEvent) => {
-      e.stopPropagation();
-      onEdit?.(building);
-    },
-    [building, onEdit]
-  );
-
-  const handleDelete = useCallback(
-    (e: React.MouseEvent) => {
-      e.stopPropagation();
-      if (disableDelete) {
-        return;
-      }
-      onDelete?.(building);
-    },
-    [building, disableDelete, onDelete]
-  );
-
-  const addressLine = [
-    building.address_line1,
-    building.address_line2,
-  ]
+  const addressLine = [building.address_line1, building.address_line2]
     .filter(Boolean)
     .join(", ");
 
   const localityLine = [building.city, building.state, building.postal_code]
     .filter(Boolean)
-    .join(", ")
-    .replace(", ", ", ");
+    .join(", ");
 
-  const hasUnits = unitsCount > 0;
+  const handleViewUnits = useCallback(() => {
+    navigate({
+      pathname: `/dashboard/buildings/${building.id}`,
+      search: location.search,
+    });
+  }, [building.id, location.search, navigate]);
+
+  const handleEdit = useCallback(
+    (event: MouseEvent<HTMLButtonElement>) => {
+      // # Step 1: Prevent parent click behavior.
+      event.stopPropagation();
+      onEdit?.(building);
+    },
+    [building, onEdit],
+  );
+
+  const handleDelete = useCallback(
+    (event: MouseEvent<HTMLButtonElement>) => {
+      // # Step 1: Prevent parent click behavior.
+      event.stopPropagation();
+
+      // # Step 2: Respect disabled delete state.
+      if (disableDelete) {
+        return;
+      }
+
+      // # Step 3: Delegate delete action upward.
+      onDelete?.(building);
+    },
+    [building, disableDelete, onDelete],
+  );
 
   return (
-    <article className="group flex h-full flex-col rounded-2xl border border-white/10 bg-gradient-to-br from-white/[0.06] to-white/[0.03] p-5 shadow-[0_10px_30px_rgba(0,0,0,0.22)] transition hover:border-cyan-400/20 hover:shadow-[0_14px_36px_rgba(0,0,0,0.28)]">
+    <article className="group flex h-full flex-col rounded-2xl border border-neutral-800/80 bg-gradient-to-br from-white/[0.06] to-white/[0.03] p-4 shadow-[0_10px_30px_rgba(0,0,0,0.22)] transition hover:border-cyan-400/20 hover:shadow-[0_14px_36px_rgba(0,0,0,0.28)]">
       <div className="flex items-start justify-between gap-4">
-        <div className="min-w-0 flex-1 space-y-4">
-          {/* Header */}
-          <div className="space-y-3">
-            <div className="flex items-start gap-3">
-              <div className="rounded-2xl bg-cyan-400/10 p-2.5 ring-1 ring-cyan-400/15">
-                <Building2 className="h-5 w-5 text-cyan-300" />
-              </div>
-
-              <div className="min-w-0 flex-1">
-                <h3 className="truncate text-xl font-semibold tracking-tight text-white">
-                  {building.name}
-                </h3>
-
-                <div className="mt-2 space-y-1">
-                  {addressLine ? (
-                    <div className="flex items-start gap-2 text-sm text-neutral-300">
-                      <MapPin className="mt-0.5 h-4 w-4 shrink-0 text-neutral-500" />
-                      <span className="truncate">{addressLine}</span>
-                    </div>
-                  ) : null}
-
-                  {localityLine ? (
-                    <p className="pl-6 text-sm text-neutral-400">{localityLine}</p>
-                  ) : null}
-                </div>
-              </div>
+        <div className="min-w-0 flex-1">
+          <div className="flex items-start gap-3">
+            <div className="rounded-2xl bg-cyan-400/10 p-2.5 ring-1 ring-cyan-400/15">
+              <Building2 className="h-5 w-5 text-cyan-300" />
             </div>
 
-            {/* Summary rail */}
-            {hasUnits ? (
-              <div className="overflow-hidden rounded-2xl border border-white/10 bg-white/[0.03]">
-                <div className="grid gap-0 sm:grid-cols-3">
-                  <div className="flex items-center gap-3 px-4 py-3">
-                    <div className="rounded-xl bg-white/5 p-2">
-                      <DoorOpen className="h-4 w-4 text-neutral-300" />
-                    </div>
-                    <div className="min-w-0">
-                      <p className="text-[11px] uppercase tracking-wide text-neutral-500">
-                        Units
-                      </p>
-                      <p className="text-sm font-semibold text-white">{unitsCount}</p>
-                    </div>
-                  </div>
+            <div className="min-w-0 flex-1">
+              <h3 className="break-words text-xl font-semibold tracking-tight text-white">
+                {building.name}
+              </h3>
 
-                  <div className="border-t border-white/8 sm:border-l sm:border-t-0">
-                    <div className="flex items-center gap-3 px-4 py-3">
-                      <div className="rounded-xl bg-emerald-400/10 p-2">
-                        <Users className="h-4 w-4 text-emerald-300" />
-                      </div>
-                      <div className="min-w-0">
-                        <p className="text-[11px] uppercase tracking-wide text-neutral-500">
-                          Occupied
-                        </p>
-                        <p className="text-sm font-semibold text-emerald-300">
-                          {occupiedCount}
-                        </p>
-                      </div>
-                    </div>
+              <div className="mt-2.5 space-y-1.5">
+                {addressLine ? (
+                  <div className="flex items-start gap-2 text-sm text-neutral-300">
+                    <MapPin className="mt-0.5 h-4 w-4 shrink-0 text-neutral-500" />
+                    <span className="break-words">{addressLine}</span>
                   </div>
+                ) : null}
 
-                  <div className="border-t border-white/8 sm:border-l sm:border-t-0">
-                    <div className="flex items-center gap-3 px-4 py-3">
-                      <div className="rounded-xl bg-rose-400/10 p-2">
-                        <BedDouble className="h-4 w-4 text-rose-300" />
-                      </div>
-                      <div className="min-w-0">
-                        <p className="text-[11px] uppercase tracking-wide text-neutral-500">
-                          Vacant
-                        </p>
-                        <p className="text-sm font-semibold text-rose-300">
-                          {vacantCount}
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-                </div>
+                {localityLine ? (
+                  <p className="break-words pl-6 text-sm text-neutral-400">
+                    {localityLine}
+                  </p>
+                ) : null}
               </div>
-            ) : (
-              <div className="rounded-2xl border border-white/10 bg-white/[0.03] px-4 py-3">
-                <p className="text-sm font-medium text-neutral-200">No units added yet</p>
-                <p className="mt-1 text-xs text-neutral-500">
-                  Add units to start tracking occupancy and lease activity.
-                </p>
-              </div>
-            )}
+            </div>
           </div>
         </div>
 
@@ -191,7 +169,7 @@ export default function BuildingCard({
               <button
                 type="button"
                 onClick={handleEdit}
-                className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-white/5 ring-1 ring-white/10 transition hover:bg-white/10"
+                className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-white/5 ring-1 ring-neutral-800/80 transition hover:bg-white/10"
                 title="Edit building"
               >
                 <Pencil className="h-4 w-4 text-neutral-200" />
@@ -203,7 +181,7 @@ export default function BuildingCard({
                 type="button"
                 onClick={handleDelete}
                 disabled={disableDelete}
-                className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-white/5 ring-1 ring-white/10 transition hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-40"
+                className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-white/5 ring-1 ring-neutral-800/80 transition hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-40"
                 title={
                   disableDelete
                     ? "Cannot delete this building right now."
@@ -217,17 +195,57 @@ export default function BuildingCard({
         ) : null}
       </div>
 
-      <div className="mt-auto pt-5">
-        <div className="border-t border-white/10 pt-4">
-          <div className="flex items-center justify-between gap-4">
-            <p className="max-w-xl text-sm text-neutral-400">
+      <div className="mt-4">
+        {hasUnits ? (
+          <div className="overflow-hidden rounded-2xl border border-neutral-800/80 bg-white/[0.03]">
+            <div className="grid grid-cols-3 divide-x divide-neutral-800/80">
+              <SummaryItem
+                icon={<DoorOpen className="h-4 w-4 text-neutral-300" />}
+                label="Units"
+                value={unitsCount}
+                iconWrapperClassName="bg-white/5"
+              />
+
+              <SummaryItem
+                icon={<Users className="h-4 w-4 text-emerald-300" />}
+                label="Occupied"
+                value={occupiedCount}
+                valueClassName="text-emerald-300"
+                iconWrapperClassName="bg-emerald-400/10"
+              />
+
+              <SummaryItem
+                icon={<BedDouble className="h-4 w-4 text-rose-300" />}
+                label="Vacant"
+                value={vacantCount}
+                valueClassName="text-rose-300"
+                iconWrapperClassName="bg-rose-400/10"
+              />
+            </div>
+          </div>
+        ) : (
+          <div className="rounded-2xl border border-neutral-800/80 bg-white/[0.03] px-4 py-3">
+            <p className="text-sm font-medium text-neutral-200">
+              No units added yet
+            </p>
+            <p className="mt-1 text-xs text-neutral-500">
+              Add units to start tracking occupancy and lease activity.
+            </p>
+          </div>
+        )}
+      </div>
+
+      <div className="mt-auto pt-4">
+        <div className="border-t border-neutral-800/80 pt-3.5">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <p className="max-w-xl text-sm leading-6 text-neutral-400">
               Open this building to manage units, tenants, and lease activity.
             </p>
 
             <button
               type="button"
-              onClick={onViewUnits}
-              className="inline-flex shrink-0 items-center gap-2 rounded-xl bg-white/5 px-3 py-2 text-sm font-medium text-neutral-100 ring-1 ring-white/10 transition hover:bg-white/8 hover:text-white"
+              onClick={handleViewUnits}
+              className="inline-flex shrink-0 items-center gap-2 self-start rounded-xl bg-white/5 px-3.5 py-2 text-sm font-medium text-neutral-100 ring-1 ring-neutral-800/80 transition hover:bg-white/10 hover:text-white sm:self-auto"
             >
               View units
               <ArrowRight className="h-4 w-4" />

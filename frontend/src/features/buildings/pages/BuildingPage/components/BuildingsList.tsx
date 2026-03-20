@@ -130,14 +130,15 @@ export default function BuildingsList({
       </div>
 
       <div className="p-5 sm:p-6">
-        <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
+        <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
           {safeBuildings.map((building) => (
-            <BuildingCard
-              key={building.id}
-              building={building}
-              onEdit={onEdit}
-              onDelete={onDelete}
-            />
+            <div key={building.id} className="min-w-0">
+              <BuildingCard
+                building={building}
+                onEdit={onEdit}
+                onDelete={onDelete}
+              />
+            </div>
           ))}
         </div>
       </div>

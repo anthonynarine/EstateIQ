@@ -3,29 +3,29 @@
 import type React from "react";
 import { useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
+
 import { formatApiError } from "../../../../api/formatApiError";
+import CollectionPaginationFooter from "../../../../components/pagination/CollectionPaginationFooter";
 import { useOrg } from "../../../tenancy/hooks/useOrg";
 
-import { useBuildingsQuery } from "./hooks/useBuildings";
-import { useCreateBuildingMutation } from "./hooks/useCreateBuildingMutation";
 import type {
   Building,
   CreateBuildingInput,
   PaginatedResponse,
 } from "../../api/buildingsApi";
-import BuildingHeader from "./components/BuildingHeader";
-import BuildingsList from "./components/BuildingsList";
+import BuildingDeleteConfirmModal from "./forms/BuildingDeleteConfirmModal";
+import BuildingEditModal from "./forms/BuildingEditModal";
 import CreateBuildingForm, {
   type BuildingFormValue,
 } from "./forms/CreateBuildingForm";
-
+import BuildingHeader from "./components/BuildingHeader";
+import BuildingsList from "./components/BuildingsList";
 import useBuildingActions from "./hooks/useBuildingActions";
-import BuildingEditModal from "./forms/BuildingEditModal";
-import BuildingDeleteConfirmModal from "./forms/BuildingDeleteConfirmModal";
-import CollectionPaginationFooter from "../../../../components/pagination/CollectionPaginationFooter";
+import { useBuildingsQuery } from "./hooks/useBuildings";
+import { useCreateBuildingMutation } from "./hooks/useCreateBuildingMutation";
 
-const PAGE_CONTAINER_CLASS =
-  "mx-auto w-full max-w-6xl px-4 py-6 sm:px-6 lg:px-8";
+// ✅ New Code
+const PAGE_CONTAINER_CLASS = "flex flex-col gap-6";
 
 const BUILDINGS_PAGE_SIZE = 4;
 
@@ -41,9 +41,11 @@ const EMPTY_FORM: BuildingFormValue = {
 };
 
 /**
- * parsePositiveInt
- *
  * Safely parses a positive integer from URL params.
+ *
+ * @param value Raw query param value.
+ * @param fallback Value to use when parsing fails.
+ * @returns Parsed positive integer.
  */
 function parsePositiveInt(value: string | null, fallback: number): number {
   if (!value) {
@@ -60,28 +62,33 @@ function parsePositiveInt(value: string | null, fallback: number): number {
 }
 
 /**
- * validateForm
+ * UI-level validation for required building fields.
  *
- * UI-level validation for required fields.
+ * @param values Current form values.
+ * @returns Field-level error map.
  */
 function validateForm(
-  v: BuildingFormValue
+  values: BuildingFormValue,
 ): Partial<Record<keyof BuildingFormValue, string>> {
   const errors: Partial<Record<keyof BuildingFormValue, string>> = {};
 
-  if (!v.name.trim()) {
+  if (!values.name.trim()) {
     errors.name = "Building name is required.";
   }
-  if (!v.address_line1.trim()) {
+
+  if (!values.address_line1.trim()) {
     errors.address_line1 = "Address line 1 is required.";
   }
-  if (!v.city.trim()) {
+
+  if (!values.city.trim()) {
     errors.city = "City is required.";
   }
-  if (!v.state.trim()) {
+
+  if (!values.state.trim()) {
     errors.state = "State is required.";
   }
-  if (!v.postal_code.trim()) {
+
+  if (!values.postal_code.trim()) {
     errors.postal_code = "Postal code is required.";
   }
 
@@ -89,20 +96,25 @@ function validateForm(
 }
 
 /**
- * normalizeCreatePayload
+ * Converts UI form values into the backend create payload.
  *
- * Converts UI form (strings) into API payload (nullables).
+ * @param values Current form values.
+ * @returns Normalized create payload.
  */
-function normalizeCreatePayload(v: BuildingFormValue): CreateBuildingInput {
+function normalizeCreatePayload(
+  values: BuildingFormValue,
+): CreateBuildingInput {
   return {
-    name: v.name.trim(),
-    address_line1: v.address_line1.trim(),
-    address_line2: v.address_line2.trim() ? v.address_line2.trim() : null,
-    city: v.city.trim(),
-    state: v.state.trim(),
-    postal_code: v.postal_code.trim(),
-    country: v.country.trim() || "US",
-    notes: v.notes.trim() ? v.notes.trim() : null,
+    name: values.name.trim(),
+    address_line1: values.address_line1.trim(),
+    address_line2: values.address_line2.trim()
+      ? values.address_line2.trim()
+      : null,
+    city: values.city.trim(),
+    state: values.state.trim(),
+    postal_code: values.postal_code.trim(),
+    country: values.country.trim() || "US",
+    notes: values.notes.trim() ? values.notes.trim() : null,
   } as CreateBuildingInput;
 }
 
@@ -125,26 +137,26 @@ export default function BuildingsPage() {
     return parsePositiveInt(searchParams.get("page"), 1);
   }, [searchParams]);
 
-  // Step 1: Server state
+  // # Step 1: Server state
   const buildingsQuery = useBuildingsQuery(
     orgSlug,
     currentPage,
-    BUILDINGS_PAGE_SIZE
+    BUILDINGS_PAGE_SIZE,
   );
   const createMutation = useCreateBuildingMutation(orgSlug);
 
-  // Step 2: Edit/delete orchestration
+  // # Step 2: Edit/delete orchestration
   const { openEdit, openDelete, editModalProps, deleteModalProps } =
     useBuildingActions(orgSlug);
 
-  // Step 3: Local create-form state
+  // # Step 3: Local create form state
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [form, setForm] = useState<BuildingFormValue>(EMPTY_FORM);
   const [formErrors, setFormErrors] = useState<
     Partial<Record<keyof BuildingFormValue, string>>
   >({});
 
-  // Step 4: Paginated response normalization
+  // # Step 4: Normalize paginated response
   const pageData: PaginatedResponse<Building> | undefined = buildingsQuery.data;
 
   const buildings = useMemo(() => {
@@ -152,16 +164,16 @@ export default function BuildingsPage() {
     return [...list].sort((a, b) => a.name.localeCompare(b.name));
   }, [pageData]);
 
-const totalCount = pageData?.count ?? 0;
-const totalPages = Math.max(
-  1,
-  Math.ceil(totalCount / BUILDINGS_PAGE_SIZE)
-);
+  const totalCount = pageData?.count ?? 0;
+  const totalPages = Math.max(
+    1,
+    Math.ceil(totalCount / BUILDINGS_PAGE_SIZE),
+  );
 
   /**
-   * setPage
+   * Updates the page query param while preserving org and future filters.
    *
-   * Updates the page query param while preserving org and any future filters.
+   * @param nextPage Target page number.
    */
   function setPage(nextPage: number) {
     const safePage = Math.max(1, nextPage);
@@ -176,7 +188,7 @@ const totalPages = Math.max(
     setSearchParams(nextParams);
   }
 
-  // Step 5: Clamp invalid URL page numbers after backend count changes
+  // # Step 5: Clamp invalid URL page numbers after backend count changes
   useEffect(() => {
     if (!buildingsQuery.isSuccess) {
       return;
@@ -187,7 +199,7 @@ const totalPages = Math.max(
     }
   }, [buildingsQuery.isSuccess, currentPage, totalPages]);
 
-  // Step 6: Error formatting
+  // # Step 6: Error formatting
   const listErrorText = buildingsQuery.error
     ? formatApiError(buildingsQuery.error)
     : null;
@@ -196,27 +208,32 @@ const totalPages = Math.max(
     ? formatApiError(createMutation.error)
     : null;
 
-  // Step 7: Controlled field setter
+  // # Step 7: Controlled field setter
   function updateField<K extends keyof BuildingFormValue>(
     key: K,
-    value: BuildingFormValue[K]
+    value: BuildingFormValue[K],
   ) {
-    setForm((prev) => ({ ...prev, [key]: value }));
+    setForm((previousState) => ({
+      ...previousState,
+      [key]: value,
+    }));
 
-    setFormErrors((prev) => {
-      if (!prev[key]) {
-        return prev;
+    setFormErrors((previousErrors) => {
+      if (!previousErrors[key]) {
+        return previousErrors;
       }
 
-      const next = { ...prev };
-      delete next[key];
-      return next;
+      const nextErrors = { ...previousErrors };
+      delete nextErrors[key];
+      return nextErrors;
     });
   }
 
-  // Step 8: Submit create form
-  const handleSubmit: React.FormEventHandler<HTMLFormElement> = async (e) => {
-    e.preventDefault();
+  // # Step 8: Submit create form
+  const handleSubmit: React.FormEventHandler<HTMLFormElement> = async (
+    event,
+  ) => {
+    event.preventDefault();
 
     const errors = validateForm(form);
     setFormErrors(errors);
@@ -232,11 +249,11 @@ const totalPages = Math.max(
     setFormErrors({});
     setIsCreateOpen(false);
 
-    // Step 9: Return to first page after create so the user sees newest inventory
+    // # Step 9: Return to page 1 after create.
     setPage(1);
   };
 
-  // Step 10: Org guard
+  // # Step 10: Org guard
   if (!hasOrg) {
     return (
       <div className={PAGE_CONTAINER_CLASS}>
@@ -259,54 +276,54 @@ const totalPages = Math.max(
 
   return (
     <div className={PAGE_CONTAINER_CLASS}>
-      <div className="space-y-6">
-        <BuildingHeader
-          orgSlug={orgSlug}
-          isCreateOpen={isCreateOpen}
-          onToggleCreate={() => setIsCreateOpen((prev) => !prev)}
-        />
+      <BuildingHeader
+        orgSlug={orgSlug}
+        isCreateOpen={isCreateOpen}
+        onToggleCreate={() =>
+          setIsCreateOpen((previousState) => !previousState)
+        }
+      />
 
-        {isCreateOpen ? (
-          <CreateBuildingForm
-            value={form}
-            errors={formErrors}
-            onChangeField={updateField}
-            onSubmit={handleSubmit}
-            onCancel={() => {
-              setForm(EMPTY_FORM);
-              setFormErrors({});
-              setIsCreateOpen(false);
-            }}
-            isSubmitting={createMutation.isPending}
-            errorText={createErrorText}
+      {isCreateOpen ? (
+        <CreateBuildingForm
+          value={form}
+          errors={formErrors}
+          onChangeField={updateField}
+          onSubmit={handleSubmit}
+          onCancel={() => {
+            setForm(EMPTY_FORM);
+            setFormErrors({});
+            setIsCreateOpen(false);
+          }}
+          isSubmitting={createMutation.isPending}
+          errorText={createErrorText}
+        />
+      ) : null}
+
+      {listErrorText ? (
+        <div className="rounded-2xl border border-red-500/30 bg-red-500/10 p-4 text-sm text-red-200">
+          {listErrorText}
+        </div>
+      ) : null}
+
+      <BuildingsList
+        buildings={buildings}
+        isLoading={buildingsQuery.isLoading}
+        isFetching={buildingsQuery.isFetching}
+        onEdit={openEdit}
+        onDelete={openDelete}
+        footer={
+          <CollectionPaginationFooter
+            page={currentPage}
+            pageSize={BUILDINGS_PAGE_SIZE}
+            totalCount={totalCount}
+            itemLabel="building"
+            isFetching={buildingsQuery.isFetching}
+            onPrevious={() => setPage(currentPage - 1)}
+            onNext={() => setPage(currentPage + 1)}
           />
-        ) : null}
-
-        {listErrorText ? (
-          <div className="rounded-2xl border border-red-500/30 bg-red-500/10 p-4 text-sm text-red-200">
-            {listErrorText}
-          </div>
-        ) : null}
-
-        <BuildingsList
-          buildings={buildings}
-          isLoading={buildingsQuery.isLoading}
-          isFetching={buildingsQuery.isFetching}
-          onEdit={openEdit}
-          onDelete={openDelete}
-          footer={
-            <CollectionPaginationFooter
-              page={currentPage}
-              pageSize={BUILDINGS_PAGE_SIZE}
-              totalCount={totalCount}
-              itemLabel="building"
-              isFetching={buildingsQuery.isFetching}
-              onPrevious={() => setPage(currentPage - 1)}
-              onNext={() => setPage(currentPage + 1)}
-            />
-          }
-        />
-      </div>
+        }
+      />
 
       <BuildingEditModal {...editModalProps} />
       <BuildingDeleteConfirmModal {...deleteModalProps} />

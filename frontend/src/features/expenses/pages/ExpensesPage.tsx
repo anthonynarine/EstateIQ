@@ -19,7 +19,7 @@ export default function ExpensesPage() {
   });
 
   return (
-    <div className="flex flex-col gap-6 px-4 py-6 md:px-6">
+    <div className="flex flex-col gap-6">
       <ExpensesHeader
         isEditing={Boolean(pageState.editingExpenseId)}
         onCreateNew={pageState.resetForm}
