@@ -19,6 +19,7 @@ in services.py.
 from __future__ import annotations
 
 from decimal import Decimal
+from django.db.models.functions import Lower
 
 from django.conf import settings
 from django.core.validators import MinValueValidator
@@ -92,18 +93,24 @@ class ExpenseCategory(models.Model):
         """Model metadata for ExpenseCategory."""
 
         ordering = ["sort_order", "name"]
-        unique_together = [("organization", "slug")]
         indexes = [
             models.Index(fields=["organization", "is_active"]),
             models.Index(fields=["organization", "kind"]),
             models.Index(fields=["organization", "name"]),
         ]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["organization", "slug"],
+                name="expenses_category_org_slug_unique",
+            ),
+            models.UniqueConstraint(
+                Lower("name"),
+                "organization",
+                name="expenses_category_org_name_ci_unique",
+            ),
+        ]
         verbose_name = "Expense category"
         verbose_name_plural = "Expense categories"
-
-    def __str__(self) -> str:
-        """Return a readable category label."""
-        return f"{self.name} ({self.organization_id})"
 
 
 class Vendor(models.Model):
@@ -160,18 +167,20 @@ class Vendor(models.Model):
         """Model metadata for Vendor."""
 
         ordering = ["name"]
-        unique_together = [("organization", "name")]
         indexes = [
             models.Index(fields=["organization", "is_active"]),
             models.Index(fields=["organization", "vendor_type"]),
             models.Index(fields=["organization", "name"]),
         ]
+        constraints = [
+            models.UniqueConstraint(
+                Lower("name"),
+                "organization",
+                name="expenses_vendor_org_name_ci_unique",
+            ),
+        ]
         verbose_name = "Vendor"
         verbose_name_plural = "Vendors"
-
-    def __str__(self) -> str:
-        """Return a readable vendor label."""
-        return self.name
 
 
 class Expense(models.Model):
