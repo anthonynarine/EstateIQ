@@ -1,51 +1,80 @@
 // # Filename: src/features/expenses/pages/components/ExpensesHeader.tsx
 
+// ✅ New Code
+
+import ExpensesWorkspaceTabs, {
+  type ExpensesWorkspaceTab,
+} from "../../components/ExpensesWorkspaceTabs";
+
 /**
  * Props for the ExpensesHeader component.
  */
 interface ExpensesHeaderProps {
   isEditing: boolean;
   onCreateNew: () => void;
+  activeWorkspace: ExpensesWorkspaceTab;
+  onWorkspaceChange: (nextValue: ExpensesWorkspaceTab) => void;
 }
 
+const HEADER_SHELL_CLASS =
+  "rounded-3xl border border-neutral-800/80 bg-neutral-950 shadow-[0_0_0_1px_rgba(255,255,255,0.02)]";
+
+const HEADER_INNER_CLASS = "flex flex-col gap-3 p-4 sm:p-5";
+
+const EYEBROW_CLASS =
+  "text-[10px] font-semibold uppercase tracking-[0.22em] text-neutral-500";
+
+const TITLE_CLASS = "text-2xl font-semibold tracking-tight text-white";
+
+const DESCRIPTION_CLASS = "text-sm leading-5 text-neutral-400";
+
+const ACTION_BUTTON_CLASS =
+  "inline-flex items-center justify-center rounded-2xl border border-emerald-500/25 bg-emerald-500/10 px-4 py-2 text-sm font-medium text-emerald-300 transition hover:bg-emerald-500/15 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/70";
+
 /**
- * ExpensesHeader
- *
  * Page-level header for the Expenses feature.
  *
- * Responsibilities:
- * - render title/description
- * - expose the "New Expense" action when editing
+ * Design intent:
+ * - mobile uses two rows for comfort
+ * - desktop collapses into one intentional control row
  *
  * @param props Component props.
- * @returns Page header UI.
+ * @returns Expenses page header UI.
  */
 export default function ExpensesHeader({
   isEditing,
   onCreateNew,
+  activeWorkspace,
+  onWorkspaceChange,
 }: ExpensesHeaderProps) {
   return (
-    <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-      <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-        <div className="flex flex-col gap-2">
-          <h1 className="text-2xl font-semibold text-slate-900">Expenses</h1>
-          <p className="max-w-3xl text-sm text-slate-600">
-            Manage operational expenses, keep category and vendor context
-            attached, and review reporting without mixing aggregate views into
-            the record lifecycle.
-          </p>
-        </div>
+    <section className={HEADER_SHELL_CLASS}>
+      <div className={HEADER_INNER_CLASS}>
+        <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
+          <div className="flex min-w-0 flex-col gap-1 xl:max-w-sm">
+            <p className={EYEBROW_CLASS}>Portfolio workspace</p>
+            <h1 className={TITLE_CLASS}>Expenses</h1>
+            <p className={`${DESCRIPTION_CLASS} xl:hidden`}>
+              Manage records and reporting.
+            </p>
+          </div>
 
-        <div className="flex flex-wrap items-center gap-3">
-          {isEditing ? (
-            <button
-              type="button"
-              onClick={onCreateNew}
-              className="rounded-xl border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-100"
-            >
-              New Expense
-            </button>
-          ) : null}
+          <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:gap-4">
+            <ExpensesWorkspaceTabs
+              value={activeWorkspace}
+              onChange={onWorkspaceChange}
+            />
+
+            {isEditing ? (
+              <button
+                type="button"
+                onClick={onCreateNew}
+                className={ACTION_BUTTON_CLASS}
+              >
+                New expense
+              </button>
+            ) : null}
+          </div>
         </div>
       </div>
     </section>

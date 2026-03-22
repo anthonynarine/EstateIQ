@@ -1,36 +1,36 @@
 // # Filename: src/features/expenses/pages/hooks/useExpensesPageActions.ts
 
-
 import { useCallback, useMemo } from "react";
 
-import { getExpensePageErrorMessage } from "../utils/expensePageErrors";
-import {
-  useArchiveExpenseMutation,
-  useCreateExpenseMutation,
-  useUnarchiveExpenseMutation,
-  useUpdateExpenseMutation,
-} from "../../hooks/useExpenseMutations";
+import { useExpenseMutations } from "../../hooks/useExpenseMutations";
 import type {
   CreateExpensePayload,
   ExpenseListItem,
+  UpdateExpensePayload,
 } from "../../api/expensesTypes";
+import { getExpensePageErrorMessage } from "../utils/expensePageErrors";
 import type { UseExpensesPageStateResult } from "./useExpensesPageState";
 
+type ExpenseFormSubmitPayload =
+  | CreateExpensePayload
+  | UpdateExpensePayload;
+
 /**
- * Input contract for useExpensesPageActions.
+ * Input contract for `useExpensesPageActions`.
  */
 interface UseExpensesPageActionsParams {
   pageState: UseExpensesPageStateResult;
 }
 
 /**
- * Action contract returned by useExpensesPageActions.
+ * Action contract returned by `useExpensesPageActions`.
  */
 export interface UseExpensesPageActionsResult {
-  handleSubmit: (values: CreateExpensePayload) => Promise<void>;
+  handleSubmit: (values: ExpenseFormSubmitPayload) => Promise<void>;
   handleEdit: (expense: ExpenseListItem) => void;
   handleArchive: (expense: ExpenseListItem) => Promise<void>;
   handleUnarchive: (expense: ExpenseListItem) => Promise<void>;
+  handleCancelEdit: () => void;
   isSubmitting: boolean;
   submitErrorMessage: string | null;
   isArchiving: boolean;
@@ -38,13 +38,32 @@ export interface UseExpensesPageActionsResult {
 }
 
 /**
- * Composes all mutation-backed page actions for the Expenses page.
+ * Builds a human-readable expense label for user-facing messaging.
+ *
+ * Some expense rows may not have a populated `description` field in every
+ * context. This helper ensures confirms and action prompts always show a
+ * stable label instead of "undefined".
+ *
+ * @param expense Selected expense row.
+ * @returns Best available display label for the expense.
+ */
+function getExpenseDisplayLabel(expense: ExpenseListItem): string {
+  return expense.description?.trim() || expense.title?.trim() || `#${expense.id}`;
+}
+
+/**
+ * Composes mutation-backed page actions for the Expenses page.
  *
  * Responsibilities:
- * - create/update submit handling
- * - edit row selection
- * - archive/unarchive confirmations
- * - submit/loading/error aggregation
+ * - route form submit into create vs update
+ * - enter and exit edit mode
+ * - archive and restore records
+ * - coordinate row-level processing state for the table
+ * - expose a page-friendly loading and error surface
+ *
+ * Important design note:
+ * This hook does not own query data or local page state.
+ * It only coordinates mutations with `useExpensesPageState`.
  *
  * @param params Hook params.
  * @returns Page action handlers and derived mutation state.
@@ -52,45 +71,55 @@ export interface UseExpensesPageActionsResult {
 export function useExpensesPageActions({
   pageState,
 }: UseExpensesPageActionsParams): UseExpensesPageActionsResult {
-  const createExpenseMutation = useCreateExpenseMutation();
-  const updateExpenseMutation = useUpdateExpenseMutation();
-  const archiveExpenseMutation = useArchiveExpenseMutation();
-  const unarchiveExpenseMutation = useUnarchiveExpenseMutation();
-
-  const isSubmitting =
-    createExpenseMutation.isPending || updateExpenseMutation.isPending;
+  const {
+    createExpense,
+    updateExpense,
+    archiveExpense,
+    unarchiveExpense,
+    isSubmitting,
+    isArchiving,
+    isUnarchiving,
+    createError,
+    updateError,
+  } = useExpenseMutations();
 
   const submitErrorMessage = useMemo(() => {
-    const submitError =
-      createExpenseMutation.error ?? updateExpenseMutation.error;
+    const submitError = createError ?? updateError;
 
     return submitError
       ? getExpensePageErrorMessage(submitError, "Unable to save expense.")
       : null;
-  }, [createExpenseMutation.error, updateExpenseMutation.error]);
+  }, [createError, updateError]);
 
   /**
    * Handles create/update form submission.
    *
-   * @param values API-ready form payload.
+   * The form hook already builds the correct payload shape based on mode.
+   * This page action hook simply routes the payload to the correct mutation.
+   *
+   * @param values API-ready create or update payload from the form layer.
    */
   const handleSubmit = useCallback(
-    async (values: CreateExpensePayload) => {
-      // # Step 1: Route to update flow when editing an existing expense.
+    async (values: ExpenseFormSubmitPayload) => {
+      // # Step 1: Route to update flow when an edit target exists.
       if (pageState.editingExpenseId) {
-        await updateExpenseMutation.mutateAsync({
+        await updateExpense({
           expenseId: pageState.editingExpenseId,
-          payload: values,
+          payload: values as UpdateExpensePayload,
         });
+
+        // # Step 2: Exit edit mode after a successful update.
         pageState.resetForm();
         return;
       }
 
-      // # Step 2: Otherwise create a new expense record.
-      await createExpenseMutation.mutateAsync(values);
+      // # Step 3: Otherwise create a new expense record.
+      await createExpense(values as CreateExpensePayload);
+
+      // # Step 4: Reset form mode after successful create.
       pageState.resetForm();
     },
-    [createExpenseMutation, pageState, updateExpenseMutation],
+    [createExpense, pageState, updateExpense],
   );
 
   /**
@@ -100,17 +129,27 @@ export function useExpensesPageActions({
    */
   const handleEdit = useCallback(
     (expense: ExpenseListItem) => {
-      // # Step 1: Move the page into edit mode.
-      pageState.setEditingExpenseId(expense.id);
+      // # Step 1: Move the page into edit mode for the selected record.
+      pageState.startEditing(expense.id);
 
-      // # Step 2: Scroll toward the top/form for smoother workflow.
-      window.scrollTo({
-        top: 0,
-        behavior: "smooth",
-      });
+      // # Step 2: Scroll toward the form for a smoother edit workflow.
+      if (typeof window !== "undefined") {
+        window.scrollTo({
+          top: 0,
+          behavior: "smooth",
+        });
+      }
     },
     [pageState],
   );
+
+  /**
+   * Cancels the current edit session and returns the page to create mode.
+   */
+  const handleCancelEdit = useCallback(() => {
+    // # Step 1: Exit edit mode.
+    pageState.stopEditing();
+  }, [pageState]);
 
   /**
    * Handles archive action from the expenses table.
@@ -119,24 +158,32 @@ export function useExpensesPageActions({
    */
   const handleArchive = useCallback(
     async (expense: ExpenseListItem) => {
+      const expenseLabel = getExpenseDisplayLabel(expense);
+
       // # Step 1: Confirm the archive state change.
-      const confirmed = window.confirm(
-        `Archive expense "${expense.description}"?`,
-      );
+      const confirmed = window.confirm(`Archive expense "${expenseLabel}"?`);
 
       if (!confirmed) {
         return;
       }
 
-      // # Step 2: Execute the archive mutation.
-      await archiveExpenseMutation.mutateAsync(expense.id);
+      // # Step 2: Mark the row as being processed.
+      pageState.startProcessingExpense(expense.id);
 
-      // # Step 3: Reset edit mode if the archived record was active in the form.
-      if (pageState.editingExpenseId === expense.id) {
-        pageState.resetForm();
+      try {
+        // # Step 3: Execute the archive mutation.
+        await archiveExpense(expense.id);
+
+        // # Step 4: Exit edit mode if the archived record is active in the form.
+        if (pageState.editingExpenseId === expense.id) {
+          pageState.resetForm();
+        }
+      } finally {
+        // # Step 5: Always clear row processing state.
+        pageState.stopProcessingExpense();
       }
     },
-    [archiveExpenseMutation, pageState],
+    [archiveExpense, pageState],
   );
 
   /**
@@ -146,19 +193,29 @@ export function useExpensesPageActions({
    */
   const handleUnarchive = useCallback(
     async (expense: ExpenseListItem) => {
-      // # Step 1: Confirm the unarchive state change.
+      const expenseLabel = getExpenseDisplayLabel(expense);
+
+      // # Step 1: Confirm the restore action.
       const confirmed = window.confirm(
-        `Restore expense "${expense.description}" to active status?`,
+        `Restore expense "${expenseLabel}" to active status?`,
       );
 
       if (!confirmed) {
         return;
       }
 
-      // # Step 2: Execute the unarchive mutation.
-      await unarchiveExpenseMutation.mutateAsync(expense.id);
+      // # Step 2: Mark the row as being processed.
+      pageState.startProcessingExpense(expense.id);
+
+      try {
+        // # Step 3: Execute the restore mutation.
+        await unarchiveExpense(expense.id);
+      } finally {
+        // # Step 4: Always clear row processing state.
+        pageState.stopProcessingExpense();
+      }
     },
-    [unarchiveExpenseMutation],
+    [pageState, unarchiveExpense],
   );
 
   return {
@@ -166,9 +223,10 @@ export function useExpensesPageActions({
     handleEdit,
     handleArchive,
     handleUnarchive,
+    handleCancelEdit,
     isSubmitting,
     submitErrorMessage,
-    isArchiving: archiveExpenseMutation.isPending,
-    isUnarchiving: unarchiveExpenseMutation.isPending,
+    isArchiving,
+    isUnarchiving,
   };
 }

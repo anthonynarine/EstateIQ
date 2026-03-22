@@ -1,3 +1,5 @@
+# Filename: backend/apps/expenses/serializers/expense_write_serializers.py
+
 """
 Write serializers for the expense intelligence domain.
 
@@ -32,7 +34,6 @@ class ExpenseCreateSerializer(serializers.ModelSerializer):
     class Meta:
         model = Expense
         fields = [
-            "organization",
             "scope",
             "building",
             "unit",
@@ -53,14 +54,61 @@ class ExpenseCreateSerializer(serializers.ModelSerializer):
             "notes",
             "source",
         ]
+        extra_kwargs = {
+            "title": {"required": False, "allow_blank": True},
+            "description": {"required": False, "allow_blank": True},
+            "building": {"required": False, "allow_null": True},
+            "unit": {"required": False, "allow_null": True},
+            "lease": {"required": False, "allow_null": True},
+            "category": {"required": False, "allow_null": True},
+            "vendor": {"required": False, "allow_null": True},
+            "due_date": {"required": False, "allow_null": True},
+            "paid_date": {"required": False, "allow_null": True},
+            "status": {"required": False},
+            "is_reimbursable": {"required": False},
+            "reimbursement_status": {"required": False},
+            "invoice_number": {"required": False, "allow_blank": True},
+            "external_reference": {"required": False, "allow_blank": True},
+            "notes": {"required": False, "allow_blank": True},
+            "source": {"required": False},
+        }
+
+    def validate(self, attrs: dict) -> dict:
+        """Normalize text fields for the current frontend contract."""
+        # Step 1: Support the current UI, which sends description but not title.
+        title = (attrs.get("title") or "").strip()
+        description = (attrs.get("description") or "").strip()
+
+        if not title and description:
+            attrs["title"] = description
+
+        # Step 2: Fail clearly if neither title nor description contains usable text.
+        normalized_title = (attrs.get("title") or "").strip()
+        if not normalized_title:
+            raise serializers.ValidationError(
+                {"title": "A title or description is required."}
+            )
+
+        return attrs
 
     def create(self, validated_data: dict) -> Expense:
         """Create a new expense through the service layer."""
         request = self.context.get("request")
         user = getattr(request, "user", None)
 
+        # Step 1: Accept organization from serializer.save(organization=...)
+        # supplied by the view layer.
+        organization = validated_data.get("organization")
+        if organization is None:
+            organization = self.context.get("organization")
+
+        if organization is None:
+            raise serializers.ValidationError(
+                {"organization": "Organization context is required."}
+            )
+
         payload = ExpenseWritePayload(
-            organization=validated_data["organization"],
+            organization=organization,
             scope=validated_data["scope"],
             building=validated_data.get("building"),
             unit=validated_data.get("unit"),
@@ -115,6 +163,35 @@ class ExpenseUpdateSerializer(serializers.ModelSerializer):
             "notes",
             "source",
         ]
+        extra_kwargs = {
+            "title": {"required": False, "allow_blank": True},
+            "description": {"required": False, "allow_blank": True},
+            "building": {"required": False, "allow_null": True},
+            "unit": {"required": False, "allow_null": True},
+            "lease": {"required": False, "allow_null": True},
+            "category": {"required": False, "allow_null": True},
+            "vendor": {"required": False, "allow_null": True},
+            "due_date": {"required": False, "allow_null": True},
+            "paid_date": {"required": False, "allow_null": True},
+            "status": {"required": False},
+            "is_reimbursable": {"required": False},
+            "reimbursement_status": {"required": False},
+            "invoice_number": {"required": False, "allow_blank": True},
+            "external_reference": {"required": False, "allow_blank": True},
+            "notes": {"required": False, "allow_blank": True},
+            "source": {"required": False},
+        }
+
+    def validate(self, attrs: dict) -> dict:
+        """Support partial updates from the current frontend contract."""
+        # Step 1: If description is provided without title, mirror it into title.
+        title = attrs.get("title")
+        description = attrs.get("description")
+
+        if (title is None or str(title).strip() == "") and description:
+            attrs["title"] = description
+
+        return attrs
 
     def update(self, instance: Expense, validated_data: dict) -> Expense:
         """Update an existing expense through the service layer."""

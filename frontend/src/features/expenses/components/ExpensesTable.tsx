@@ -1,7 +1,10 @@
 // # Filename: src/features/expenses/components/ExpensesTable.tsx
 
+// ✅ New Code
+
 import ExpenseStatusBadge from "./ExpenseStatusBadge";
-import type { ExpenseListItem } from "../api/expensesTypes";
+import ExpensesTablePaginationFooter from "./ExpensesTablePaginationFooter";
+import type { EntityId, ExpenseListItem } from "../api/expensesTypes";
 
 interface ExpensesTableProps {
   expenses: ExpenseListItem[];
@@ -10,8 +13,48 @@ interface ExpensesTableProps {
   onUnarchive: (expense: ExpenseListItem) => Promise<void> | void;
   isArchiving?: boolean;
   isUnarchiving?: boolean;
+  processingExpenseId?: EntityId | null;
+
+  /**
+   * Optional pagination props.
+   *
+   * The records footer now belongs to the table renderer so the mobile cards,
+   * desktop table, and footer stay as one visual unit.
+   */
+  totalExpenseCount?: number;
+  page?: number;
+  pageSize?: number;
+  isPaginationFetching?: boolean;
+  onPreviousPage?: () => void;
+  onNextPage?: () => void;
 }
 
+const TABLE_HEAD_CELL_CLASS =
+  "px-5 py-3 text-left text-[11px] font-semibold uppercase tracking-[0.18em] text-neutral-500";
+
+const TABLE_BODY_ROW_CLASS =
+  "border-b border-neutral-800/80 transition hover:bg-neutral-900/50 last:border-b-0";
+
+const TABLE_CELL_CLASS = "px-5 py-4 align-top";
+
+const ACTION_BUTTON_BASE_CLASS =
+  "inline-flex items-center justify-center rounded-xl border px-3 py-1.5 text-xs font-medium transition disabled:cursor-not-allowed disabled:opacity-50";
+
+const EDIT_BUTTON_CLASS =
+  "border-neutral-700 bg-neutral-900 text-neutral-200 hover:bg-neutral-800";
+
+const ARCHIVE_BUTTON_CLASS =
+  "border-amber-500/30 bg-amber-500/10 text-amber-300 hover:bg-amber-500/15";
+
+const RESTORE_BUTTON_CLASS =
+  "border-emerald-500/30 bg-emerald-500/10 text-emerald-300 hover:bg-emerald-500/15";
+
+/**
+ * Formats a raw expense amount into USD currency.
+ *
+ * @param value Raw amount from the expense record.
+ * @returns Formatted USD display string.
+ */
 function formatCurrency(value: string | number | null | undefined): string {
   if (value === null || value === undefined || value === "") {
     return "$0.00";
@@ -30,7 +73,64 @@ function formatCurrency(value: string | number | null | undefined): string {
   }).format(numericValue);
 }
 
-// ✅ New Code
+/**
+ * Formats an ISO-like date string into a stable date-only value.
+ *
+ * @param value Raw expense date string from the API.
+ * @returns Date-only display string or em dash fallback.
+ */
+function formatExpenseDate(value: string | null | undefined): string {
+  if (!value) {
+    return "—";
+  }
+
+  return value.slice(0, 10);
+}
+
+/**
+ * Returns the best available primary label for an expense row.
+ *
+ * @param expense Expense record.
+ * @returns Row title for display.
+ */
+function getExpensePrimaryLabel(expense: ExpenseListItem): string {
+  return expense.title?.trim() || expense.description?.trim() || "Untitled expense";
+}
+
+/**
+ * Returns compact secondary metadata for the row.
+ *
+ * @param expense Expense record.
+ * @returns Secondary metadata string or null.
+ */
+function getExpenseSecondaryMeta(expense: ExpenseListItem): string | null {
+  const parts: string[] = [];
+
+  if (expense.category?.name) {
+    parts.push(expense.category.name);
+  }
+
+  if (expense.vendor?.name) {
+    parts.push(expense.vendor.name);
+  }
+
+  return parts.length > 0 ? parts.join(" · ") : null;
+}
+
+/**
+ * Renders the primary expense records table.
+ *
+ * Responsibilities:
+ * - display current expense rows
+ * - expose edit/archive/restore actions
+ * - reflect archived state clearly
+ * - support row-level mutation locking during archive/restore flows
+ * - provide a more intentional mobile experience with stacked cards
+ * - own the local records pagination footer
+ *
+ * @param props Table props and row action handlers.
+ * @returns Expenses records UI.
+ */
 export default function ExpensesTable({
   expenses,
   onEdit,
@@ -38,129 +138,242 @@ export default function ExpensesTable({
   onUnarchive,
   isArchiving = false,
   isUnarchiving = false,
+  processingExpenseId = null,
+  totalExpenseCount,
+  page,
+  pageSize,
+  isPaginationFetching = false,
+  onPreviousPage,
+  onNextPage,
 }: ExpensesTableProps) {
+  const canRenderPagination =
+    typeof totalExpenseCount === "number" &&
+    typeof page === "number" &&
+    typeof pageSize === "number" &&
+    typeof onPreviousPage === "function" &&
+    typeof onNextPage === "function";
+
   if (expenses.length === 0) {
     return (
-      <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-        <h2 className="text-lg font-semibold text-slate-900">Expense Records</h2>
-        <p className="mt-2 text-sm text-slate-600">
-          No expenses match the current filters.
-        </p>
-      </section>
+      <div className="px-4 pb-4 sm:px-5 sm:pb-5">
+        <div className="rounded-2xl border border-dashed border-neutral-800 bg-neutral-900/40 p-6 text-center">
+          <p className="text-sm font-medium text-neutral-200">
+            No expenses match the current filters.
+          </p>
+          <p className="mt-1 text-sm text-neutral-500">
+            Try clearing a filter or adjusting your search.
+          </p>
+        </div>
+      </div>
     );
   }
 
   return (
-    <section className="rounded-2xl border border-slate-200 bg-white shadow-sm">
-      <div className="border-b border-slate-200 px-6 py-4">
-        <h2 className="text-lg font-semibold text-slate-900">Expense Records</h2>
-        <p className="mt-1 text-sm text-slate-600">
-          Review, edit, archive, and restore expense records.
-        </p>
+    <>
+      {/* Mobile cards */}
+      <div className="grid gap-3 px-4 pb-4 md:hidden sm:px-5 sm:pb-5">
+        {expenses.map((expense) => {
+          const isRowProcessing = processingExpenseId === expense.id;
+          const disableArchiveButton =
+            isArchiving && isRowProcessing && !expense.is_archived;
+          const disableRestoreButton =
+            isUnarchiving && isRowProcessing && Boolean(expense.is_archived);
+          const disableEditButton = isRowProcessing;
+
+          const primaryLabel = getExpensePrimaryLabel(expense);
+          const secondaryMeta = getExpenseSecondaryMeta(expense);
+
+          return (
+            <article
+              key={expense.id}
+              className="rounded-2xl border border-neutral-800 bg-neutral-900/60 p-4"
+            >
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0 flex flex-col gap-1">
+                  <h3 className="text-sm font-semibold text-white">
+                    {primaryLabel}
+                  </h3>
+
+                  {secondaryMeta ? (
+                    <p className="text-xs text-neutral-500">{secondaryMeta}</p>
+                  ) : null}
+
+                  {expense.notes ? (
+                    <p className="text-xs text-neutral-400">{expense.notes}</p>
+                  ) : null}
+                </div>
+
+                <ExpenseStatusBadge isArchived={Boolean(expense.is_archived)} />
+              </div>
+
+              <div className="mt-4 grid grid-cols-2 gap-3 rounded-xl border border-neutral-800/80 bg-neutral-950/70 p-3">
+                <div className="flex flex-col gap-1">
+                  <span className="text-[10px] font-semibold uppercase tracking-[0.16em] text-neutral-500">
+                    Date
+                  </span>
+                  <span className="text-sm text-neutral-200">
+                    {formatExpenseDate(expense.expense_date)}
+                  </span>
+                </div>
+
+                <div className="flex flex-col gap-1">
+                  <span className="text-[10px] font-semibold uppercase tracking-[0.16em] text-neutral-500">
+                    Amount
+                  </span>
+                  <span className="text-sm font-semibold text-white">
+                    {formatCurrency(expense.amount)}
+                  </span>
+                </div>
+              </div>
+
+              <div className="mt-4 flex items-center justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={() => onEdit(expense)}
+                  disabled={disableEditButton}
+                  className={`${ACTION_BUTTON_BASE_CLASS} ${EDIT_BUTTON_CLASS}`}
+                >
+                  Edit
+                </button>
+
+                {expense.is_archived ? (
+                  <button
+                    type="button"
+                    onClick={() => onUnarchive(expense)}
+                    disabled={disableRestoreButton}
+                    className={`${ACTION_BUTTON_BASE_CLASS} ${RESTORE_BUTTON_CLASS}`}
+                  >
+                    {disableRestoreButton ? "Restoring..." : "Restore"}
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => onArchive(expense)}
+                    disabled={disableArchiveButton}
+                    className={`${ACTION_BUTTON_BASE_CLASS} ${ARCHIVE_BUTTON_CLASS}`}
+                  >
+                    {disableArchiveButton ? "Archiving..." : "Archive"}
+                  </button>
+                )}
+              </div>
+            </article>
+          );
+        })}
       </div>
 
-      <div className="overflow-x-auto">
-        <table className="min-w-full divide-y divide-slate-200">
-          <thead className="bg-slate-50">
+      {/* Desktop table */}
+      <div className="hidden overflow-x-auto md:block">
+        <table className="min-w-full">
+          <thead className="border-b border-neutral-800 bg-neutral-950/80">
             <tr>
-              <th className="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
-                Description
-              </th>
-              <th className="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
-                Category
-              </th>
-              <th className="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
-                Vendor
-              </th>
-              <th className="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
-                Date
-              </th>
-              <th className="px-6 py-3 text-right text-xs font-semibold uppercase tracking-wide text-slate-500">
-                Amount
-              </th>
-              <th className="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
-                Status
-              </th>
-              <th className="px-6 py-3 text-right text-xs font-semibold uppercase tracking-wide text-slate-500">
-                Actions
-              </th>
+              <th className={TABLE_HEAD_CELL_CLASS}>Description</th>
+              <th className={TABLE_HEAD_CELL_CLASS}>Date</th>
+              <th className={`${TABLE_HEAD_CELL_CLASS} text-right`}>Amount</th>
+              <th className={TABLE_HEAD_CELL_CLASS}>Status</th>
+              <th className={`${TABLE_HEAD_CELL_CLASS} text-right`}>Actions</th>
             </tr>
           </thead>
 
-          <tbody className="divide-y divide-slate-100 bg-white">
-            {expenses.map((expense) => (
-              <tr key={expense.id} className="hover:bg-slate-50">
-                <td className="px-6 py-4 align-top">
-                  <div className="flex flex-col gap-1">
-                    <span className="text-sm font-medium text-slate-900">
-                      {expense.description}
-                    </span>
-                    {expense.notes ? (
-                      <span className="max-w-md text-xs text-slate-500">
-                        {expense.notes}
+          <tbody>
+            {expenses.map((expense) => {
+              const isRowProcessing = processingExpenseId === expense.id;
+              const disableArchiveButton =
+                isArchiving && isRowProcessing && !expense.is_archived;
+              const disableRestoreButton =
+                isUnarchiving && isRowProcessing && Boolean(expense.is_archived);
+              const disableEditButton = isRowProcessing;
+
+              const primaryLabel = getExpensePrimaryLabel(expense);
+              const secondaryMeta = getExpenseSecondaryMeta(expense);
+
+              return (
+                <tr key={expense.id} className={TABLE_BODY_ROW_CLASS}>
+                  <td className={TABLE_CELL_CLASS}>
+                    <div className="flex max-w-[32rem] flex-col gap-1">
+                      <span className="text-sm font-medium text-white">
+                        {primaryLabel}
                       </span>
-                    ) : null}
-                  </div>
-                </td>
 
-                <td className="px-6 py-4 align-top text-sm text-slate-700">
-                  {expense.category?.name ?? "—"}
-                </td>
+                      {secondaryMeta ? (
+                        <span className="text-xs text-neutral-500">
+                          {secondaryMeta}
+                        </span>
+                      ) : null}
 
-                <td className="px-6 py-4 align-top text-sm text-slate-700">
-                  {expense.vendor?.name ?? "—"}
-                </td>
+                      {expense.notes ? (
+                        <span className="text-xs text-neutral-400">
+                          {expense.notes}
+                        </span>
+                      ) : null}
+                    </div>
+                  </td>
 
-                <td className="px-6 py-4 align-top text-sm text-slate-700">
-                  {expense.expense_date ? expense.expense_date.slice(0, 10) : "—"}
-                </td>
+                  <td className={`${TABLE_CELL_CLASS} text-sm text-neutral-300`}>
+                    {formatExpenseDate(expense.expense_date)}
+                  </td>
 
-                <td className="px-6 py-4 align-top text-right text-sm font-medium text-slate-900">
-                  {formatCurrency(expense.amount)}
-                </td>
+                  <td
+                    className={`${TABLE_CELL_CLASS} text-right text-sm font-semibold text-white`}
+                  >
+                    {formatCurrency(expense.amount)}
+                  </td>
 
-                <td className="px-6 py-4 align-top">
-                  <ExpenseStatusBadge
-                    isArchived={Boolean(expense.is_archived)}
-                  />
-                </td>
+                  <td className={TABLE_CELL_CLASS}>
+                    <ExpenseStatusBadge
+                      isArchived={Boolean(expense.is_archived)}
+                    />
+                  </td>
 
-                <td className="px-6 py-4 align-top">
-                  <div className="flex justify-end gap-2">
-                    <button
-                      type="button"
-                      onClick={() => onEdit(expense)}
-                      className="rounded-lg border border-slate-300 px-3 py-1.5 text-xs font-medium text-slate-700 transition hover:bg-slate-100"
-                    >
-                      Edit
-                    </button>
-
-                    {expense.is_archived ? (
+                  <td className={TABLE_CELL_CLASS}>
+                    <div className="flex justify-end gap-2">
                       <button
                         type="button"
-                        onClick={() => onUnarchive(expense)}
-                        disabled={isUnarchiving}
-                        className="rounded-lg border border-emerald-300 px-3 py-1.5 text-xs font-medium text-emerald-700 transition hover:bg-emerald-50 disabled:cursor-not-allowed disabled:opacity-60"
+                        onClick={() => onEdit(expense)}
+                        disabled={disableEditButton}
+                        className={`${ACTION_BUTTON_BASE_CLASS} ${EDIT_BUTTON_CLASS}`}
                       >
-                        Restore
+                        Edit
                       </button>
-                    ) : (
-                      <button
-                        type="button"
-                        onClick={() => onArchive(expense)}
-                        disabled={isArchiving}
-                        className="rounded-lg border border-amber-300 px-3 py-1.5 text-xs font-medium text-amber-700 transition hover:bg-amber-50 disabled:cursor-not-allowed disabled:opacity-60"
-                      >
-                        Archive
-                      </button>
-                    )}
-                  </div>
-                </td>
-              </tr>
-            ))}
+
+                      {expense.is_archived ? (
+                        <button
+                          type="button"
+                          onClick={() => onUnarchive(expense)}
+                          disabled={disableRestoreButton}
+                          className={`${ACTION_BUTTON_BASE_CLASS} ${RESTORE_BUTTON_CLASS}`}
+                        >
+                          {disableRestoreButton ? "Restoring..." : "Restore"}
+                        </button>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => onArchive(expense)}
+                          disabled={disableArchiveButton}
+                          className={`${ACTION_BUTTON_BASE_CLASS} ${ARCHIVE_BUTTON_CLASS}`}
+                        >
+                          {disableArchiveButton ? "Archiving..." : "Archive"}
+                        </button>
+                      )}
+                    </div>
+                  </td>
+                </tr>
+              );
+            })}
           </tbody>
         </table>
       </div>
-    </section>
+
+      {canRenderPagination ? (
+        <ExpensesTablePaginationFooter
+          page={page}
+          pageSize={pageSize}
+          totalCount={totalExpenseCount}
+          itemLabel="expense"
+          isFetching={isPaginationFetching}
+          onPrevious={onPreviousPage}
+          onNext={onNextPage}
+        />
+      ) : null}
+    </>
   );
 }

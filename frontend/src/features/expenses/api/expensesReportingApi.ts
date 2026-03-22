@@ -5,13 +5,18 @@
 import api from "../../../api/axios";
 
 import type {
+  ExpenseByBuildingPoint,
   ExpenseByBuildingResponse,
+  ExpenseByCategoryPoint,
   ExpenseByCategoryResponse,
   ExpenseDashboardResponse,
   ExpenseListFilters,
+  ExpenseMonthlyTrendPoint,
   ExpenseMonthlyTrendResponse,
 } from "./expensesTypes";
 import { buildExpenseListParams } from "./expensesReadApi";
+
+const EXPENSES_API_PREFIX = "/api/v1";
 
 /**
  * Reporting-surface endpoint registry for the Expenses feature.
@@ -21,12 +26,138 @@ import { buildExpenseListParams } from "./expensesReadApi";
  * endpoint into a junk drawer.
  */
 export const EXPENSES_REPORTING_ENDPOINTS = {
-  root: "/expense-reporting/",
-  dashboard: "/expense-reporting/dashboard/",
-  monthlyTrend: "/expense-reporting/monthly-trend/",
-  byCategory: "/expense-reporting/by-category/",
-  byBuilding: "/expense-reporting/by-building/",
+  root: `${EXPENSES_API_PREFIX}/expense-reporting/`,
+  dashboard: `${EXPENSES_API_PREFIX}/expense-reporting/dashboard/`,
+  monthlyTrend: `${EXPENSES_API_PREFIX}/expense-reporting/monthly-trend/`,
+  byCategory: `${EXPENSES_API_PREFIX}/expense-reporting/by-category/`,
+  byBuilding: `${EXPENSES_API_PREFIX}/expense-reporting/by-building/`,
 } as const;
+
+/**
+ * Type guard for plain object-like API payloads.
+ *
+ * @param value Unknown API payload.
+ * @returns True when the payload is a non-null object and not an array.
+ */
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+/**
+ * Normalizes a dashboard response into a safe object shape.
+ *
+ * The dashboard endpoint should conceptually return an object, but while
+ * the slice is evolving we protect the UI from null/unsupported payloads.
+ *
+ * @param payload Raw API payload.
+ * @returns Safe dashboard object for the hook/UI layer.
+ */
+function normalizeDashboardPayload(payload: unknown): ExpenseDashboardResponse {
+  // # Step 1: Accept valid object payloads as-is.
+  if (isRecord(payload)) {
+    return payload as ExpenseDashboardResponse;
+  }
+
+  // # Step 2: Fall back to an empty object so the UI can render an honest
+  // sparse state instead of crashing or treating the response as invalid.
+  return {};
+}
+
+/**
+ * Normalizes a trend payload into a collection-bearing response.
+ *
+ * Supports:
+ * - plain array payloads
+ * - object payloads with results/points/items/data
+ * - null/unsupported payloads
+ *
+ * @param payload Raw API payload.
+ * @returns Safe monthly trend response.
+ */
+function normalizeMonthlyTrendPayload(
+  payload: unknown,
+): ExpenseMonthlyTrendResponse {
+  // # Step 1: Wrap plain arrays into a stable collection key.
+  if (Array.isArray(payload)) {
+    return {
+      results: payload as ExpenseMonthlyTrendPoint[],
+    };
+  }
+
+  // # Step 2: Accept object payloads as-is.
+  if (isRecord(payload)) {
+    return payload as ExpenseMonthlyTrendResponse;
+  }
+
+  // # Step 3: Return an empty collection shape for sparse/invalid payloads.
+  return {
+    results: [],
+  };
+}
+
+/**
+ * Normalizes a category breakdown payload into a collection-bearing response.
+ *
+ * Supports:
+ * - plain array payloads
+ * - object payloads with results/points/items/data
+ * - null/unsupported payloads
+ *
+ * @param payload Raw API payload.
+ * @returns Safe category breakdown response.
+ */
+function normalizeByCategoryPayload(
+  payload: unknown,
+): ExpenseByCategoryResponse {
+  // # Step 1: Wrap plain arrays into a stable collection key.
+  if (Array.isArray(payload)) {
+    return {
+      results: payload as ExpenseByCategoryPoint[],
+    };
+  }
+
+  // # Step 2: Accept object payloads as-is.
+  if (isRecord(payload)) {
+    return payload as ExpenseByCategoryResponse;
+  }
+
+  // # Step 3: Return an empty collection shape for sparse/invalid payloads.
+  return {
+    results: [],
+  };
+}
+
+/**
+ * Normalizes a building breakdown payload into a collection-bearing response.
+ *
+ * Supports:
+ * - plain array payloads
+ * - object payloads with results/points/items/data
+ * - null/unsupported payloads
+ *
+ * @param payload Raw API payload.
+ * @returns Safe building breakdown response.
+ */
+function normalizeByBuildingPayload(
+  payload: unknown,
+): ExpenseByBuildingResponse {
+  // # Step 1: Wrap plain arrays into a stable collection key.
+  if (Array.isArray(payload)) {
+    return {
+      results: payload as ExpenseByBuildingPoint[],
+    };
+  }
+
+  // # Step 2: Accept object payloads as-is.
+  if (isRecord(payload)) {
+    return payload as ExpenseByBuildingResponse;
+  }
+
+  // # Step 3: Return an empty collection shape for sparse/invalid payloads.
+  return {
+    results: [],
+  };
+}
 
 /**
  * Fetches the expense dashboard summary payload.
@@ -41,12 +172,12 @@ export async function getExpenseDashboard(
   const params = buildExpenseListParams(filters);
 
   // # Step 2: Request the dashboard reporting endpoint.
-  const response = await api.get<ExpenseDashboardResponse>(
-    EXPENSES_REPORTING_ENDPOINTS.dashboard,
-    { params },
-  );
+  const response = await api.get<unknown>(EXPENSES_REPORTING_ENDPOINTS.dashboard, {
+    params,
+  });
 
-  return response.data;
+  // # Step 3: Normalize sparse/variable payloads before they reach the UI.
+  return normalizeDashboardPayload(response.data);
 }
 
 /**
@@ -62,12 +193,13 @@ export async function getExpenseMonthlyTrend(
   const params = buildExpenseListParams(filters);
 
   // # Step 2: Request the monthly trend reporting endpoint.
-  const response = await api.get<ExpenseMonthlyTrendResponse>(
+  const response = await api.get<unknown>(
     EXPENSES_REPORTING_ENDPOINTS.monthlyTrend,
     { params },
   );
 
-  return response.data;
+  // # Step 3: Normalize sparse/variable payloads before they reach the UI.
+  return normalizeMonthlyTrendPayload(response.data);
 }
 
 /**
@@ -83,12 +215,13 @@ export async function getExpenseByCategory(
   const params = buildExpenseListParams(filters);
 
   // # Step 2: Request the category breakdown reporting endpoint.
-  const response = await api.get<ExpenseByCategoryResponse>(
+  const response = await api.get<unknown>(
     EXPENSES_REPORTING_ENDPOINTS.byCategory,
     { params },
   );
 
-  return response.data;
+  // # Step 3: Normalize sparse/variable payloads before they reach the UI.
+  return normalizeByCategoryPayload(response.data);
 }
 
 /**
@@ -104,10 +237,11 @@ export async function getExpenseByBuilding(
   const params = buildExpenseListParams(filters);
 
   // # Step 2: Request the building breakdown reporting endpoint.
-  const response = await api.get<ExpenseByBuildingResponse>(
+  const response = await api.get<unknown>(
     EXPENSES_REPORTING_ENDPOINTS.byBuilding,
     { params },
   );
 
-  return response.data;
+  // # Step 3: Normalize sparse/variable payloads before they reach the UI.
+  return normalizeByBuildingPayload(response.data);
 }

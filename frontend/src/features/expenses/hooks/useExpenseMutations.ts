@@ -12,6 +12,7 @@ import {
 import type {
   CreateExpensePayload,
   EntityId,
+  ExpenseDetail,
   UpdateExpensePayload,
 } from "../api/expensesTypes";
 
@@ -63,7 +64,7 @@ export function useCreateExpenseMutation() {
 
   return useMutation({
     mutationFn: async (payload: CreateExpensePayload) => createExpense(payload),
-    onSuccess: async (createdExpense) => {
+    onSuccess: async (createdExpense: ExpenseDetail) => {
       // # Step 1: Invalidate list and reporting caches.
       await invalidateExpenseCaches(queryClient, createdExpense.id);
     },
@@ -92,7 +93,7 @@ export function useUpdateExpenseMutation() {
   return useMutation({
     mutationFn: async ({ expenseId, payload }: UpdateExpenseMutationInput) =>
       updateExpense(expenseId, payload),
-    onSuccess: async (updatedExpense) => {
+    onSuccess: async (updatedExpense: ExpenseDetail) => {
       // # Step 1: Invalidate caches affected by the updated record.
       await invalidateExpenseCaches(queryClient, updatedExpense.id);
     },
@@ -112,7 +113,7 @@ export function useArchiveExpenseMutation() {
 
   return useMutation({
     mutationFn: async (expenseId: EntityId) => archiveExpense(expenseId),
-    onSuccess: async (archivedExpense) => {
+    onSuccess: async (archivedExpense: ExpenseDetail) => {
       // # Step 1: Invalidate caches affected by archive state change.
       await invalidateExpenseCaches(queryClient, archivedExpense.id);
     },
@@ -131,9 +132,89 @@ export function useUnarchiveExpenseMutation() {
 
   return useMutation({
     mutationFn: async (expenseId: EntityId) => unarchiveExpense(expenseId),
-    onSuccess: async (restoredExpense) => {
+    onSuccess: async (restoredExpense: ExpenseDetail) => {
       // # Step 1: Invalidate caches affected by unarchive state change.
       await invalidateExpenseCaches(queryClient, restoredExpense.id);
     },
   });
+}
+
+/**
+ * Aggregated mutation contract for the Expenses page orchestration layer.
+ *
+ * Why this exists:
+ * The page should not need to manually wire four separate mutation hooks
+ * every time it wants to support create, edit, archive, and restore flows.
+ *
+ * This hook keeps the individual mutation hooks reusable while also giving
+ * the page a clean, production-friendly orchestration surface.
+ */
+export interface ExpenseMutationsBundle {
+  createExpense: (payload: CreateExpensePayload) => Promise<ExpenseDetail>;
+  updateExpense: (
+    input: UpdateExpenseMutationInput,
+  ) => Promise<ExpenseDetail>;
+  archiveExpense: (expenseId: EntityId) => Promise<ExpenseDetail>;
+  unarchiveExpense: (expenseId: EntityId) => Promise<ExpenseDetail>;
+  isCreating: boolean;
+  isUpdating: boolean;
+  isArchiving: boolean;
+  isUnarchiving: boolean;
+  isSubmitting: boolean;
+  createError: Error | null;
+  updateError: Error | null;
+  archiveError: Error | null;
+  unarchiveError: Error | null;
+}
+
+/**
+ * Bundles all expense mutations into one page-friendly orchestration hook.
+ *
+ * This is especially useful for:
+ * - ExpensesPage
+ * - useExpensesPageActions
+ * - table row action handlers
+ * - create/edit panel submit handlers
+ *
+ * @returns Aggregated mutation actions and state flags.
+ */
+export function useExpenseMutations(): ExpenseMutationsBundle {
+  const createMutation = useCreateExpenseMutation();
+  const updateMutation = useUpdateExpenseMutation();
+  const archiveMutation = useArchiveExpenseMutation();
+  const unarchiveMutation = useUnarchiveExpenseMutation();
+
+  return {
+    // # Step 1: Expose promise-based mutation executors.
+    createExpense: async (payload: CreateExpensePayload) =>
+      await createMutation.mutateAsync(payload),
+
+    updateExpense: async (input: UpdateExpenseMutationInput) =>
+      await updateMutation.mutateAsync(input),
+
+    archiveExpense: async (expenseId: EntityId) =>
+      await archiveMutation.mutateAsync(expenseId),
+
+    unarchiveExpense: async (expenseId: EntityId) =>
+      await unarchiveMutation.mutateAsync(expenseId),
+
+    // # Step 2: Expose operation-specific loading state.
+    isCreating: createMutation.isPending,
+    isUpdating: updateMutation.isPending,
+    isArchiving: archiveMutation.isPending,
+    isUnarchiving: unarchiveMutation.isPending,
+
+    // # Step 3: Expose aggregate submit state for form/action locking.
+    isSubmitting:
+      createMutation.isPending ||
+      updateMutation.isPending ||
+      archiveMutation.isPending ||
+      unarchiveMutation.isPending,
+
+    // # Step 4: Expose typed errors for page-level messaging.
+    createError: (createMutation.error as Error | null) ?? null,
+    updateError: (updateMutation.error as Error | null) ?? null,
+    archiveError: (archiveMutation.error as Error | null) ?? null,
+    unarchiveError: (unarchiveMutation.error as Error | null) ?? null,
+  };
 }

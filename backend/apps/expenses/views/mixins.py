@@ -24,15 +24,13 @@ class OrganizationScopedViewMixin:
     permission_classes = [permissions.IsAuthenticated]
 
     def _get_request_organization(self) -> Any:
-        """Return the organization resolved for the current request.
+        """Return the organization resolved for the current request."""
+        organization = getattr(self.request, "organization", None) or getattr(
+            self.request,
+            "org",
+            None,
+        )
 
-        Returns:
-            Any: Organization instance attached to the request.
-
-        Raises:
-            PermissionDenied: If no organization is available on the request.
-        """
-        organization = getattr(self.request, "organization", None)
         if organization is None:
             raise PermissionDenied("No organization was resolved for this request.")
 

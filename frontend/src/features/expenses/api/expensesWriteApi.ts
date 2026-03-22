@@ -1,5 +1,6 @@
 // # Filename: src/features/expenses/api/expensesWriteApi.ts
 
+
 import api from "../../../api/axios";
 
 import type {
@@ -9,6 +10,8 @@ import type {
   UpdateExpensePayload,
 } from "./expensesTypes";
 
+const EXPENSES_API_PREFIX = "/api/v1";
+
 /**
  * Write-surface endpoint registry for the Expenses feature.
  *
@@ -17,7 +20,7 @@ import type {
  * backend mutation URLs.
  */
 export const EXPENSES_WRITE_ENDPOINTS = {
-  expenses: "/expenses/",
+  expenses: `${EXPENSES_API_PREFIX}/expenses/`,
 } as const;
 
 /**
@@ -40,11 +43,6 @@ export async function createExpense(
 
 /**
  * Partially updates an existing expense record.
- *
- * PATCH is the safest default here because:
- * - edit forms often submit changed fields only
- * - it avoids forcing the page layer to reconstruct a full object
- * - it aligns well with production-safe incremental updates
  *
  * @param expenseId Expense primary key.
  * @param payload Partial expense update payload.

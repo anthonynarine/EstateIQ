@@ -7,6 +7,20 @@ interface ExpensesContentProps {
   tableSection: ReactNode;
 }
 
+/**
+ * Two-column layout shell for the Expenses page.
+ *
+ * Responsibilities:
+ * - keep the form and records table visually separated
+ * - provide a responsive single-column fallback on smaller screens
+ * - keep the form section sticky on larger screens during record review
+ *
+ * This component is intentionally layout-only.
+ * It should not own any data fetching, mutation logic, or page state.
+ *
+ * @param props Render props for the form and table regions.
+ * @returns Responsive page content layout for the Expenses slice.
+ */
 export default function ExpensesContent({
   formSection,
   tableSection,

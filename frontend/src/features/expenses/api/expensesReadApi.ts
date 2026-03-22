@@ -14,63 +14,39 @@ import type {
   PaginatedResponse,
 } from "./expensesTypes";
 
-/**
- * Read-surface endpoint registry for the Expenses feature.
- *
- * Keep backend route strings centralized here so that:
- * - hooks stay clean
- * - page/components never hardcode API paths
- * - contract changes are isolated to one layer
- *
- * Update these paths here only if your DRF router names differ.
- */
- export const EXPENSES_READ_ENDPOINTS = {
-  expenses: "/expenses/",
-  categories: "/expense-categories/",
-  vendors: "/vendors/",
-} as const;
+const EXPENSES_API_PREFIX = "/api/v1";
 
 /**
- * Normalized list response returned to the hook layer.
- *
- * This lets the UI consume expense/category/vendor collections consistently
- * whether the backend returns:
- * - a plain array
- * - or a DRF paginated payload
+ * Read-surface endpoint registry for the Expenses feature.
  */
+export const EXPENSES_READ_ENDPOINTS = {
+  expenses: `${EXPENSES_API_PREFIX}/expenses/`,
+  categories: `${EXPENSES_API_PREFIX}/expense-categories/`,
+  vendors: `${EXPENSES_API_PREFIX}/vendors/`,
+} as const;
+
 export interface NormalizedCollectionResult<T> {
   items: T[];
-  count: number | null;
+  count: number;
   next: string | null;
   previous: string | null;
   isPaginated: boolean;
 }
 
-/**
- * Type guard for the common DRF paginated response shape.
- *
- * @param value Unknown collection payload from the API.
- * @returns True when the payload matches DRF pagination structure.
- */
-export function isPaginatedResponse<T>(
-  value: CollectionResponse<T>,
-): value is PaginatedResponse<T> {
+function isPaginatedResponse<T>(
+  payload: CollectionResponse<T>,
+): payload is PaginatedResponse<T> {
   return (
-    typeof value === "object" &&
-    value !== null &&
-    "results" in value &&
-    Array.isArray((value as PaginatedResponse<T>).results)
+    typeof payload === "object" &&
+    payload !== null &&
+    "results" in payload &&
+    "count" in payload &&
+    Array.isArray(payload.results)
   );
 }
 
 /**
- * Builds safe axios params from frontend expense filter state.
- *
- * Rules:
- * - omit undefined
- * - omit null
- * - omit empty strings
- * - preserve false and 0 because they are valid query values
+ * Builds a clean backend-safe params object from page filters.
  *
  * @param filters Raw filter state from the page layer.
  * @returns Clean query params object for axios.
@@ -106,13 +82,8 @@ export function buildExpenseListParams(
 /**
  * Normalizes collection responses into one stable frontend shape.
  *
- * Supported backend list shapes:
- * - plain array
- * - DRF paginated response
- *
  * @param payload Raw API response payload.
  * @returns Normalized list result.
- * @throws Error when the backend returns an unsupported shape.
  */
 export function normalizeCollectionResponse<T>(
   payload: CollectionResponse<T>,
@@ -139,7 +110,7 @@ export function normalizeCollectionResponse<T>(
     };
   }
 
-  // # Step 3: Fail loudly if the contract is not one of the supported shapes.
+  // # Step 3: Fail loudly if the contract is unsupported.
   throw new Error("Unsupported collection response shape received from API.");
 }
 
