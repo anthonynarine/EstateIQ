@@ -146,12 +146,18 @@ export function useExpensesPageData(
 
       // # Step 3: Archived-only mode should only send true when active.
       is_archived: pageState.showArchivedOnly ? true : undefined,
+
+      // # Step 4: Send backend pagination params from page-local state.
+      page: pageState.page,
+      page_size: pageState.pageSize,
     };
   }, [
     pageState.searchInput,
     pageState.selectedCategoryId,
     pageState.selectedVendorId,
     pageState.showArchivedOnly,
+    pageState.page,
+    pageState.pageSize,
   ]);
 
   const reportingFilters = useMemo<ExpenseListFilters>(() => {
@@ -172,8 +178,11 @@ export function useExpensesPageData(
   const byCategoryQuery = useExpenseByCategory(reportingFilters);
   const byBuildingQuery = useExpenseByBuilding(reportingFilters);
 
+  // # Step 1: Use the normalized collection result from the API client.
   const expenses = expenseListQuery.data?.items ?? [];
-  const totalExpenseCount = expenseListQuery.data?.count ?? expenses.length;
+
+  // # Step 2: Use backend count as the source of truth.
+  const totalExpenseCount = expenseListQuery.data?.count ?? 0;
 
   const reportingRecordCountHint = useMemo<number | null>(() => {
     // # Step 1: Only reuse the list count when it matches reporting scope.
@@ -183,7 +192,11 @@ export function useExpensesPageData(
 
     // # Step 2: Provide a stable fallback signal for partial reporting UI.
     return totalExpenseCount;
-  }, [pageState, totalExpenseCount]);
+  }, [
+    pageState.searchInput,
+    pageState.showArchivedOnly,
+    totalExpenseCount,
+  ]);
 
   const categories = categoriesQuery.data ?? [];
   const vendors = vendorsQuery.data ?? [];

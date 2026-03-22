@@ -32,3 +32,8 @@ class LeaseHistoryPagination(StandardResultsSetPagination):
     """Pagination for lease history collections."""
 
     page_size = 5
+    
+class ExpensesPagination(StandardResultsSetPagination):
+    """Pagination policy for the expenses records workspace."""
+
+    page_size = 6

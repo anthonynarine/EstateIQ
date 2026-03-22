@@ -4,6 +4,7 @@
 
 import ExpensesTable from "../../components/ExpensesTable";
 import type { EntityId, ExpenseListItem } from "../../api/expensesTypes";
+import ExpensesTablePaginationFooter from "../../components/ExpensesTablePaginationFooter";
 
 interface ExpensesTableSectionProps {
   expenses: ExpenseListItem[];
@@ -18,17 +19,17 @@ interface ExpensesTableSectionProps {
   processingExpenseId?: EntityId | null;
 
   /**
-   * Optional pagination props.
+   * Pagination props.
    *
-   * These are intentionally optional so we can land the UI shell now
-   * and wire real pagination from page state/data in the next step.
+   * These are optional so the section can still render safely even if the
+   * parent has not wired pagination yet.
    */
   totalExpenseCount?: number;
   page?: number;
   pageSize?: number;
-  totalPages?: number;
   onPreviousPage?: () => void;
   onNextPage?: () => void;
+  isListFetching?: boolean;
 }
 
 const SHELL_CLASS =
@@ -56,46 +57,6 @@ const LOADING_SHELL_CLASS =
 const ERROR_SHELL_CLASS =
   "rounded-3xl border border-red-500/20 bg-red-500/10 p-5 shadow-[0_0_0_1px_rgba(255,255,255,0.02)]";
 
-const FOOTER_CLASS =
-  "flex flex-col gap-3 border-t border-neutral-800 px-4 py-4 sm:px-5 sm:flex-row sm:items-center sm:justify-between";
-
-const FOOTER_TEXT_CLASS = "text-sm text-neutral-400";
-
-const PAGINATION_GROUP_CLASS = "flex items-center gap-2";
-const PAGINATION_BUTTON_CLASS =
-  "inline-flex items-center justify-center rounded-2xl border border-neutral-800 bg-neutral-900 px-3.5 py-2 text-sm font-medium text-neutral-200 transition hover:bg-neutral-800 disabled:cursor-not-allowed disabled:opacity-50";
-
-const PAGE_BADGE_CLASS =
-  "inline-flex items-center rounded-2xl border border-neutral-800 bg-neutral-900 px-3.5 py-2 text-sm font-medium text-neutral-300";
-
-/**
- * Builds a human-readable visible record range for the pagination footer.
- *
- * @param page Current page number.
- * @param pageSize Current page size.
- * @param totalExpenseCount Total number of matching expense records.
- * @param visibleRowCount Number of rows currently rendered on this page.
- * @returns Visible range summary string.
- */
-function getVisibleRangeLabel(
-  page: number,
-  pageSize: number,
-  totalExpenseCount: number,
-  visibleRowCount: number,
-): string {
-  // # Step 1: Guard against empty datasets.
-  if (totalExpenseCount === 0 || visibleRowCount === 0) {
-    return "Showing 0 expenses";
-  }
-
-  // # Step 2: Compute the first and last visible row index.
-  const start = (page - 1) * pageSize + 1;
-  const end = Math.min(start + visibleRowCount - 1, totalExpenseCount);
-
-  // # Step 3: Return a concise human-readable label.
-  return `Showing ${start}-${end} of ${totalExpenseCount} expenses`;
-}
-
 /**
  * Returns the best available count label for the records header badge.
  *
@@ -118,13 +79,8 @@ function getCountBadgeLabel(
  * - provide the records workspace shell
  * - handle loading and error states
  * - render page-level lookup warnings
- * - expose a pagination footer when page data is available
- * - keep actual row rendering delegated to `ExpensesTable`
- *
- * Important note:
- * This file owns the section shell and pagination container.
- * Column reduction and row-level visual simplification belong in
- * `ExpensesTable.tsx`, which should be patched next.
+ * - delegate row rendering to `ExpensesTable`
+ * - delegate footer rendering to `ExpensesTablePaginationFooter`
  *
  * @param props Section props for the expense records area.
  * @returns Expense records section UI.
@@ -143,11 +99,11 @@ export default function ExpensesTableSection({
   totalExpenseCount,
   page,
   pageSize,
-  totalPages,
   onPreviousPage,
   onNextPage,
+  isListFetching = false,
 }: ExpensesTableSectionProps) {
-  // # Step 1: Render loading state in the new dark shell.
+  // # Step 1: Render loading state in the dark shell.
   if (isLoading) {
     return (
       <section className={LOADING_SHELL_CLASS}>
@@ -168,7 +124,7 @@ export default function ExpensesTableSection({
     );
   }
 
-  // # Step 2: Render error state in the new dark shell.
+  // # Step 2: Render error state in the dark shell.
   if (listErrorMessage) {
     return (
       <section className={ERROR_SHELL_CLASS}>
@@ -186,9 +142,7 @@ export default function ExpensesTableSection({
   const canRenderPagination =
     typeof page === "number" &&
     typeof pageSize === "number" &&
-    typeof totalPages === "number" &&
     typeof totalExpenseCount === "number" &&
-    totalPages > 0 &&
     typeof onPreviousPage === "function" &&
     typeof onNextPage === "function";
 
@@ -227,40 +181,15 @@ export default function ExpensesTableSection({
         />
 
         {canRenderPagination ? (
-          <div className={FOOTER_CLASS}>
-            <p className={FOOTER_TEXT_CLASS}>
-              {getVisibleRangeLabel(
-                page,
-                pageSize,
-                totalExpenseCount,
-                expenses.length,
-              )}
-            </p>
-
-            <div className={PAGINATION_GROUP_CLASS}>
-              <button
-                type="button"
-                onClick={onPreviousPage}
-                disabled={page <= 1}
-                className={PAGINATION_BUTTON_CLASS}
-              >
-                Previous
-              </button>
-
-              <div className={PAGE_BADGE_CLASS}>
-                Page {page} of {totalPages}
-              </div>
-
-              <button
-                type="button"
-                onClick={onNextPage}
-                disabled={page >= totalPages}
-                className={PAGINATION_BUTTON_CLASS}
-              >
-                Next
-              </button>
-            </div>
-          </div>
+          <ExpensesTablePaginationFooter
+            page={page}
+            pageSize={pageSize}
+            totalCount={totalExpenseCount}
+            itemLabel="expense"
+            isFetching={isListFetching}
+            onPrevious={onPreviousPage}
+            onNext={onNextPage}
+          />
         ) : null}
       </div>
     </section>

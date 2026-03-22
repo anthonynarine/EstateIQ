@@ -26,6 +26,7 @@ from rest_framework.exceptions import NotFound, ValidationError
 from rest_framework.response import Response
 
 from apps.expenses.models import Expense
+from shared.api.pagination import ExpensesPagination
 from apps.expenses.selectors import get_expense_detail, list_expenses
 from apps.expenses.serializers import (
     ExpenseArchiveSerializer,
@@ -42,6 +43,9 @@ from apps.expenses.views.mixins import OrganizationScopedViewMixin
 
 class ExpenseViewSet(OrganizationScopedViewMixin, viewsets.ModelViewSet):
     """ViewSet for expense list/detail/create/update/archive endpoints."""
+
+    # Step 1: Make the records pagination contract explicit at the view layer.
+    pagination_class = ExpensesPagination
 
     def get_queryset(self):
         """Return the org-scoped queryset for list operations."""

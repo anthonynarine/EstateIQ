@@ -1,6 +1,5 @@
 // # Filename: src/features/expenses/pages/ExpensesPage.tsx
 
-
 import { useEffect, useMemo, useState } from "react";
 
 import ExpenseReportingSection from "../components/ExpenseReportingSection";
@@ -31,8 +30,8 @@ const WORKSPACE_SECTION_CLASS = "flex flex-col gap-6";
  * - reporting = analytical workflow
  *
  * Current pagination model:
- * - client-side over the filtered records list
- * - fixed page size of 6
+ * - backend pagination for the expense records list
+ * - frontend owns current page state and navigation only
  *
  * @returns Expenses page UI.
  */
@@ -66,30 +65,19 @@ export default function ExpensesPage() {
     pageSize,
   } = pageState;
 
-  const totalExpenseCount = pageData.totalExpenseCount ?? pageData.expenses.length;
+  // # Step 6: Use backend count as the source of truth for pagination.
+  const totalExpenseCount = pageData.totalExpenseCount ?? 0;
 
   const totalPages = useMemo(() => {
     return Math.max(1, Math.ceil(totalExpenseCount / pageSize));
   }, [totalExpenseCount, pageSize]);
 
-  // # Step 6: Clamp page when the filtered result set shrinks.
+  // # Step 7: Clamp page when the filtered result set shrinks.
   useEffect(() => {
     if (page > totalPages) {
       setPage(totalPages);
     }
   }, [page, totalPages, setPage]);
-
-  // # Step 7: Reset back to page 1 when filters change.
-  useEffect(() => {
-    setPage(1);
-  }, [searchInput, selectedCategoryId, selectedVendorId, showArchivedOnly, setPage]);
-
-  const paginatedExpenses = useMemo(() => {
-    const startIndex = (page - 1) * pageSize;
-    const endIndex = startIndex + pageSize;
-
-    return pageData.expenses.slice(startIndex, endIndex);
-  }, [pageData.expenses, page, pageSize]);
 
   const handlePreviousPage = () => {
     // # Step 1: Move to the previous page without dropping below page 1.
@@ -99,6 +87,30 @@ export default function ExpensesPage() {
   const handleNextPage = () => {
     // # Step 1: Move to the next page without exceeding the last page.
     setPage((currentPage) => Math.min(totalPages, currentPage + 1));
+  };
+
+  const handleSearchChange = (value: string) => {
+    // # Step 1: Reset pagination when the search filter changes.
+    setPage(1);
+    pageState.setSearchInput(value);
+  };
+
+  const handleCategoryChange = (value: number | null) => {
+    // # Step 1: Reset pagination when the category filter changes.
+    setPage(1);
+    pageState.setSelectedCategoryId(value);
+  };
+
+  const handleVendorChange = (value: number | null) => {
+    // # Step 1: Reset pagination when the vendor filter changes.
+    setPage(1);
+    pageState.setSelectedVendorId(value);
+  };
+
+  const handleArchivedToggle = (value: boolean) => {
+    // # Step 1: Reset pagination when the archived filter changes.
+    setPage(1);
+    pageState.setShowArchivedOnly(value);
   };
 
   return (
@@ -127,10 +139,10 @@ export default function ExpensesPage() {
             totalExpenseCount={totalExpenseCount}
             categories={pageData.categories}
             vendors={pageData.vendors}
-            onSearchChange={pageState.setSearchInput}
-            onCategoryChange={pageState.setSelectedCategoryId}
-            onVendorChange={pageState.setSelectedVendorId}
-            onArchivedToggle={pageState.setShowArchivedOnly}
+            onSearchChange={handleSearchChange}
+            onCategoryChange={handleCategoryChange}
+            onVendorChange={handleVendorChange}
+            onArchivedToggle={handleArchivedToggle}
           />
 
           <ExpensesContent
@@ -150,7 +162,7 @@ export default function ExpensesPage() {
             }
             tableSection={
               <ExpensesTableSection
-                expenses={paginatedExpenses}
+                expenses={pageData.expenses}
                 isLoading={pageData.isListLoading}
                 listErrorMessage={pageData.listErrorMessage}
                 showLookupWarning={pageData.hasLookupError}
@@ -163,7 +175,7 @@ export default function ExpensesPage() {
                 totalExpenseCount={totalExpenseCount}
                 page={page}
                 pageSize={pageSize}
-                totalPages={totalPages}
+                isListFetching={pageData.expenseListQuery.isFetching}
                 onPreviousPage={handlePreviousPage}
                 onNextPage={handleNextPage}
               />
