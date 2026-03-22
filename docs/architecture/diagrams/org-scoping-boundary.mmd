@@ -1,0 +1,15 @@
+flowchart TD
+    REQ[Incoming Request]
+    AUTH[Authenticated User]
+    ORG[Resolve request.org]
+    PERM[Role / permission checks]
+    VIEW[View / endpoint]
+    SEL[Selectors]
+    SVC[Services]
+    DB[(Org-scoped querysets)]
+
+    REQ --> AUTH --> ORG --> PERM --> VIEW
+    VIEW --> SEL
+    VIEW --> SVC
+    SEL --> DB
+    SVC --> DB

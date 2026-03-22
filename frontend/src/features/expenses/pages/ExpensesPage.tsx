@@ -1,5 +1,6 @@
 // # Filename: src/features/expenses/pages/ExpensesPage.tsx
 
+
 import { useEffect, useMemo, useState } from "react";
 
 import ExpenseReportingSection from "../components/ExpenseReportingSection";
@@ -15,26 +16,11 @@ import { useExpensesPageState } from "./hooks/useExpensesPageState";
 
 const PAGE_CONTAINER_CLASS = "flex flex-col gap-6";
 const WORKSPACE_SECTION_CLASS = "flex flex-col gap-6";
+const LOOKUP_ALERT_CLASS =
+  "rounded-2xl border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-200";
+const DEV_DEBUG_CLASS =
+  "rounded-2xl border border-sky-500/20 bg-sky-500/10 px-4 py-3 text-xs text-sky-100";
 
-/**
- * Top-level orchestration page for the Expenses slice.
- *
- * Responsibilities:
- * - own page-local workspace state
- * - compose page state, query data, and mutation actions
- * - route the user between Records and Reporting workspaces
- * - keep orchestration here and feature rendering in child components
- *
- * Workspace model:
- * - records = operational workflow
- * - reporting = analytical workflow
- *
- * Current pagination model:
- * - backend pagination for the expense records list
- * - frontend owns current page state and navigation only
- *
- * @returns Expenses page UI.
- */
 export default function ExpensesPage() {
   // # Step 1: Build page-local UI state.
   const pageState = useExpensesPageState();
@@ -131,6 +117,23 @@ export default function ExpensesPage() {
           className={WORKSPACE_SECTION_CLASS}
           aria-label="Expense records workspace"
         >
+          {pageData.lookupErrorMessage ? (
+            <div className={LOOKUP_ALERT_CLASS}>
+              Failed to load expense lookup options: {pageData.lookupErrorMessage}
+            </div>
+          ) : null}
+
+          <div className={DEV_DEBUG_CLASS}>
+            <div>categories count: {pageData.categories.length}</div>
+            <div>vendors count: {pageData.vendors.length}</div>
+            <div>categories query status: {pageData.categoriesQuery.status}</div>
+            <div>vendors query status: {pageData.vendorsQuery.status}</div>
+            <div>
+              categories fetch status: {pageData.categoriesQuery.fetchStatus}
+            </div>
+            <div>vendors fetch status: {pageData.vendorsQuery.fetchStatus}</div>
+          </div>
+
           <ExpensesFiltersBar
             searchInput={searchInput}
             selectedCategoryId={selectedCategoryId}

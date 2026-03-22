@@ -1,0 +1,10 @@
+flowchart LR
+    LEASE[Lease]
+    CHARGE[Charge]
+    PAYMENT[Payment]
+    ALLOC[Allocation]
+
+    LEASE --> CHARGE
+    LEASE --> PAYMENT
+    PAYMENT --> ALLOC
+    CHARGE --> ALLOC

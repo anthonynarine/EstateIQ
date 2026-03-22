@@ -16,20 +16,50 @@ import {
   listExpenses,
 } from "../api/expensesReadApi";
 import type {
+  CollectionResponse,
   EntityId,
   ExpenseByBuildingPoint,
   ExpenseByBuildingResponse,
   ExpenseByCategoryPoint,
   ExpenseByCategoryResponse,
+  ExpenseCategoryOption,
   ExpenseDashboardResponse,
   ExpenseListFilters,
   ExpenseMonthlyTrendPoint,
   ExpenseMonthlyTrendResponse,
+  ExpenseVendorOption,
 } from "../api/expensesTypes";
 
 const LOOKUP_STALE_TIME_MS = 1000 * 60 * 5;
 const DETAIL_STALE_TIME_MS = 1000 * 60;
 const REPORTING_STALE_TIME_MS = 1000 * 30;
+
+/**
+ * Safely normalizes a collection response into a plain array.
+ *
+ * Supports both:
+ * - direct array responses
+ * - DRF paginated responses with `results`
+ *
+ * @param response Raw collection payload from the API.
+ * @returns A stable array for UI consumers.
+ */
+function normalizeCollectionResponse<T>(
+  response: CollectionResponse<T> | undefined | null,
+): T[] {
+  // # Step 1: Treat missing data as an empty array.
+  if (!response) {
+    return [];
+  }
+
+  // # Step 2: Support non-paginated list responses.
+  if (Array.isArray(response)) {
+    return response;
+  }
+
+  // # Step 3: Support DRF paginated list responses.
+  return response.results ?? [];
+}
 
 /**
  * Normalizes dashboard payload shape so UI components can safely assume
@@ -110,14 +140,6 @@ function normalizeExpenseByBuildingResponse(
 /**
  * Query hook for the expense list surface.
  *
- * This hook owns:
- * - expense list retrieval
- * - expense list cache identity
- * - expense list filter-aware refetching
- *
- * `placeholderData: keepPreviousData` keeps the table stable while page
- * filters change and the next request is in flight.
- *
  * @param filters Optional page-level list filters.
  * @returns TanStack Query result for the expense list.
  */
@@ -131,10 +153,6 @@ export function useExpenseList(filters?: ExpenseListFilters) {
 
 /**
  * Query hook for a single expense detail record.
- *
- * The hook is disabled until a valid expense ID is present.
- * This avoids accidental requests when the page is still in create mode
- * or when an edit target has not been selected yet.
  *
  * @param expenseId Expense primary key.
  * @returns TanStack Query result for a single expense record.
@@ -151,9 +169,7 @@ export function useExpenseDetail(expenseId?: EntityId | null) {
 /**
  * Query hook for expense category lookup options.
  *
- * Used by:
- * - create/edit forms
- * - filter controls
+ * Always returns a plain array regardless of backend pagination shape.
  *
  * @returns TanStack Query result for expense categories.
  */
@@ -161,6 +177,9 @@ export function useExpenseCategories() {
   return useQuery({
     queryKey: expenseQueryKeys.categories(),
     queryFn: async () => await listExpenseCategories(),
+    select: (
+      response: CollectionResponse<ExpenseCategoryOption>,
+    ): ExpenseCategoryOption[] => normalizeCollectionResponse(response),
     staleTime: LOOKUP_STALE_TIME_MS,
   });
 }
@@ -168,9 +187,7 @@ export function useExpenseCategories() {
 /**
  * Query hook for expense vendor lookup options.
  *
- * Used by:
- * - create/edit forms
- * - filter controls
+ * Always returns a plain array regardless of backend pagination shape.
  *
  * @returns TanStack Query result for expense vendors.
  */
@@ -178,18 +195,15 @@ export function useExpenseVendors() {
   return useQuery({
     queryKey: expenseQueryKeys.vendors(),
     queryFn: async () => await listExpenseVendors(),
+    select: (
+      response: CollectionResponse<ExpenseVendorOption>,
+    ): ExpenseVendorOption[] => normalizeCollectionResponse(response),
     staleTime: LOOKUP_STALE_TIME_MS,
   });
 }
 
 /**
  * Query hook for the expense dashboard reporting payload.
- *
- * This stays separate from CRUD query logic even if both surfaces appear
- * on the same page.
- *
- * The response is normalized so downstream UI code can assume a stable
- * `metrics` array.
  *
  * @param filters Optional reporting filters from the page layer.
  * @returns TanStack Query result for dashboard metrics.
@@ -207,9 +221,6 @@ export function useExpenseDashboard(filters?: ExpenseListFilters) {
 /**
  * Query hook for monthly expense trend data.
  *
- * The response is normalized so chart components can always read from
- * `points` even when the backend returns `results`.
- *
  * @param filters Optional reporting filters from the page layer.
  * @returns TanStack Query result for monthly trend reporting.
  */
@@ -226,9 +237,6 @@ export function useExpenseMonthlyTrend(filters?: ExpenseListFilters) {
 /**
  * Query hook for category breakdown reporting.
  *
- * The response is normalized so tables/charts can consistently read from
- * `points`.
- *
  * @param filters Optional reporting filters from the page layer.
  * @returns TanStack Query result for expense-by-category reporting.
  */
@@ -244,9 +252,6 @@ export function useExpenseByCategory(filters?: ExpenseListFilters) {
 
 /**
  * Query hook for building breakdown reporting.
- *
- * The response is normalized so tables/charts can consistently read from
- * `points`.
  *
  * @param filters Optional reporting filters from the page layer.
  * @returns TanStack Query result for expense-by-building reporting.

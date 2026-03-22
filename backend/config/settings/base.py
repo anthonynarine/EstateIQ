@@ -101,7 +101,7 @@ INSTALLED_APPS = [
     "rest_framework_simplejwt.token_blacklist",
     "corsheaders",
     # Step 3: Local apps
-    "apps.core",
+    "apps.core.apps.CoreConfig",
     "apps.users",
     "apps.buildings",
     "apps.leases",

@@ -1,0 +1,16 @@
+flowchart TD
+    EXP[Expense]
+    SCOPE{Scope}
+    ORG[Organization-scoped]
+    BLDG[Building-scoped]
+    UNIT[Unit-scoped]
+    LEASE[Lease-scoped]
+
+    EXP --> SCOPE
+    SCOPE --> ORG
+    SCOPE --> BLDG
+    SCOPE --> UNIT
+    SCOPE --> LEASE
+
+    LEASE -->|derive and persist| UNIT
+    UNIT -->|belongs to| BLDG
