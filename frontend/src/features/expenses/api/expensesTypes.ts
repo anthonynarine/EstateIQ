@@ -346,3 +346,34 @@ export interface ExpenseByBuildingResponse {
   data?: ExpenseByBuildingPoint[];
   [key: string]: unknown;
 }
+
+/**
+ * Full vendor record shape returned by vendor create/detail endpoints.
+ *
+ * This extends the lightweight dropdown option shape with the richer
+ * fields exposed by the backend CRUD serializer.
+ */
+export interface ExpenseVendorRecord extends ExpenseVendorOption {
+  vendor_type?: string | null;
+  vendor_type_label?: string | null;
+  contact_name?: string | null;
+  notes?: string | null;
+  created_at?: string;
+  updated_at?: string;
+}
+
+/**
+ * Payload used when creating a vendor from the expense flow.
+ *
+ * Organization is intentionally omitted because the backend resolves
+ * and enforces org scope from the current request context.
+ */
+export interface CreateVendorPayload {
+  name: string;
+  vendor_type?: string;
+  contact_name?: string;
+  email?: string;
+  phone?: string;
+  notes?: string;
+  is_active?: boolean;
+}

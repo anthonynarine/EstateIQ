@@ -1,6 +1,7 @@
 // # Filename: src/features/expenses/components/expense-form/ExpenseFormActions.tsx
+// ✅ New Code
 
-
+import { PlusCircle, Check } from "lucide-react";
 
 interface ExpenseFormActionsProps {
   mode: "create" | "edit";
@@ -13,13 +14,23 @@ export default function ExpenseFormActions({
   isSubmitting = false,
   onCancel,
 }: ExpenseFormActionsProps) {
+  const isCreateMode = mode === "create";
+
+  const buttonLabel = isSubmitting
+    ? isCreateMode
+      ? "Creating..."
+      : "Saving..."
+    : isCreateMode
+      ? "Create Expense"
+      : "Save Changes";
+
   return (
-    <div className="flex flex-wrap items-center justify-end gap-3 border-t border-slate-200 pt-4">
+    <div className="mt-auto flex flex-col gap-2 pt-1 sm:flex-row sm:items-center sm:justify-center">
       {onCancel ? (
         <button
           type="button"
           onClick={onCancel}
-          className="rounded-xl border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-100"
+          className="inline-flex min-h-10 items-center justify-center gap-2 rounded-xl bg-white/5 px-4 py-2 text-sm font-medium text-neutral-100 ring-1 ring-white/10 transition hover:bg-white/10 hover:text-white"
         >
           Cancel
         </button>
@@ -28,15 +39,15 @@ export default function ExpenseFormActions({
       <button
         type="submit"
         disabled={isSubmitting}
-        className="rounded-xl bg-slate-900 px-4 py-2 text-sm font-medium text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60"
+        className="inline-flex min-h-10 w-full items-center justify-center gap-2 rounded-xl bg-cyan-500/10 px-5 py-2 text-sm font-medium text-cyan-200 ring-1 ring-cyan-400/20 transition hover:bg-cyan-500/15 hover:text-cyan-100 disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto sm:min-w-[200px]"
       >
-        {isSubmitting
-          ? mode === "create"
-            ? "Creating..."
-            : "Saving..."
-          : mode === "create"
-            ? "Create Expense"
-            : "Save Changes"}
+        {isCreateMode ? (
+          <PlusCircle className="h-4 w-4" />
+        ) : (
+          <Check className="h-4 w-4" />
+        )}
+
+        {buttonLabel}
       </button>
     </div>
   );

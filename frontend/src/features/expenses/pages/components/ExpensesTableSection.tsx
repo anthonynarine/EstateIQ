@@ -1,6 +1,5 @@
 // # Filename: src/features/expenses/pages/components/ExpensesTableSection.tsx
-
-
+// ✅ New Code
 
 import ExpensesTable from "../../components/ExpensesTable";
 import type { EntityId, ExpenseListItem } from "../../api/expensesTypes";
@@ -17,13 +16,6 @@ interface ExpensesTableSectionProps {
   isArchiving: boolean;
   isUnarchiving: boolean;
   processingExpenseId?: EntityId | null;
-
-  /**
-   * Pagination props.
-   *
-   * These are optional so the section can still render safely even if the
-   * parent has not wired pagination yet.
-   */
   totalExpenseCount?: number;
   page?: number;
   pageSize?: number;
@@ -33,9 +25,10 @@ interface ExpensesTableSectionProps {
 }
 
 const SHELL_CLASS =
-  "rounded-3xl border border-neutral-800/80 bg-neutral-950 shadow-[0_0_0_1px_rgba(255,255,255,0.02)]";
+  "flex h-full flex-col rounded-3xl border border-neutral-800/80 bg-neutral-950 shadow-[0_0_0_1px_rgba(255,255,255,0.02)]";
 
-const SECTION_INNER_CLASS = "flex flex-col gap-4";
+const SECTION_INNER_CLASS = "flex flex-1 flex-col gap-2";
+
 const HEADER_CLASS =
   "flex flex-col gap-3 border-b border-neutral-800 px-4 py-4 sm:px-5 sm:py-5 lg:flex-row lg:items-start lg:justify-between";
 
@@ -72,19 +65,6 @@ function getCountBadgeLabel(
   return `${count} ${count === 1 ? "expense" : "expenses"}`;
 }
 
-/**
- * Page-level wrapper around the expense records table.
- *
- * Responsibilities:
- * - provide the records workspace shell
- * - handle loading and error states
- * - render page-level lookup warnings
- * - delegate row rendering to `ExpensesTable`
- * - delegate footer rendering to `ExpensesTablePaginationFooter`
- *
- * @param props Section props for the expense records area.
- * @returns Expense records section UI.
- */
 export default function ExpensesTableSection({
   expenses,
   isLoading,
@@ -103,11 +83,10 @@ export default function ExpensesTableSection({
   onNextPage,
   isListFetching = false,
 }: ExpensesTableSectionProps) {
-  // # Step 1: Render loading state in the dark shell.
   if (isLoading) {
     return (
       <section className={LOADING_SHELL_CLASS}>
-        <div className="flex flex-col gap-4">
+        <div className="flex flex-col gap-3">
           <div className="flex flex-col gap-1">
             <p className={EYEBROW_CLASS}>Records workspace</p>
             <h2 className={TITLE_CLASS}>Expense records</h2>
@@ -124,7 +103,6 @@ export default function ExpensesTableSection({
     );
   }
 
-  // # Step 2: Render error state in the dark shell.
   if (listErrorMessage) {
     return (
       <section className={ERROR_SHELL_CLASS}>
@@ -170,27 +148,31 @@ export default function ExpensesTableSection({
           </div>
         ) : null}
 
-        <ExpensesTable
-          expenses={expenses}
-          onEdit={onEdit}
-          onArchive={onArchive}
-          onUnarchive={onUnarchive}
-          isArchiving={isArchiving}
-          isUnarchiving={isUnarchiving}
-          processingExpenseId={processingExpenseId}
-        />
+        <div className="flex min-h-0 flex-1 flex-col">
+          <div className="min-h-0 flex-1">
+            <ExpensesTable
+              expenses={expenses}
+              onEdit={onEdit}
+              onArchive={onArchive}
+              onUnarchive={onUnarchive}
+              isArchiving={isArchiving}
+              isUnarchiving={isUnarchiving}
+              processingExpenseId={processingExpenseId}
+            />
+          </div>
 
-        {canRenderPagination ? (
-          <ExpensesTablePaginationFooter
-            page={page}
-            pageSize={pageSize}
-            totalCount={totalExpenseCount}
-            itemLabel="expense"
-            isFetching={isListFetching}
-            onPrevious={onPreviousPage}
-            onNext={onNextPage}
-          />
-        ) : null}
+          {canRenderPagination ? (
+            <ExpensesTablePaginationFooter
+              page={page}
+              pageSize={pageSize}
+              totalCount={totalExpenseCount}
+              itemLabel="expense"
+              isFetching={isListFetching}
+              onPrevious={onPreviousPage}
+              onNext={onNextPage}
+            />
+          ) : null}
+        </div>
       </div>
     </section>
   );

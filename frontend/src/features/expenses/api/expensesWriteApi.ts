@@ -1,12 +1,12 @@
-// # Filename: src/features/expenses/api/expensesWriteApi.ts
-
 
 import api from "../../../api/axios";
 
 import type {
   CreateExpensePayload,
+  CreateVendorPayload,
   EntityId,
   ExpenseDetail,
+  ExpenseVendorRecord,
   UpdateExpensePayload,
 } from "./expensesTypes";
 
@@ -21,6 +21,7 @@ const EXPENSES_API_PREFIX = "/api/v1";
  */
 export const EXPENSES_WRITE_ENDPOINTS = {
   expenses: `${EXPENSES_API_PREFIX}/expenses/`,
+  vendors: `${EXPENSES_API_PREFIX}/vendors/`,
 } as const;
 
 /**
@@ -35,6 +36,28 @@ export async function createExpense(
   // # Step 1: Create the expense through the primary expense endpoint.
   const response = await api.post<ExpenseDetail>(
     EXPENSES_WRITE_ENDPOINTS.expenses,
+    payload,
+  );
+
+  return response.data;
+}
+
+/**
+ * Creates a new vendor within the active organization context.
+ *
+ * Important:
+ * The frontend does not send organization. The backend resolves and
+ * enforces org scope from the request context.
+ *
+ * @param payload Validated vendor create payload from the UI layer.
+ * @returns The created vendor record as returned by the backend.
+ */
+export async function createVendor(
+  payload: CreateVendorPayload,
+): Promise<ExpenseVendorRecord> {
+  // # Step 1: Send the vendor create request through the vendor resource.
+  const response = await api.post<ExpenseVendorRecord>(
+    EXPENSES_WRITE_ENDPOINTS.vendors,
     payload,
   );
 

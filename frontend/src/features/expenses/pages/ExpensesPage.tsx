@@ -117,7 +117,7 @@ export default function ExpensesPage() {
           className={WORKSPACE_SECTION_CLASS}
           aria-label="Expense records workspace"
         >
-          {pageData.lookupErrorMessage ? (
+          {/* {pageData.lookupErrorMessage ? (
             <div className={LOOKUP_ALERT_CLASS}>
               Failed to load expense lookup options: {pageData.lookupErrorMessage}
             </div>
@@ -132,7 +132,7 @@ export default function ExpensesPage() {
               categories fetch status: {pageData.categoriesQuery.fetchStatus}
             </div>
             <div>vendors fetch status: {pageData.vendorsQuery.fetchStatus}</div>
-          </div>
+          </div> */}
 
           <ExpensesFiltersBar
             searchInput={searchInput}

@@ -1,9 +1,7 @@
 // # Filename: src/features/expenses/components/ExpensesTable.tsx
-
 // ✅ New Code
 
 import ExpenseStatusBadge from "./ExpenseStatusBadge";
-import ExpensesTablePaginationFooter from "./ExpensesTablePaginationFooter";
 import type { EntityId, ExpenseListItem } from "../api/expensesTypes";
 
 interface ExpensesTableProps {
@@ -14,40 +12,27 @@ interface ExpensesTableProps {
   isArchiving?: boolean;
   isUnarchiving?: boolean;
   processingExpenseId?: EntityId | null;
-
-  /**
-   * Optional pagination props.
-   *
-   * The records footer now belongs to the table renderer so the mobile cards,
-   * desktop table, and footer stay as one visual unit.
-   */
-  totalExpenseCount?: number;
-  page?: number;
-  pageSize?: number;
-  isPaginationFetching?: boolean;
-  onPreviousPage?: () => void;
-  onNextPage?: () => void;
 }
 
 const TABLE_HEAD_CELL_CLASS =
-  "px-5 py-3 text-left text-[11px] font-semibold uppercase tracking-[0.18em] text-neutral-500";
+  "px-5 py-2.5 text-left text-[11px] font-semibold uppercase tracking-[0.18em] text-neutral-500";
 
 const TABLE_BODY_ROW_CLASS =
-  "border-b border-neutral-800/80 transition hover:bg-neutral-900/50 last:border-b-0";
+  "border-b border-neutral-800/80 transition hover:bg-neutral-900/40 last:border-b-0";
 
-const TABLE_CELL_CLASS = "px-5 py-4 align-top";
+const TABLE_CELL_CLASS = "px-5 py-3 align-middle";
 
 const ACTION_BUTTON_BASE_CLASS =
-  "inline-flex items-center justify-center rounded-xl border px-3 py-1.5 text-xs font-medium transition disabled:cursor-not-allowed disabled:opacity-50";
+  "inline-flex min-h-9 items-center justify-center rounded-xl border px-3 py-1.5 text-xs font-medium transition disabled:cursor-not-allowed disabled:opacity-50";
 
 const EDIT_BUTTON_CLASS =
-  "border-neutral-700 bg-neutral-900 text-neutral-200 hover:bg-neutral-800";
+  "border-white/10 bg-white/[0.04] text-neutral-100 hover:bg-white/[0.08]";
 
 const ARCHIVE_BUTTON_CLASS =
-  "border-amber-500/30 bg-amber-500/10 text-amber-300 hover:bg-amber-500/15";
+  "border-amber-500/25 bg-amber-500/10 text-amber-300 hover:bg-amber-500/15";
 
 const RESTORE_BUTTON_CLASS =
-  "border-emerald-500/30 bg-emerald-500/10 text-emerald-300 hover:bg-emerald-500/15";
+  "border-emerald-500/25 bg-emerald-500/10 text-emerald-300 hover:bg-emerald-500/15";
 
 /**
  * Formats a raw expense amount into USD currency.
@@ -117,20 +102,6 @@ function getExpenseSecondaryMeta(expense: ExpenseListItem): string | null {
   return parts.length > 0 ? parts.join(" · ") : null;
 }
 
-/**
- * Renders the primary expense records table.
- *
- * Responsibilities:
- * - display current expense rows
- * - expose edit/archive/restore actions
- * - reflect archived state clearly
- * - support row-level mutation locking during archive/restore flows
- * - provide a more intentional mobile experience with stacked cards
- * - own the local records pagination footer
- *
- * @param props Table props and row action handlers.
- * @returns Expenses records UI.
- */
 export default function ExpensesTable({
   expenses,
   onEdit,
@@ -139,20 +110,7 @@ export default function ExpensesTable({
   isArchiving = false,
   isUnarchiving = false,
   processingExpenseId = null,
-  totalExpenseCount,
-  page,
-  pageSize,
-  isPaginationFetching = false,
-  onPreviousPage,
-  onNextPage,
 }: ExpensesTableProps) {
-  const canRenderPagination =
-    typeof totalExpenseCount === "number" &&
-    typeof page === "number" &&
-    typeof pageSize === "number" &&
-    typeof onPreviousPage === "function" &&
-    typeof onNextPage === "function";
-
   if (expenses.length === 0) {
     return (
       <div className="px-4 pb-4 sm:px-5 sm:pb-5">
@@ -203,7 +161,9 @@ export default function ExpensesTable({
                   ) : null}
                 </div>
 
-                <ExpenseStatusBadge isArchived={Boolean(expense.is_archived)} />
+                {expense.is_archived ? (
+                  <ExpenseStatusBadge isArchived />
+                ) : null}
               </div>
 
               <div className="mt-4 grid grid-cols-2 gap-3 rounded-xl border border-neutral-800/80 bg-neutral-950/70 p-3">
@@ -269,7 +229,6 @@ export default function ExpensesTable({
               <th className={TABLE_HEAD_CELL_CLASS}>Description</th>
               <th className={TABLE_HEAD_CELL_CLASS}>Date</th>
               <th className={`${TABLE_HEAD_CELL_CLASS} text-right`}>Amount</th>
-              <th className={TABLE_HEAD_CELL_CLASS}>Status</th>
               <th className={`${TABLE_HEAD_CELL_CLASS} text-right`}>Actions</th>
             </tr>
           </thead>
@@ -289,20 +248,20 @@ export default function ExpensesTable({
               return (
                 <tr key={expense.id} className={TABLE_BODY_ROW_CLASS}>
                   <td className={TABLE_CELL_CLASS}>
-                    <div className="flex max-w-[32rem] flex-col gap-1">
-                      <span className="text-sm font-medium text-white">
+                    <div className="flex max-w-[34rem] flex-col gap-0.5">
+                      <span
+                        className={
+                          expense.is_archived
+                            ? "text-sm font-medium text-neutral-300"
+                            : "text-sm font-medium text-white"
+                        }
+                      >
                         {primaryLabel}
                       </span>
 
                       {secondaryMeta ? (
                         <span className="text-xs text-neutral-500">
                           {secondaryMeta}
-                        </span>
-                      ) : null}
-
-                      {expense.notes ? (
-                        <span className="text-xs text-neutral-400">
-                          {expense.notes}
                         </span>
                       ) : null}
                     </div>
@@ -316,12 +275,6 @@ export default function ExpensesTable({
                     className={`${TABLE_CELL_CLASS} text-right text-sm font-semibold text-white`}
                   >
                     {formatCurrency(expense.amount)}
-                  </td>
-
-                  <td className={TABLE_CELL_CLASS}>
-                    <ExpenseStatusBadge
-                      isArchived={Boolean(expense.is_archived)}
-                    />
                   </td>
 
                   <td className={TABLE_CELL_CLASS}>
@@ -362,18 +315,6 @@ export default function ExpensesTable({
           </tbody>
         </table>
       </div>
-
-      {canRenderPagination ? (
-        <ExpensesTablePaginationFooter
-          page={page}
-          pageSize={pageSize}
-          totalCount={totalExpenseCount}
-          itemLabel="expense"
-          isFetching={isPaginationFetching}
-          onPrevious={onPreviousPage}
-          onNext={onNextPage}
-        />
-      ) : null}
     </>
   );
 }

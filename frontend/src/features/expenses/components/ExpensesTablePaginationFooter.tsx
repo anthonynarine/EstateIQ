@@ -1,5 +1,4 @@
-// # Filename: src/features/expenses/pages/components/ExpensesTablePaginationFooter.tsx
-
+// # Filename: src/features/expenses/components/ExpensesTablePaginationFooter.tsx
 // ✅ New Code
 
 interface ExpensesTablePaginationFooterProps {
@@ -13,17 +12,17 @@ interface ExpensesTablePaginationFooterProps {
 }
 
 const FOOTER_CLASS =
-  "flex flex-col gap-3 border-t border-neutral-800 px-4 py-4 sm:px-5 sm:flex-row sm:items-center sm:justify-between";
+  "mt-auto flex flex-col gap-3 border-t border-neutral-800/80 px-4 py-5 sm:px-5 sm:flex-row sm:items-center sm:justify-between";
 
-const SUMMARY_CLASS = "text-sm text-neutral-400";
+  const SUMMARY_CLASS = "text-sm text-neutral-400";
 
 const CONTROLS_CLASS = "flex items-center gap-2";
 
 const BUTTON_CLASS =
-  "inline-flex items-center justify-center rounded-2xl border border-neutral-800 bg-neutral-900 px-3.5 py-2 text-sm font-medium text-neutral-200 transition hover:border-neutral-700 hover:bg-neutral-800 disabled:cursor-not-allowed disabled:opacity-50";
+  "inline-flex items-center justify-center rounded-xl border border-neutral-800 bg-neutral-900 px-3 py-2 text-sm font-medium text-neutral-200 transition hover:border-neutral-700 hover:bg-neutral-800 disabled:cursor-not-allowed disabled:opacity-50";
 
 const PAGE_BADGE_CLASS =
-  "inline-flex items-center rounded-2xl border border-neutral-800 bg-neutral-900 px-3.5 py-2 text-sm font-medium text-neutral-300";
+  "inline-flex items-center rounded-xl border border-neutral-800 bg-neutral-900 px-3 py-2 text-sm font-medium text-neutral-300";
 
 /**
  * Builds a human-readable visible range label for the records footer.
@@ -55,16 +54,6 @@ function getRangeLabel(
   }`;
 }
 
-/**
- * Local pagination footer for the Expenses records workspace.
- *
- * This footer is intentionally page-specific so the Expenses slice can keep a
- * calmer visual language without forcing those styles onto shared pagination
- * components used elsewhere in the app.
- *
- * @param props Pagination footer props.
- * @returns Pagination footer UI for the expenses records table.
- */
 export default function ExpensesTablePaginationFooter({
   page,
   pageSize,
