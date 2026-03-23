@@ -10,38 +10,31 @@ import ExpensesFormSection from "./components/Reporting";
 import ExpensesHeader from "./components/ExpensesHeader";
 import ExpensesTableSection from "./components/ExpensesTableSection";
 import type { ExpensesWorkspaceTab } from "../components/ExpensesWorkspaceTabs";
+import type { ExpenseScope } from "../api/expensesTypes";
 import { useExpensesPageActions } from "./hooks/useExpensesPageActions";
 import { useExpensesPageData } from "./hooks/useExpensesPageData";
 import { useExpensesPageState } from "./hooks/useExpensesPageState";
 
 const PAGE_CONTAINER_CLASS = "flex flex-col gap-6";
 const WORKSPACE_SECTION_CLASS = "flex flex-col gap-6";
-const LOOKUP_ALERT_CLASS =
-  "rounded-2xl border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-200";
-const DEV_DEBUG_CLASS =
-  "rounded-2xl border border-sky-500/20 bg-sky-500/10 px-4 py-3 text-xs text-sky-100";
 
 export default function ExpensesPage() {
-  // # Step 1: Build page-local UI state.
   const pageState = useExpensesPageState();
-
-  // # Step 2: Build query-backed page data from page state.
   const pageData = useExpensesPageData(pageState);
-
-  // # Step 3: Build mutation-backed page actions.
   const pageActions = useExpensesPageActions({
     pageState,
   });
 
-  // # Step 4: Keep workspace selection local to the page.
   const [activeWorkspace, setActiveWorkspace] =
     useState<ExpensesWorkspaceTab>("records");
 
-  // # Step 5: Destructure stable page-state fields for pagination/effects.
   const {
     searchInput,
+    selectedScope,
     selectedCategoryId,
     selectedVendorId,
+    selectedBuildingId,
+    selectedUnitId,
     showArchivedOnly,
     editingExpenseId,
     processingExpenseId,
@@ -51,14 +44,12 @@ export default function ExpensesPage() {
     pageSize,
   } = pageState;
 
-  // # Step 6: Use backend count as the source of truth for pagination.
   const totalExpenseCount = pageData.totalExpenseCount ?? 0;
 
   const totalPages = useMemo(() => {
     return Math.max(1, Math.ceil(totalExpenseCount / pageSize));
   }, [totalExpenseCount, pageSize]);
 
-  // # Step 7: Clamp page when the filtered result set shrinks.
   useEffect(() => {
     if (page > totalPages) {
       setPage(totalPages);
@@ -66,35 +57,55 @@ export default function ExpensesPage() {
   }, [page, totalPages, setPage]);
 
   const handlePreviousPage = () => {
-    // # Step 1: Move to the previous page without dropping below page 1.
     setPage((currentPage) => Math.max(1, currentPage - 1));
   };
 
   const handleNextPage = () => {
-    // # Step 1: Move to the next page without exceeding the last page.
     setPage((currentPage) => Math.min(totalPages, currentPage + 1));
   };
 
   const handleSearchChange = (value: string) => {
-    // # Step 1: Reset pagination when the search filter changes.
     setPage(1);
     pageState.setSearchInput(value);
   };
 
+  const handleScopeChange = (value: ExpenseScope | null) => {
+    setPage(1);
+    pageState.setSelectedScope(value);
+
+    if (value === "organization") {
+      pageState.setSelectedBuildingId(null);
+      pageState.setSelectedUnitId(null);
+      return;
+    }
+
+    if (value === "building") {
+      pageState.setSelectedUnitId(null);
+    }
+  };
+
   const handleCategoryChange = (value: number | null) => {
-    // # Step 1: Reset pagination when the category filter changes.
     setPage(1);
     pageState.setSelectedCategoryId(value);
   };
 
   const handleVendorChange = (value: number | null) => {
-    // # Step 1: Reset pagination when the vendor filter changes.
     setPage(1);
     pageState.setSelectedVendorId(value);
   };
 
+  const handleBuildingChange = (value: number | null) => {
+    setPage(1);
+    pageState.setSelectedBuildingId(value);
+    pageState.setSelectedUnitId(null);
+  };
+
+  const handleUnitChange = (value: number | null) => {
+    setPage(1);
+    pageState.setSelectedUnitId(value);
+  };
+
   const handleArchivedToggle = (value: boolean) => {
-    // # Step 1: Reset pagination when the archived filter changes.
     setPage(1);
     pageState.setShowArchivedOnly(value);
   };
@@ -106,7 +117,6 @@ export default function ExpensesPage() {
         activeWorkspace={activeWorkspace}
         onWorkspaceChange={setActiveWorkspace}
         onCreateNew={() => {
-          // # Step 8: Reset the form and return the user to Records.
           pageState.resetForm();
           setActiveWorkspace("records");
         }}
@@ -117,34 +127,27 @@ export default function ExpensesPage() {
           className={WORKSPACE_SECTION_CLASS}
           aria-label="Expense records workspace"
         >
-          {/* {pageData.lookupErrorMessage ? (
-            <div className={LOOKUP_ALERT_CLASS}>
-              Failed to load expense lookup options: {pageData.lookupErrorMessage}
-            </div>
-          ) : null}
-
-          <div className={DEV_DEBUG_CLASS}>
-            <div>categories count: {pageData.categories.length}</div>
-            <div>vendors count: {pageData.vendors.length}</div>
-            <div>categories query status: {pageData.categoriesQuery.status}</div>
-            <div>vendors query status: {pageData.vendorsQuery.status}</div>
-            <div>
-              categories fetch status: {pageData.categoriesQuery.fetchStatus}
-            </div>
-            <div>vendors fetch status: {pageData.vendorsQuery.fetchStatus}</div>
-          </div> */}
-
           <ExpensesFiltersBar
             searchInput={searchInput}
+            selectedScope={selectedScope}
             selectedCategoryId={selectedCategoryId}
             selectedVendorId={selectedVendorId}
+            selectedBuildingId={selectedBuildingId}
+            selectedUnitId={selectedUnitId}
             showArchivedOnly={showArchivedOnly}
             totalExpenseCount={totalExpenseCount}
             categories={pageData.categories}
             vendors={pageData.vendors}
+            buildingOptions={pageData.buildingOptions}
+            unitOptions={pageData.unitOptions}
+            isPropertyLookupLoading={pageData.isPropertyLookupLoading}
+            propertyLookupErrorMessage={pageData.propertyLookupErrorMessage}
             onSearchChange={handleSearchChange}
+            onScopeChange={handleScopeChange}
             onCategoryChange={handleCategoryChange}
             onVendorChange={handleVendorChange}
+            onBuildingChange={handleBuildingChange}
+            onUnitChange={handleUnitChange}
             onArchivedToggle={handleArchivedToggle}
           />
 

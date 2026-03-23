@@ -1,4 +1,5 @@
-// Filename: src/features/buildings/api/unitsApi.ts
+// # Filename: src/features/buildings/api/unitsApi.ts
+
 
 import api from "../../../api/axios";
 
@@ -73,6 +74,7 @@ export type PaginatedResponse<T> = {
  * Params for listing units scoped to a single building.
  */
 export type ListUnitsByBuildingParams = {
+  orgSlug: string;
   buildingId: number;
   page?: number;
   pageSize?: number;
@@ -116,15 +118,9 @@ export type UpdateUnitInput = Partial<{
  * normalizePaginatedResponse
  *
  * Ensures the units list always returns a stable paginated shape.
- *
- * Why this exists:
- * - The backend should return DRF pagination metadata.
- * - This guard protects the frontend from malformed or unexpected payloads.
- * - We intentionally do NOT flatten the response to an array because the UI
- *   needs count/next/previous for real pagination controls.
  */
 function normalizePaginatedResponse<T>(data: unknown): PaginatedResponse<T> {
-  // Step 1: DRF paginated payload
+  // # Step 1: DRF paginated payload
   if (
     data &&
     typeof data === "object" &&
@@ -141,7 +137,7 @@ function normalizePaginatedResponse<T>(data: unknown): PaginatedResponse<T> {
     };
   }
 
-  // Step 2: Legacy/plain-list fallback
+  // # Step 2: Legacy/plain-list fallback
   if (Array.isArray(data)) {
     return {
       count: data.length,
@@ -151,7 +147,7 @@ function normalizePaginatedResponse<T>(data: unknown): PaginatedResponse<T> {
     };
   }
 
-  // Step 3: Fail-safe empty payload
+  // # Step 3: Fail-safe empty payload
   return {
     count: 0,
     next: null,
@@ -169,12 +165,14 @@ function normalizePaginatedResponse<T>(data: unknown): PaginatedResponse<T> {
  * - GET /api/v1/units/?building=<buildingId>&page=<page>&page_size=<pageSize>
  */
 export async function listUnitsByBuilding({
+  orgSlug,
   buildingId,
   page = 1,
   pageSize = 6,
   ordering,
 }: ListUnitsByBuildingParams): Promise<PaginatedResponse<Unit>> {
   const res = await api.get<PaginatedResponse<Unit> | Unit[]>("/api/v1/units/", {
+    headers: { "X-Org-Slug": orgSlug },
     params: {
       building: buildingId,
       page,

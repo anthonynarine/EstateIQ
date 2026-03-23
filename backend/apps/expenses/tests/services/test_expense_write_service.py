@@ -1,3 +1,5 @@
+# Filename: backend/apps/expenses/tests/services/test_expense_write_service.py
+
 """Write-service tests for the expenses domain."""
 
 from __future__ import annotations
@@ -185,6 +187,8 @@ def test_update_expense_validates_relationships_and_sets_updated_by(
     assert updated.title == "Updated Repair"
     assert updated.updated_by_id == user_a.id
 
+
+# Step 9: Missing source should default to manual.
 def test_create_expense_defaults_source_to_manual(organization_a, building_a1):
     expense = ExpenseService.create_expense(
         payload=ExpenseWritePayload(
@@ -198,3 +202,68 @@ def test_create_expense_defaults_source_to_manual(organization_a, building_a1):
     )
 
     assert expense.source == ExpenseSource.MANUAL
+
+
+# Step 10: Scope changes to building should clear stale unit and lease refs.
+def test_update_expense_scope_change_to_building_clears_unit_and_lease(
+    organization_a,
+    building_a1,
+    unit_a1,
+):
+    expense = ExpenseService.create_expense(
+        payload=ExpenseWritePayload(
+            organization=organization_a,
+            scope=ExpenseScope.UNIT,
+            building=building_a1,
+            unit=unit_a1,
+            title="Unit Turnover Paint",
+            amount=Decimal("240.00"),
+            expense_date=date(2026, 2, 1),
+        )
+    )
+
+    updated = ExpenseService.update_expense(
+        expense=expense,
+        updates={
+            "scope": ExpenseScope.BUILDING,
+            "building": building_a1,
+            "title": "Building Common Area Paint",
+        },
+    )
+
+    assert updated.scope == ExpenseScope.BUILDING
+    assert updated.building_id == building_a1.id
+    assert updated.unit is None
+    assert updated.lease is None
+    assert updated.title == "Building Common Area Paint"
+
+
+# Step 11: Scope changes to organization should clear all location refs.
+def test_update_expense_scope_change_to_organization_clears_all_scope_refs(
+    organization_a,
+    building_a1,
+):
+    expense = ExpenseService.create_expense(
+        payload=ExpenseWritePayload(
+            organization=organization_a,
+            scope=ExpenseScope.BUILDING,
+            building=building_a1,
+            title="Building Insurance Rider",
+            amount=Decimal("180.00"),
+            expense_date=date(2026, 2, 1),
+        )
+    )
+
+    updated = ExpenseService.update_expense(
+        expense=expense,
+        updates={
+            "scope": ExpenseScope.ORGANIZATION,
+            "title": "Portfolio Insurance Rider",
+        },
+    )
+
+    assert updated.scope == ExpenseScope.ORGANIZATION
+    assert updated.building is None
+    assert updated.unit is None
+    assert updated.lease is None
+    assert updated.title == "Portfolio Insurance Rider"

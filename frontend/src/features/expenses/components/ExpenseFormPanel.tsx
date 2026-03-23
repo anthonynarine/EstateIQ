@@ -1,7 +1,7 @@
 // # Filename: src/features/expenses/components/ExpenseFormPanel.tsx
 // ✅ New Code
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { isAxiosError } from "axios";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 
@@ -9,10 +9,13 @@ import { expenseQueryKeys } from "../api/expenseQueryKeys";
 import { createVendor } from "../api/expensesWriteApi";
 import type {
   CreateExpensePayload,
+  ExpenseBuildingOption,
   ExpenseCategoryOption,
+  ExpenseUnitOption,
   ExpenseVendorOption,
   UpdateExpensePayload,
 } from "../api/expensesTypes";
+import { useExpensePropertyLookups } from "../hooks/useExpensePropertyLookups";
 import CreateVendorModal from "./create-vendor/CreateVendorModal";
 import { useCreateVendorForm } from "./create-vendor/useCreateVendorForm";
 import ExpenseFormActions from "./expense-form/ExpenseFormActions";
@@ -29,6 +32,8 @@ interface ExpenseFormPanelProps {
   initialValues?: Partial<ExpenseFormValues>;
   categories: ExpenseCategoryOption[];
   vendors: ExpenseVendorOption[];
+  buildingOptions?: ExpenseBuildingOption[];
+  unitOptions?: ExpenseUnitOption[];
   isSubmitting?: boolean;
   submitError?: string | null;
   onSubmit: (values: ExpenseFormSubmitPayload) => Promise<void> | void;
@@ -80,6 +85,8 @@ export default function ExpenseFormPanel({
   initialValues,
   categories,
   vendors,
+  buildingOptions: buildingOptionsProp = [],
+  unitOptions: unitOptionsProp = [],
   isSubmitting = false,
   submitError = null,
   onSubmit,
@@ -99,6 +106,27 @@ export default function ExpenseFormPanel({
     initialValues,
     onSubmit,
   });
+
+  const {
+    buildingOptions: fetchedBuildingOptions,
+    unitOptions: fetchedUnitOptions,
+    isLoadingBuildings,
+    isLoadingUnits,
+    propertyLookupError,
+  } = useExpensePropertyLookups({
+    scope: formValues.scope,
+    buildingId: formValues.building_id ?? null,
+  });
+
+  const resolvedBuildingOptions = useMemo(() => {
+    return buildingOptionsProp.length > 0
+      ? buildingOptionsProp
+      : fetchedBuildingOptions;
+  }, [buildingOptionsProp, fetchedBuildingOptions]);
+
+  const resolvedUnitOptions = useMemo(() => {
+    return unitOptionsProp.length > 0 ? unitOptionsProp : fetchedUnitOptions;
+  }, [unitOptionsProp, fetchedUnitOptions]);
 
   const {
     values: vendorValues,
@@ -133,6 +161,15 @@ export default function ExpenseFormPanel({
   const combinedError = validationError ?? submitError;
   const isVendorCreateSubmitting = createVendorMutation.isPending;
   const isAddVendorDisabled = isSubmitting || isVendorCreateSubmitting;
+
+  const shouldShowPropertyLoadingMessage =
+    (formValues.scope === "building" || formValues.scope === "unit") &&
+    isLoadingBuildings;
+
+  const shouldShowUnitLoadingMessage =
+    formValues.scope === "unit" &&
+    Boolean(formValues.building_id) &&
+    isLoadingUnits;
 
   const handleOpenVendorModal = () => {
     setVendorSubmitError(null);
@@ -187,11 +224,31 @@ export default function ExpenseFormPanel({
               </div>
             ) : null}
 
+            {propertyLookupError ? (
+              <div className="rounded-2xl border border-amber-500/25 bg-amber-500/10 p-4 text-sm text-amber-200">
+                {propertyLookupError}
+              </div>
+            ) : null}
+
+            {shouldShowPropertyLoadingMessage ? (
+              <div className="rounded-2xl border border-sky-500/20 bg-sky-500/10 p-3 text-sm text-sky-100">
+                Loading building options...
+              </div>
+            ) : null}
+
+            {shouldShowUnitLoadingMessage ? (
+              <div className="rounded-2xl border border-sky-500/20 bg-sky-500/10 p-3 text-sm text-sky-100">
+                Loading units for the selected building...
+              </div>
+            ) : null}
+
             <div className="flex-1">
               <ExpenseFormFields
                 formValues={formValues}
                 categories={categories}
                 vendors={vendors}
+                buildingOptions={resolvedBuildingOptions}
+                unitOptions={resolvedUnitOptions}
                 updateField={updateField}
                 onAddVendorClick={handleOpenVendorModal}
                 isAddVendorDisabled={isAddVendorDisabled}

@@ -1,10 +1,13 @@
 // # Filename: src/features/expenses/pages/components/Reporting.tsx
+// ✅ New Code
 
 import ExpenseFormPanel from "../../components/ExpenseFormPanel";
 import type { ExpenseFormValues } from "../../components/expense-form/expenseFormTypes";
 import type {
   CreateExpensePayload,
+  ExpenseBuildingOption,
   ExpenseCategoryOption,
+  ExpenseUnitOption,
   ExpenseVendorOption,
   UpdateExpensePayload,
 } from "../../api/expensesTypes";
@@ -25,6 +28,8 @@ interface ExpensesFormSectionProps {
   initialValues: Partial<ExpenseFormValues>;
   categories: ExpenseCategoryOption[];
   vendors: ExpenseVendorOption[];
+  buildingOptions?: ExpenseBuildingOption[];
+  unitOptions?: ExpenseUnitOption[];
   isSubmitting: boolean;
   isLoadingDetail: boolean;
   submitError: string | null;
@@ -47,7 +52,11 @@ function hasEditInitialValues(
       initialValues.expense_date ||
       initialValues.notes ||
       initialValues.category_id !== undefined ||
-      initialValues.vendor_id !== undefined,
+      initialValues.vendor_id !== undefined ||
+      initialValues.scope !== undefined ||
+      initialValues.building_id !== undefined ||
+      initialValues.unit_id !== undefined ||
+      initialValues.lease_id !== undefined,
   );
 }
 
@@ -68,6 +77,8 @@ export default function ExpensesFormSection({
   initialValues,
   categories,
   vendors,
+  buildingOptions = [],
+  unitOptions = [],
   isSubmitting,
   isLoadingDetail,
   submitError,
@@ -122,6 +133,8 @@ export default function ExpensesFormSection({
         initialValues={initialValues}
         categories={categories}
         vendors={vendors}
+        buildingOptions={buildingOptions}
+        unitOptions={unitOptions}
         isSubmitting={isSubmitting || isLoadingDetail}
         submitError={submitError}
         onSubmit={onSubmit}

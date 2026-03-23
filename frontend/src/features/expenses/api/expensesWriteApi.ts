@@ -1,3 +1,5 @@
+// # Filename: src/features/expenses/api/expensesWriteApi.ts
+
 
 import api from "../../../api/axios";
 
@@ -25,6 +27,86 @@ export const EXPENSES_WRITE_ENDPOINTS = {
 } as const;
 
 /**
+ * Maps the frontend expense payload into the backend serializer contract.
+ *
+ * Frontend convention:
+ * - category_id
+ * - vendor_id
+ * - building_id
+ * - unit_id
+ * - lease_id
+ *
+ * Backend serializer convention:
+ * - category
+ * - vendor
+ * - building
+ * - unit
+ * - lease
+ *
+ * Important:
+ * - Use `"field" in payload` checks so PATCH requests only send fields that
+ *   were intentionally provided.
+ * - Preserve explicit `null` values, because those are used to clear
+ *   incompatible scope relationships during updates.
+ *
+ * @param payload Frontend create/update payload.
+ * @returns Backend-shaped payload for DRF serializers.
+ */
+function buildExpenseWritePayload(
+  payload: CreateExpensePayload | UpdateExpensePayload,
+): Record<string, unknown> {
+  const backendPayload: Record<string, unknown> = {};
+
+  // # Step 1: Copy scalar fields only when intentionally provided.
+  if ("scope" in payload) {
+    backendPayload.scope = payload.scope;
+  }
+
+  if ("title" in payload) {
+    backendPayload.title = payload.title;
+  }
+
+  if ("description" in payload) {
+    backendPayload.description = payload.description;
+  }
+
+  if ("amount" in payload) {
+    backendPayload.amount = payload.amount;
+  }
+
+  if ("expense_date" in payload) {
+    backendPayload.expense_date = payload.expense_date;
+  }
+
+  if ("notes" in payload) {
+    backendPayload.notes = payload.notes;
+  }
+
+  // # Step 2: Translate frontend *_id fields into backend relation names.
+  if ("category_id" in payload) {
+    backendPayload.category = payload.category_id ?? null;
+  }
+
+  if ("vendor_id" in payload) {
+    backendPayload.vendor = payload.vendor_id ?? null;
+  }
+
+  if ("building_id" in payload) {
+    backendPayload.building = payload.building_id ?? null;
+  }
+
+  if ("unit_id" in payload) {
+    backendPayload.unit = payload.unit_id ?? null;
+  }
+
+  if ("lease_id" in payload) {
+    backendPayload.lease = payload.lease_id ?? null;
+  }
+
+  return backendPayload;
+}
+
+/**
  * Creates a new expense record.
  *
  * @param payload Validated expense form payload from the UI layer.
@@ -33,10 +115,13 @@ export const EXPENSES_WRITE_ENDPOINTS = {
 export async function createExpense(
   payload: CreateExpensePayload,
 ): Promise<ExpenseDetail> {
-  // # Step 1: Create the expense through the primary expense endpoint.
+  // # Step 1: Translate frontend field names into the backend contract.
+  const requestBody = buildExpenseWritePayload(payload);
+
+  // # Step 2: Create the expense through the primary expense endpoint.
   const response = await api.post<ExpenseDetail>(
     EXPENSES_WRITE_ENDPOINTS.expenses,
-    payload,
+    requestBody,
   );
 
   return response.data;
@@ -80,10 +165,13 @@ export async function updateExpense(
     throw new Error("A valid expense ID is required to update an expense.");
   }
 
-  // # Step 2: Send a partial update request to the detail endpoint.
+  // # Step 2: Translate frontend field names into the backend contract.
+  const requestBody = buildExpenseWritePayload(payload);
+
+  // # Step 3: Send a partial update request to the detail endpoint.
   const response = await api.patch<ExpenseDetail>(
     `${EXPENSES_WRITE_ENDPOINTS.expenses}${expenseId}/`,
-    payload,
+    requestBody,
   );
 
   return response.data;

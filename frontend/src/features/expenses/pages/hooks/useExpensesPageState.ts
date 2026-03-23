@@ -1,5 +1,5 @@
 // # Filename: src/features/expenses/pages/hooks/useExpensesPageState.ts
-
+// ✅ New Code
 
 import {
   useCallback,
@@ -8,6 +8,8 @@ import {
   type Dispatch,
   type SetStateAction,
 } from "react";
+
+import type { ExpenseScope } from "../../api/expensesTypes";
 
 /**
  * State contract for the Expenses page orchestration layer.
@@ -24,10 +26,22 @@ import {
 export interface UseExpensesPageStateResult {
   searchInput: string;
   setSearchInput: Dispatch<SetStateAction<string>>;
+
+  selectedScope: ExpenseScope | null;
+  setSelectedScope: Dispatch<SetStateAction<ExpenseScope | null>>;
+
   selectedCategoryId: number | null;
   setSelectedCategoryId: Dispatch<SetStateAction<number | null>>;
+
   selectedVendorId: number | null;
   setSelectedVendorId: Dispatch<SetStateAction<number | null>>;
+
+  selectedBuildingId: number | null;
+  setSelectedBuildingId: Dispatch<SetStateAction<number | null>>;
+
+  selectedUnitId: number | null;
+  setSelectedUnitId: Dispatch<SetStateAction<number | null>>;
+
   showArchivedOnly: boolean;
   setShowArchivedOnly: Dispatch<SetStateAction<boolean>>;
 
@@ -71,10 +85,15 @@ const EXPENSES_RECORDS_PAGE_SIZE = 6;
  */
 export function useExpensesPageState(): UseExpensesPageStateResult {
   const [searchInput, setSearchInput] = useState("");
+  const [selectedScope, setSelectedScope] = useState<ExpenseScope | null>(null);
   const [selectedCategoryId, setSelectedCategoryId] = useState<number | null>(
     null,
   );
   const [selectedVendorId, setSelectedVendorId] = useState<number | null>(null);
+  const [selectedBuildingId, setSelectedBuildingId] = useState<number | null>(
+    null,
+  );
+  const [selectedUnitId, setSelectedUnitId] = useState<number | null>(null);
   const [showArchivedOnly, setShowArchivedOnly] = useState(false);
 
   const [editingExpenseId, setEditingExpenseId] = useState<number | null>(null);
@@ -124,10 +143,22 @@ export function useExpensesPageState(): UseExpensesPageStateResult {
   return {
     searchInput,
     setSearchInput,
+
+    selectedScope,
+    setSelectedScope,
+
     selectedCategoryId,
     setSelectedCategoryId,
+
     selectedVendorId,
     setSelectedVendorId,
+
+    selectedBuildingId,
+    setSelectedBuildingId,
+
+    selectedUnitId,
+    setSelectedUnitId,
+
     showArchivedOnly,
     setShowArchivedOnly,
 

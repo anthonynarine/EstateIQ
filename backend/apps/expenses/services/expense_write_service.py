@@ -1,3 +1,4 @@
+# Filename: backend/apps/expenses/services/expense_write_service.py
 
 """
 Write-side service workflows for expense creation and updates.
@@ -9,8 +10,8 @@ from typing import Any
 
 from django.db import transaction
 
+from apps.expenses.choices import ExpenseScope, ExpenseSource
 from apps.expenses.models import Expense
-from apps.expenses.choices import ExpenseSource
 from apps.expenses.services.expense_payloads import ExpenseWritePayload
 from apps.expenses.services.expense_validation_service import (
     ExpenseValidationService,
@@ -61,6 +62,7 @@ class ExpenseWriteService:
             updates=updates,
             updated_by=updated_by,
         )
+        data = cls._normalize_scope_relationships(data=data)
 
         ExpenseValidationService.validate_expense_data(data=data)
 
@@ -74,7 +76,14 @@ class ExpenseWriteService:
 
     @classmethod
     def _normalize_payload(cls, *, payload: ExpenseWritePayload) -> dict[str, Any]:
-        """Convert dataclass payload into normalized model-ready data."""
+        """Convert dataclass payload into normalized model-ready data.
+
+        Args:
+            payload: Normalized dataclass payload.
+
+        Returns:
+            dict[str, Any]: Model-ready dictionary for create workflows.
+        """
         return {
             "organization": payload.organization,
             "scope": payload.scope,
@@ -108,7 +117,16 @@ class ExpenseWriteService:
         updates: dict[str, Any],
         updated_by: Any | None = None,
     ) -> dict[str, Any]:
-        """Build normalized update data from an existing expense and patch set."""
+        """Build normalized update data from an existing expense and patch set.
+
+        Args:
+            expense: Existing expense instance.
+            updates: Partial update dictionary.
+            updated_by: User performing the update.
+
+        Returns:
+            dict[str, Any]: Merged update data.
+        """
         return {
             "organization": expense.organization,
             "scope": updates.get("scope", expense.scope),
@@ -145,3 +163,51 @@ class ExpenseWriteService:
             "created_by": expense.created_by,
             "updated_by": updated_by or expense.updated_by,
         }
+
+    @classmethod
+    def _normalize_scope_relationships(
+        cls,
+        *,
+        data: dict[str, Any],
+    ) -> dict[str, Any]:
+        """Normalize relationship fields for the selected expense scope.
+
+        This hardens partial updates so scope transitions do not depend on the
+        frontend explicitly nulling incompatible relations.
+
+        Rules:
+        - organization: clear building, unit, lease
+        - building: keep building, clear unit and lease
+        - unit: keep building/unit, clear lease
+        - lease: keep lease; building/unit will be derived in validation
+
+        Args:
+            data: Merged create/update data.
+
+        Returns:
+            dict[str, Any]: Scope-normalized data.
+        """
+        normalized_data = dict(data)
+        scope = normalized_data["scope"]
+
+        if scope == ExpenseScope.ORGANIZATION:
+            normalized_data["building"] = None
+            normalized_data["unit"] = None
+            normalized_data["lease"] = None
+            return normalized_data
+
+        if scope == ExpenseScope.BUILDING:
+            normalized_data["unit"] = None
+            normalized_data["lease"] = None
+            return normalized_data
+
+        if scope == ExpenseScope.UNIT:
+            normalized_data["lease"] = None
+            return normalized_data
+
+        if scope == ExpenseScope.LEASE:
+            normalized_data["building"] = None
+            normalized_data["unit"] = None
+            return normalized_data
+
+        return normalized_data
