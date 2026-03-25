@@ -1,7 +1,7 @@
-// # Filename: src/features/expenses/pages/components/ExpensesFiltersBar.tsx
+// # Filename: src/features/expenses/pages/components/ExpenseReportingFiltersBar.tsx
+
 // ✅ New Code
 
-import { ChevronDown } from "lucide-react";
 import type {
   ExpenseBuildingOption,
   ExpenseCategoryOption,
@@ -10,85 +10,90 @@ import type {
   ExpenseVendorOption,
 } from "../../api/expensesTypes";
 
-interface ExpensesFiltersBarProps {
-  searchInput: string;
+/**
+ * Props for the ExpenseReportingFiltersBar component.
+ */
+interface ExpenseReportingFiltersBarProps {
   selectedScope: ExpenseScope | null;
   selectedCategoryId: number | null;
   selectedVendorId: number | null;
   selectedBuildingId: number | null;
   selectedUnitId: number | null;
-  showArchivedOnly: boolean;
-  totalExpenseCount: number;
-
   categories?: ExpenseCategoryOption[];
   vendors?: ExpenseVendorOption[];
   buildingOptions?: ExpenseBuildingOption[];
   unitOptions?: ExpenseUnitOption[];
-
   isPropertyLookupLoading?: boolean;
   propertyLookupErrorMessage?: string | null;
-
-  onSearchChange: (value: string) => void;
   onScopeChange: (value: ExpenseScope | null) => void;
   onCategoryChange: (value: number | null) => void;
   onVendorChange: (value: number | null) => void;
   onBuildingChange: (value: number | null) => void;
   onUnitChange: (value: number | null) => void;
-  onArchivedToggle: (nextValue: boolean) => void;
 }
-
-const SHELL_CLASS =
-  "rounded-3xl border border-neutral-800/80 bg-neutral-950 shadow-[0_0_0_1px_rgba(255,255,255,0.02)]";
-
-const INNER_CLASS = "flex flex-col gap-4 p-4 sm:p-5";
-const TOP_ROW_CLASS =
-  "flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between";
-const TITLE_WRAP_CLASS = "flex min-w-0 flex-col gap-1";
-const EYEBROW_CLASS =
-  "text-[10px] font-semibold uppercase tracking-[0.22em] text-neutral-500";
-const TITLE_CLASS = "text-lg font-semibold tracking-tight text-white";
-const DESCRIPTION_CLASS = "text-sm text-neutral-400";
-const COUNT_BADGE_CLASS =
-  "inline-flex w-fit items-center rounded-full border border-neutral-800 bg-neutral-900 px-3 py-1 text-xs font-medium text-neutral-300";
-const CONTROLS_GRID_CLASS =
-  "grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4 2xl:grid-cols-7";
-const LABEL_CLASS =
-  "mb-1.5 block text-[11px] font-semibold uppercase tracking-[0.16em] text-neutral-500";
-const INPUT_CLASS =
-  "w-full rounded-2xl border border-neutral-800 bg-neutral-900 px-4 py-2.5 text-sm text-neutral-100 outline-none transition placeholder:text-neutral-500 focus:border-emerald-500/50 focus:ring-2 focus:ring-emerald-500/20 disabled:cursor-not-allowed disabled:opacity-60";
-const SELECT_CLASS =
-  "w-full appearance-none rounded-2xl border border-neutral-800 bg-neutral-900 px-4 py-2.5 pr-14 text-sm text-neutral-100 outline-none transition focus:border-emerald-500/50 focus:ring-2 focus:ring-emerald-500/20 disabled:cursor-not-allowed disabled:opacity-60";
-const SELECT_WRAPPER_CLASS = "relative";
-const SELECT_CHEVRON_CLASS =
-  "pointer-events-none absolute right-5 top-1/2 h-4 w-4 -translate-y-1/2 text-neutral-400";
-const TOGGLE_WRAPPER_CLASS = "flex h-full items-end";
-const TOGGLE_BUTTON_BASE_CLASS =
-  "inline-flex min-h-[42px] w-full items-center justify-between rounded-2xl border px-4 py-2.5 text-sm font-medium transition focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/70 xl:w-auto xl:min-w-[170px]";
-const TOGGLE_BUTTON_ACTIVE_CLASS =
-  "border-emerald-500/25 bg-emerald-500/10 text-emerald-300";
-const TOGGLE_BUTTON_INACTIVE_CLASS =
-  "border-neutral-800 bg-neutral-900 text-neutral-300 hover:bg-neutral-800/80";
-const ACTIVE_FILTER_PILL_CLASS =
-  "inline-flex items-center rounded-full border border-neutral-800 bg-neutral-900 px-3 py-1 text-xs text-neutral-300";
-const CLEAR_BUTTON_CLASS =
-  "inline-flex items-center rounded-xl border border-neutral-800 bg-neutral-900 px-3 py-1.5 text-xs font-medium text-neutral-300 transition hover:bg-neutral-800 hover:text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/70";
-const PROPERTY_LOOKUP_ALERT_CLASS =
-  "rounded-2xl border border-amber-500/25 bg-amber-500/10 px-4 py-3 text-sm text-amber-200";
 
 interface SelectControlProps {
   id: string;
   value: string | number;
   disabled?: boolean;
-  onChange: (value: string) => void;
   children: React.ReactNode;
+  onChange: (value: string) => void;
 }
 
+const SHELL_CLASS =
+  "rounded-3xl border border-neutral-800/80 bg-neutral-950 shadow-[0_0_0_1px_rgba(255,255,255,0.02)]";
+
+const INNER_CLASS = "flex flex-col gap-5 p-5 sm:p-6";
+
+const TOP_ROW_CLASS =
+  "flex flex-col gap-3 xl:flex-row xl:items-start xl:justify-between";
+
+const EYEBROW_CLASS =
+  "text-[10px] font-semibold uppercase tracking-[0.22em] text-neutral-500";
+
+const TITLE_CLASS = "text-2xl font-semibold tracking-tight text-white";
+
+const DESCRIPTION_CLASS = "max-w-3xl text-sm leading-6 text-neutral-400";
+
+const BADGE_CLASS =
+  "inline-flex items-center self-start rounded-full border border-neutral-800 bg-neutral-900 px-3 py-1 text-xs font-medium text-neutral-300";
+
+const ALERT_CLASS =
+  "rounded-2xl border border-amber-500/20 bg-amber-500/10 px-4 py-3 text-sm text-amber-200";
+
+const CONTROLS_GRID_CLASS =
+  "grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-5";
+
+const LABEL_CLASS =
+  "mb-2 block text-[11px] font-semibold uppercase tracking-[0.18em] text-neutral-500";
+
+const SELECT_WRAPPER_CLASS = "relative";
+
+const SELECT_CLASS =
+  "w-full appearance-none rounded-2xl border border-neutral-800 bg-neutral-900 px-4 py-3 pr-11 text-sm text-white outline-none transition placeholder:text-neutral-500 hover:border-neutral-700 focus:border-emerald-500/40 focus:ring-2 focus:ring-emerald-500/15 disabled:cursor-not-allowed disabled:opacity-60";
+
+const CHEVRON_CLASS =
+  "pointer-events-none absolute inset-y-0 right-4 flex items-center text-neutral-500";
+
+const ACTIVE_FILTER_PILL_CLASS =
+  "inline-flex items-center rounded-full border border-neutral-800 bg-neutral-900 px-3 py-1 text-xs font-medium text-neutral-300";
+
+const CLEAR_BUTTON_CLASS =
+  "inline-flex items-center rounded-full border border-neutral-800 bg-neutral-950 px-3 py-1 text-xs font-medium text-neutral-300 transition hover:border-neutral-700 hover:bg-neutral-900 hover:text-white";
+
+/**
+ * Lightweight select wrapper so the reporting filter bar visually matches
+ * the records filter bar without forcing a broader refactor yet.
+ *
+ * @param props Component props.
+ * @returns Styled select control.
+ */
 function SelectControl({
   id,
   value,
   disabled = false,
-  onChange,
   children,
+  onChange,
 }: SelectControlProps) {
   return (
     <div className={SELECT_WRAPPER_CLASS}>
@@ -102,20 +107,48 @@ function SelectControl({
         {children}
       </select>
 
-      <ChevronDown className={SELECT_CHEVRON_CLASS} />
+      <div className={CHEVRON_CLASS} aria-hidden="true">
+        <svg
+          viewBox="0 0 20 20"
+          fill="none"
+          className="h-4 w-4"
+          xmlns="http://www.w3.org/2000/svg"
+        >
+          <path
+            d="M5 7.5L10 12.5L15 7.5"
+            stroke="currentColor"
+            strokeWidth="1.5"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
+        </svg>
+      </div>
     </div>
   );
 }
 
+/**
+ * Parses a nullable numeric select value.
+ *
+ * @param value Raw select value.
+ * @returns Parsed numeric identifier or null.
+ */
 function parseNullableId(value: string): number | null {
   if (!value) {
     return null;
   }
 
-  const parsed = Number(value);
+  const parsed = Number.parseInt(value, 10);
+
   return Number.isNaN(parsed) ? null : parsed;
 }
 
+/**
+ * Parses a nullable scope select value.
+ *
+ * @param value Raw select value.
+ * @returns Scope or null.
+ */
 function parseNullableScope(value: string): ExpenseScope | null {
   if (!value) {
     return null;
@@ -124,58 +157,12 @@ function parseNullableScope(value: string): ExpenseScope | null {
   return value as ExpenseScope;
 }
 
-function getSelectedCategoryName(
-  categories: ExpenseCategoryOption[],
-  selectedCategoryId: number | null,
-): string | null {
-  if (selectedCategoryId == null) {
-    return null;
-  }
-
-  const match = categories.find(
-    (category) => category.id === selectedCategoryId,
-  );
-  return match?.name ?? null;
-}
-
-function getSelectedVendorName(
-  vendors: ExpenseVendorOption[],
-  selectedVendorId: number | null,
-): string | null {
-  if (selectedVendorId == null) {
-    return null;
-  }
-
-  const match = vendors.find((vendor) => vendor.id === selectedVendorId);
-  return match?.name ?? null;
-}
-
-function getSelectedBuildingName(
-  buildingOptions: ExpenseBuildingOption[],
-  selectedBuildingId: number | null,
-): string | null {
-  if (selectedBuildingId == null) {
-    return null;
-  }
-
-  const match = buildingOptions.find(
-    (building) => building.id === selectedBuildingId,
-  );
-  return match?.name ?? null;
-}
-
-function getSelectedUnitName(
-  unitOptions: ExpenseUnitOption[],
-  selectedUnitId: number | null,
-): string | null {
-  if (selectedUnitId == null) {
-    return null;
-  }
-
-  const match = unitOptions.find((unit) => unit.id === selectedUnitId);
-  return match?.name ?? match?.unit_number ?? null;
-}
-
+/**
+ * Resolves a human-readable scope label for active filter pills.
+ *
+ * @param selectedScope Selected scope value.
+ * @returns Readable scope label or null.
+ */
 function getSelectedScopeLabel(
   selectedScope: ExpenseScope | null,
 ): string | null {
@@ -202,29 +189,125 @@ function getSelectedScopeLabel(
   return null;
 }
 
-export default function ExpensesFiltersBar({
-  searchInput,
+/**
+ * Resolves a selected category name from available options.
+ *
+ * @param categories Category options.
+ * @param selectedCategoryId Selected category id.
+ * @returns Category name or null.
+ */
+function getSelectedCategoryName(
+  categories: ExpenseCategoryOption[],
+  selectedCategoryId: number | null,
+): string | null {
+  if (selectedCategoryId == null) {
+    return null;
+  }
+
+  const match = categories.find(
+    (category) => category.id === selectedCategoryId,
+  );
+
+  return match?.name ?? null;
+}
+
+/**
+ * Resolves a selected vendor name from available options.
+ *
+ * @param vendors Vendor options.
+ * @param selectedVendorId Selected vendor id.
+ * @returns Vendor name or null.
+ */
+function getSelectedVendorName(
+  vendors: ExpenseVendorOption[],
+  selectedVendorId: number | null,
+): string | null {
+  if (selectedVendorId == null) {
+    return null;
+  }
+
+  const match = vendors.find((vendor) => vendor.id === selectedVendorId);
+
+  return match?.name ?? null;
+}
+
+/**
+ * Resolves a selected building name from available options.
+ *
+ * @param buildingOptions Building options.
+ * @param selectedBuildingId Selected building id.
+ * @returns Building name or null.
+ */
+function getSelectedBuildingName(
+  buildingOptions: ExpenseBuildingOption[],
+  selectedBuildingId: number | null,
+): string | null {
+  if (selectedBuildingId == null) {
+    return null;
+  }
+
+  const match = buildingOptions.find(
+    (building) => building.id === selectedBuildingId,
+  );
+
+  return match?.name ?? null;
+}
+
+/**
+ * Resolves a selected unit name from available options.
+ *
+ * @param unitOptions Unit options.
+ * @param selectedUnitId Selected unit id.
+ * @returns Unit name or null.
+ */
+function getSelectedUnitName(
+  unitOptions: ExpenseUnitOption[],
+  selectedUnitId: number | null,
+): string | null {
+  if (selectedUnitId == null) {
+    return null;
+  }
+
+  const match = unitOptions.find((unit) => unit.id === selectedUnitId);
+
+  return match?.name ?? match?.unit_number ?? null;
+}
+
+/**
+ * Reporting-focused filter bar for the expense reporting workspace.
+ *
+ * Responsibilities:
+ * - expose reporting-safe filters only
+ * - mirror the records filter bar design language
+ * - surface active filter state clearly
+ *
+ * Non-responsibilities:
+ * - fetching reporting data
+ * - search input
+ * - archived-only toggles
+ *
+ * @param props Component props.
+ * @returns Reporting filter bar UI.
+ */
+export default function ExpenseReportingFiltersBar({
   selectedScope,
   selectedCategoryId,
   selectedVendorId,
   selectedBuildingId,
   selectedUnitId,
-  showArchivedOnly,
-  totalExpenseCount,
   categories = [],
   vendors = [],
   buildingOptions = [],
   unitOptions = [],
   isPropertyLookupLoading = false,
   propertyLookupErrorMessage = null,
-  onSearchChange,
   onScopeChange,
   onCategoryChange,
   onVendorChange,
   onBuildingChange,
   onUnitChange,
-  onArchivedToggle,
-}: ExpensesFiltersBarProps) {
+}: ExpenseReportingFiltersBarProps) {
+  // # Step 1: Resolve active filter labels for display pills.
   const selectedScopeLabel = getSelectedScopeLabel(selectedScope);
   const selectedCategoryName = getSelectedCategoryName(
     categories,
@@ -237,61 +320,43 @@ export default function ExpensesFiltersBar({
   );
   const selectedUnitName = getSelectedUnitName(unitOptions, selectedUnitId);
 
+  // # Step 2: Determine whether any reporting filters are active.
   const hasActiveFilters = Boolean(
-    searchInput.trim() ||
-      selectedScope !== null ||
+    selectedScope !== null ||
       selectedCategoryId !== null ||
       selectedVendorId !== null ||
       selectedBuildingId !== null ||
-      selectedUnitId !== null ||
-      showArchivedOnly,
+      selectedUnitId !== null,
   );
 
   return (
     <section className={SHELL_CLASS}>
       <div className={INNER_CLASS}>
         <div className={TOP_ROW_CLASS}>
-          <div className={TITLE_WRAP_CLASS}>
-            <p className={EYEBROW_CLASS}>Records workspace</p>
-            <h2 className={TITLE_CLASS}>Search and filter expenses</h2>
+          <div className="flex min-w-0 flex-col gap-1">
+            <p className={EYEBROW_CLASS}>Reporting workspace</p>
+            <h2 className={TITLE_CLASS}>Filter reporting</h2>
             <p className={DESCRIPTION_CLASS}>
-              Narrow the operational list by scope, property, category, and
-              vendor.
+              Slice reporting by scope, property, category, and vendor while
+              keeping the workspace deterministic and easy to scan.
             </p>
           </div>
 
-          <div className={COUNT_BADGE_CLASS}>
-            {totalExpenseCount} {totalExpenseCount === 1 ? "expense" : "expenses"}
-          </div>
+          <div className={BADGE_CLASS}>Shared reporting filters</div>
         </div>
 
         {propertyLookupErrorMessage ? (
-          <div className={PROPERTY_LOOKUP_ALERT_CLASS}>
-            {propertyLookupErrorMessage}
-          </div>
+          <div className={ALERT_CLASS}>{propertyLookupErrorMessage}</div>
         ) : null}
 
         <div className={CONTROLS_GRID_CLASS}>
-          <div className="2xl:col-span-2">
-            <label htmlFor="expense-search" className={LABEL_CLASS}>
-              Search
-            </label>
-            <input
-              id="expense-search"
-              type="text"
-              value={searchInput}
-              onChange={(event) => onSearchChange(event.target.value)}
-              placeholder="Search by title, description, notes, or amount..."
-              className={INPUT_CLASS}
-            />
-          </div>
-
           <div>
-            <label htmlFor="expense-scope-filter" className={LABEL_CLASS}>
+            <label htmlFor="reporting-scope-filter" className={LABEL_CLASS}>
               Scope
             </label>
+
             <SelectControl
-              id="expense-scope-filter"
+              id="reporting-scope-filter"
               value={selectedScope ?? ""}
               onChange={(value) => onScopeChange(parseNullableScope(value))}
             >
@@ -299,15 +364,17 @@ export default function ExpensesFiltersBar({
               <option value="organization">Portfolio only</option>
               <option value="building">Building only</option>
               <option value="unit">Unit only</option>
+              <option value="lease">Lease only</option>
             </SelectControl>
           </div>
 
           <div>
-            <label htmlFor="expense-category-filter" className={LABEL_CLASS}>
+            <label htmlFor="reporting-category-filter" className={LABEL_CLASS}>
               Category
             </label>
+
             <SelectControl
-              id="expense-category-filter"
+              id="reporting-category-filter"
               value={selectedCategoryId ?? ""}
               onChange={(value) => onCategoryChange(parseNullableId(value))}
             >
@@ -321,11 +388,12 @@ export default function ExpensesFiltersBar({
           </div>
 
           <div>
-            <label htmlFor="expense-vendor-filter" className={LABEL_CLASS}>
+            <label htmlFor="reporting-vendor-filter" className={LABEL_CLASS}>
               Vendor
             </label>
+
             <SelectControl
-              id="expense-vendor-filter"
+              id="reporting-vendor-filter"
               value={selectedVendorId ?? ""}
               onChange={(value) => onVendorChange(parseNullableId(value))}
             >
@@ -339,19 +407,17 @@ export default function ExpensesFiltersBar({
           </div>
 
           <div>
-            <label htmlFor="expense-building-filter" className={LABEL_CLASS}>
+            <label htmlFor="reporting-building-filter" className={LABEL_CLASS}>
               Building
             </label>
+
             <SelectControl
-              id="expense-building-filter"
+              id="reporting-building-filter"
               value={selectedBuildingId ?? ""}
               onChange={(value) => onBuildingChange(parseNullableId(value))}
-              disabled={isPropertyLookupLoading && buildingOptions.length === 0}
             >
               <option value="">
-                {isPropertyLookupLoading && buildingOptions.length === 0
-                  ? "Loading buildings..."
-                  : "All buildings"}
+                {isPropertyLookupLoading ? "Loading buildings..." : "All buildings"}
               </option>
               {buildingOptions.map((building) => (
                 <option key={building.id} value={building.id}>
@@ -362,11 +428,12 @@ export default function ExpensesFiltersBar({
           </div>
 
           <div>
-            <label htmlFor="expense-unit-filter" className={LABEL_CLASS}>
+            <label htmlFor="reporting-unit-filter" className={LABEL_CLASS}>
               Unit
             </label>
+
             <SelectControl
-              id="expense-unit-filter"
+              id="reporting-unit-filter"
               value={selectedUnitId ?? ""}
               onChange={(value) => onUnitChange(parseNullableId(value))}
               disabled={!selectedBuildingId}
@@ -381,49 +448,13 @@ export default function ExpensesFiltersBar({
               ))}
             </SelectControl>
           </div>
-
-          <div className={TOGGLE_WRAPPER_CLASS}>
-            <button
-              type="button"
-              onClick={() => onArchivedToggle(!showArchivedOnly)}
-              className={`${TOGGLE_BUTTON_BASE_CLASS} ${
-                showArchivedOnly
-                  ? TOGGLE_BUTTON_ACTIVE_CLASS
-                  : TOGGLE_BUTTON_INACTIVE_CLASS
-              }`}
-              aria-pressed={showArchivedOnly}
-            >
-              <span>Archived only</span>
-              <span className="ml-3 text-xs">
-                {showArchivedOnly ? "On" : "Off"}
-              </span>
-            </button>
-          </div>
         </div>
 
         {hasActiveFilters ? (
           <div className="flex flex-wrap items-center gap-2 border-t border-neutral-800 pt-3">
-            {searchInput.trim() ? (
-              <span className={ACTIVE_FILTER_PILL_CLASS}>
-                Search: {searchInput.trim()}
-              </span>
-            ) : null}
-
             {selectedScopeLabel ? (
               <span className={ACTIVE_FILTER_PILL_CLASS}>
                 Scope: {selectedScopeLabel}
-              </span>
-            ) : null}
-
-            {selectedBuildingName ? (
-              <span className={ACTIVE_FILTER_PILL_CLASS}>
-                Building: {selectedBuildingName}
-              </span>
-            ) : null}
-
-            {selectedUnitName ? (
-              <span className={ACTIVE_FILTER_PILL_CLASS}>
-                Unit: {selectedUnitName}
               </span>
             ) : null}
 
@@ -439,20 +470,26 @@ export default function ExpensesFiltersBar({
               </span>
             ) : null}
 
-            {showArchivedOnly ? (
-              <span className={ACTIVE_FILTER_PILL_CLASS}>Archived only</span>
+            {selectedBuildingName ? (
+              <span className={ACTIVE_FILTER_PILL_CLASS}>
+                Building: {selectedBuildingName}
+              </span>
+            ) : null}
+
+            {selectedUnitName ? (
+              <span className={ACTIVE_FILTER_PILL_CLASS}>
+                Unit: {selectedUnitName}
+              </span>
             ) : null}
 
             <button
               type="button"
               onClick={() => {
-                onSearchChange("");
                 onScopeChange(null);
                 onCategoryChange(null);
                 onVendorChange(null);
                 onBuildingChange(null);
                 onUnitChange(null);
-                onArchivedToggle(false);
               }}
               className={CLEAR_BUTTON_CLASS}
             >

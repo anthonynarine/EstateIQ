@@ -1,6 +1,6 @@
 // # Filename: src/features/expenses/pages/utils/expensePageMappers.ts
 
-import type { ExpenseFormValues } from "../components/Reporting";
+import type { ExpenseFormValues } from "../components/ExpenseFormSection";
 import type { ExpenseDetail, ExpenseListItem } from "../../api/expensesTypes";
 
 type ExpenseRecord = ExpenseDetail | ExpenseListItem;

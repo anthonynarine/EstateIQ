@@ -17,6 +17,7 @@ import type {
 } from "../api/expensesTypes";
 import { useExpensePropertyLookups } from "../hooks/useExpensePropertyLookups";
 import CreateVendorModal from "./create-vendor/CreateVendorModal";
+import ExpenseNotesModal from "./expense-form/ExpenseNotesModal";
 import { useCreateVendorForm } from "./create-vendor/useCreateVendorForm";
 import ExpenseFormActions from "./expense-form/ExpenseFormActions";
 import ExpenseFormFields from "./expense-form/ExpenseFormFields";
@@ -40,6 +41,12 @@ interface ExpenseFormPanelProps {
   onCancel?: () => void;
 }
 
+/**
+ * Returns a safe vendor create error message for UI display.
+ *
+ * @param error Unknown mutation error.
+ * @returns User-friendly error string.
+ */
 function getVendorCreateErrorMessage(error: unknown): string {
   if (isAxiosError(error)) {
     const responseData = error.response?.data;
@@ -137,6 +144,7 @@ export default function ExpenseFormPanel({
   } = useCreateVendorForm();
 
   const [isVendorModalOpen, setIsVendorModalOpen] = useState(false);
+  const [isNotesModalOpen, setIsNotesModalOpen] = useState(false);
   const [vendorSubmitError, setVendorSubmitError] = useState<string | null>(
     null,
   );
@@ -197,6 +205,19 @@ export default function ExpenseFormPanel({
     await createVendorMutation.mutateAsync(payload);
   };
 
+  const handleOpenNotesModal = () => {
+    setIsNotesModalOpen(true);
+  };
+
+  const handleCloseNotesModal = () => {
+    setIsNotesModalOpen(false);
+  };
+
+  const handleSaveNotes = (value: string) => {
+    updateField("notes", value);
+    setIsNotesModalOpen(false);
+  };
+
   return (
     <>
       <section className="flex h-full flex-col overflow-hidden rounded-3xl border border-neutral-800/80 bg-neutral-950 shadow-[0_0_0_1px_rgba(255,255,255,0.02)]">
@@ -210,14 +231,12 @@ export default function ExpenseFormPanel({
               {panelTitle}
             </h2>
 
-            <p className="text-sm text-neutral-400">
-              {panelDescription}
-            </p>
+            <p className="text-sm text-neutral-400">{panelDescription}</p>
           </div>
         </div>
 
-        <div className="flex flex-1 flex-col px-4 py-4 sm:px-5 sm:py-4">
-          <form onSubmit={handleSubmit} className="flex h-full flex-col gap-3">
+        <div className="flex flex-1 flex-col px-4 py-3.5 sm:px-5 sm:py-4">
+          <form onSubmit={handleSubmit} className="flex h-full flex-col gap-2.5">
             {combinedError ? (
               <div className="rounded-2xl border border-red-500/30 bg-red-500/10 p-4 text-sm text-red-200">
                 {combinedError}
@@ -242,7 +261,7 @@ export default function ExpenseFormPanel({
               </div>
             ) : null}
 
-            <div className="flex-1">
+            <div className="min-h-0">
               <ExpenseFormFields
                 formValues={formValues}
                 categories={categories}
@@ -251,15 +270,18 @@ export default function ExpenseFormPanel({
                 unitOptions={resolvedUnitOptions}
                 updateField={updateField}
                 onAddVendorClick={handleOpenVendorModal}
+                onOpenNotesModal={handleOpenNotesModal}
                 isAddVendorDisabled={isAddVendorDisabled}
               />
             </div>
 
-            <ExpenseFormActions
-              mode={mode}
-              isSubmitting={isSubmitting}
-              onCancel={onCancel}
-            />
+            <div className="pt-1">
+              <ExpenseFormActions
+                mode={mode}
+                isSubmitting={isSubmitting}
+                onCancel={onCancel}
+              />
+            </div>
           </form>
         </div>
       </section>
@@ -273,6 +295,13 @@ export default function ExpenseFormPanel({
         onClose={handleCloseVendorModal}
         onChange={updateVendorField}
         onSubmit={handleCreateVendor}
+      />
+
+      <ExpenseNotesModal
+        isOpen={isNotesModalOpen}
+        initialValue={formValues.notes ?? ""}
+        onClose={handleCloseNotesModal}
+        onSave={handleSaveNotes}
       />
     </>
   );
