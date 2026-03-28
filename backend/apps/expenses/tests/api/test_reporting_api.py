@@ -143,7 +143,10 @@ def test_breakdown_endpoints_honor_top_n(
     building_a1,
     building_a2,
 ):
-    category_two = create_category(organization=organization_a, name="Utilities")
+    category_two = create_category(
+        organization=organization_a,
+        name="Zz Reporting TopN Utilities",
+    )
 
     create_expense(
         organization=organization_a,

@@ -15,7 +15,7 @@ It is not a rent tracker.
 It is not a lightweight property directory.  
 It is not built around tenant self-service first.
 
-It is being designed as a **financial operating system** where the core system produces structured, reliable portfolio data and AI sits on top of that data to explain risk, performance, delinquency, and portfolio health.
+It is being designed as a **financial operating system** where the core platform produces structured, reliable portfolio data and AI sits on top of that data to explain risk, performance, delinquency, and portfolio health.
 
 The target user is the small landlord or operator who needs institutional-grade financial clarity without enterprise software bloat.
 
@@ -47,7 +47,7 @@ flowchart TD
     A[Portfolio Owner / Manager] --> B[React + TypeScript Frontend]
     B --> C[Django + DRF Modular Monolith]
     C --> D[(PostgreSQL)]
-    C --> F[Object Storage / Documents]
+    C --> E[(Private Object Storage / Documents)]
 
     C --> G[Core / Organizations / Auth]
     C --> H[Properties]
@@ -65,11 +65,11 @@ flowchart TD
     D --> M
 ```
 
-This architecture reflects the system as it exists today: a React frontend, a Django + DRF modular monolith, PostgreSQL as the system of record, and object storage for documents and receipts.
+This diagram reflects the architecture as it exists today: a React frontend, a Django + DRF modular monolith, PostgreSQL as the system of record, and private document storage for receipts and lease-related files.
 
-It also reflects the core design principle of the product:
+It also reflects the central design principle of the product:
 
-**the application creates trusted financial truth first, and AI interprets that truth second.**
+**The application creates trusted financial truth first, and AI interprets that truth second.**
 
 ---
 
@@ -83,7 +83,7 @@ It also reflects the core design principle of the product:
 - organization-scoped access model
 - buildings, units, leasing, expenses, and reporting foundations
 - billing ledger domain being formalized
-- object storage path for documents and receipts
+- private document storage path for receipts and operational files
 
 ### Planned infrastructure
 
@@ -195,12 +195,12 @@ flowchart LR
 ```mermaid
 flowchart LR
     U[User Browser] --> DNS[DNS]
-    DNS --> EDGE[CDN / Edge / WAF]
+    DNS --> EDGE[CDN / Edge / HTTPS Boundary]
     EDGE --> APP[React App]
     EDGE --> API[Django + DRF API]
     API --> DB[(PostgreSQL)]
-    API --> OBJ[(Object Storage)]
-    API --> FUTURE[Planned: Redis / Jobs / Expanded Observability]
+    API --> OBJ[(Private Object Storage)]
+    API --> FUTURE[Planned: Redis / Jobs / Observability]
 ```
 
 ### What each part does
@@ -215,8 +215,10 @@ DNS resolves the application domain and routes traffic to the edge layer.
 
 This sits outside the app code, but it is still part of the real system architecture because every request starts here.
 
-#### CDN / Edge / WAF
-The edge layer serves cached static assets, terminates or forwards HTTPS traffic depending on deployment setup, and becomes the right place for web protection, request filtering, and future traffic hardening.
+#### CDN / Edge / HTTPS boundary
+The edge layer serves static assets, handles or forwards encrypted traffic, and is the right place for future traffic hardening and request protection.
+
+Even if every edge optimization is not fully deployed yet, this remains the logical outer trust boundary of the system.
 
 #### React application
 The React app owns user interaction, local UI state, and client-side data fetching patterns.
@@ -224,7 +226,7 @@ The React app owns user interaction, local UI state, and client-side data fetchi
 It should be fast, mobile-friendly, and clear, but it should not contain the source of truth for billing, expenses, or lease state.
 
 #### Django + DRF API
-The backend is the operational core of the system.
+The backend is the operational core of the platform.
 
 It owns:
 
@@ -242,8 +244,8 @@ PostgreSQL is the system of record.
 
 Buildings, units, leases, expenses, charges, payments, allocations, and reporting inputs all flow from structured data stored here.
 
-#### Object storage
-Documents and receipts should live in object storage rather than bloating the relational database.
+#### Private object storage
+Receipts and lease documents should live in private object storage rather than bloating the relational database.
 
 This keeps the financial core clean while still supporting real operational workflows.
 
@@ -251,6 +253,95 @@ This keeps the financial core clean while still supporting real operational work
 Redis, background jobs, and deeper observability are important future layers, but they should be introduced when the application actually needs caching, scheduled processing, async workflows, or more advanced runtime visibility.
 
 That is the right sequence for this product.
+
+---
+
+## Security boundaries
+
+EstateIQ is a multi-tenant financial system.  
+That means trust must be earned in layers.
+
+```mermaid
+flowchart TB
+    USER[Authenticated User]
+    CLIENT[Browser / React Client]
+    EDGE[Edge / HTTPS Boundary]
+    API[Django API]
+    AUTH[Auth / Session Validation]
+    ORG[Organization Resolution]
+    PERM[Role Permissions]
+    DOMAIN[Services / Selectors / Serializers]
+    DB[(PostgreSQL)]
+    FILES[(Private Object Storage)]
+    AUDIT[Audit Logs]
+
+    USER --> CLIENT
+    CLIENT --> EDGE
+    EDGE --> API
+    API --> AUTH
+    AUTH --> ORG
+    ORG --> PERM
+    PERM --> DOMAIN
+    DOMAIN --> DB
+    DOMAIN --> FILES
+    DOMAIN --> AUDIT
+
+    CLIENT -. never trusted for org isolation .-> DB
+    CLIENT -. never trusted for authorization .-> FILES
+```
+
+### Why this matters
+
+- The browser can render state, but it is not the final authority on access.
+- Every request must be authenticated, organization-scoped, and permission-checked before domain logic runs.
+- Sensitive data and files must stay inside explicit access boundaries.
+- Audit logs are part of the security model, not an afterthought.
+
+### Security model in plain English
+
+#### The browser is not a trust boundary
+The frontend can hold session context and render the right screens, but it is not the final authority on access.
+
+The client can be tampered with. That means the backend must assume that every request needs real validation.
+
+#### Authentication comes before business logic
+Before the backend performs any domain work, it must determine whether the request belongs to a real authenticated user or service context.
+
+This is the first application-level trust gate.
+
+#### Organization resolution is the central tenant boundary
+EstateIQ is multi-tenant. That means the most dangerous class of failure is cross-tenant leakage.
+
+Because of that, the backend must reliably resolve the active organization and ensure every queryset and domain operation stays inside that organization.
+
+If this step is weak, the whole system is weak.
+
+#### Role permissions shape what authenticated users can actually do
+Authentication answers **who are you**.  
+Authorization answers **what are you allowed to do**.
+
+A valid user still may not have permission to:
+
+- invite members
+- mutate lease data
+- create payments
+- access accounting exports
+- change expense records
+
+#### Domain logic should not bypass security assumptions
+Even inside trusted backend code, services, selectors, and serializers should still assume they are operating within organization and permission constraints.
+
+Good architecture does not forget security once the request enters the app. It carries those constraints through the runtime path.
+
+#### Database and files need separate protection
+The database holds the most sensitive structured records. Files such as receipts and lease documents are private operational assets.
+
+Both need controlled access patterns, and neither should be treated as publicly accessible by default.
+
+#### Audit logs are part of the trust story
+In a financial platform, it is not enough to say that an action was allowed.
+
+You also want a durable record of who did it, when they did it, and what object was touched.
 
 ---
 
@@ -311,7 +402,7 @@ That separation is what keeps the system teachable, testable, and safe.
 
 ### Supporting infrastructure
 
-- object storage for documents and receipts
+- private object storage for documents and receipts
 - Redis and background jobs planned as the platform grows
 
 ### Security and auth
@@ -373,6 +464,50 @@ That means:
 - deterministic logic comes before AI interpretation
 
 This is what makes future features like executive summaries, delinquency risk explanations, and portfolio health insights credible.
+
+---
+
+## What exists now
+
+The current platform direction and implemented foundation already support the real shape of the product.
+
+### Current foundation
+
+- organization-scoped platform model
+- buildings and units domain
+- lease-driven occupancy model
+- tenant / lease relationship flows
+- expense domain and reporting-oriented architecture
+- React + TypeScript frontend shell and provider structure
+- Django + DRF backend with layered architecture patterns
+
+### Actively being formalized now
+
+- full **billing ledger domain**
+  - charge
+  - payment
+  - allocation
+  - lease ledger views
+  - delinquency selectors
+  - internal billing alerts
+
+This is important: billing is being built as **accounts receivable infrastructure**, not as a tenant portal.
+
+---
+
+## Why the modular monolith is the right move
+
+At this phase, a modular monolith is stronger than forcing microservices too early.
+
+It gives the project:
+
+- faster iteration
+- shared transactional boundaries
+- easier local development
+- simpler testing
+- safer refactors across leasing, expenses, billing, and reporting
+
+That matters because the core product value is not service sprawl. It is trustworthy financial behavior.
 
 ---
 
