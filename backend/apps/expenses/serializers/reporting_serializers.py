@@ -1,4 +1,3 @@
-
 """
 Reporting serializers for the expenses domain.
 
@@ -10,12 +9,12 @@ Typical frontend uses:
 - monthly expense trend chart
 - expense by category chart
 - expense by building chart
+- expense by unit chart
 - dashboard/report payload composition
 """
 
 from __future__ import annotations
 
-from decimal import Decimal
 from typing import Any
 
 from rest_framework import serializers
@@ -28,11 +27,20 @@ class ExpenseMonthlyTrendPointSerializer(serializers.Serializer):
     amount = serializers.DecimalField(max_digits=12, decimal_places=2)
 
     def get_month(self, obj: dict[str, Any]) -> str | None:
-        """Return a YYYY-MM chart label from a month bucket."""
+        """Return a YYYY-MM chart label from a month bucket.
+
+        Args:
+            obj: Aggregated monthly trend row.
+
+        Returns:
+            str | None: YYYY-MM month label or None.
+        """
+        # Step 1: Resolve the month bucket from the aggregated row.
         month_bucket = obj.get("month_bucket")
         if month_bucket is None:
             return None
 
+        # Step 2: Convert the bucket into a chart-safe label.
         return month_bucket.strftime("%Y-%m")
 
 
@@ -41,6 +49,7 @@ class ExpenseCategoryBreakdownSerializer(serializers.Serializer):
 
     category_id = serializers.IntegerField(allow_null=True)
     category_name = serializers.CharField()
+    count = serializers.IntegerField()
     amount = serializers.DecimalField(max_digits=12, decimal_places=2)
 
 
@@ -49,6 +58,16 @@ class ExpenseBuildingBreakdownSerializer(serializers.Serializer):
 
     building_id = serializers.IntegerField(allow_null=True)
     building_name = serializers.CharField()
+    count = serializers.IntegerField()
+    amount = serializers.DecimalField(max_digits=12, decimal_places=2)
+
+
+class ExpenseUnitBreakdownSerializer(serializers.Serializer):
+    """Aggregate row for expense-by-unit charts."""
+
+    unit_id = serializers.IntegerField(allow_null=True)
+    unit_name = serializers.CharField()
+    count = serializers.IntegerField()
     amount = serializers.DecimalField(max_digits=12, decimal_places=2)
 
 
@@ -68,6 +87,7 @@ class ExpenseDashboardChartsSerializer(serializers.Serializer):
     monthly_expense_trend = ExpenseMonthlyTrendPointSerializer(many=True)
     expense_by_category = ExpenseCategoryBreakdownSerializer(many=True)
     expense_by_building = ExpenseBuildingBreakdownSerializer(many=True)
+    expense_by_unit = ExpenseUnitBreakdownSerializer(many=True, required=False)
 
 
 class ExpenseDashboardSerializer(serializers.Serializer):

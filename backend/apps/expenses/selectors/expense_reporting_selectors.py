@@ -1,3 +1,4 @@
+# ✅ New Code
 
 """
 Reporting selectors for the expenses domain.
@@ -15,7 +16,7 @@ from __future__ import annotations
 from decimal import Decimal
 from typing import Any
 
-from django.db.models import Avg, Count, DecimalField, Q, Sum, Value
+from django.db.models import Avg, Count, DecimalField, Q, QuerySet, Sum, Value
 from django.db.models.functions import Coalesce, TruncMonth
 
 from apps.expenses.models import Expense
@@ -23,10 +24,19 @@ from apps.expenses.models import Expense
 
 def _apply_common_reporting_filters(
     *,
-    queryset,
+    queryset: QuerySet[Expense],
     filters: dict[str, Any],
-):
-    """Apply normalized reporting filters to a base expense queryset."""
+) -> QuerySet[Expense]:
+    """Apply normalized reporting filters to a base expense queryset.
+
+    Args:
+        queryset: Base org-scoped expense queryset.
+        filters: Normalized reporting filters built by the view/mixin layer.
+
+    Returns:
+        QuerySet[Expense]: Filtered reporting queryset.
+    """
+    # Step 1: Resolve supported filter inputs.
     building = filters.get("building")
     unit = filters.get("unit")
     lease = filters.get("lease")
@@ -43,6 +53,7 @@ def _apply_common_reporting_filters(
     due_date_to = filters.get("due_date_to")
     search = filters.get("search")
 
+    # Step 2: Apply relational filters.
     if building:
         queryset = queryset.filter(building_id=building)
 
@@ -58,6 +69,7 @@ def _apply_common_reporting_filters(
     if vendor:
         queryset = queryset.filter(vendor_id=vendor)
 
+    # Step 3: Apply scalar/state filters.
     if status:
         queryset = queryset.filter(status=status)
 
@@ -73,6 +85,7 @@ def _apply_common_reporting_filters(
     if is_archived is not None:
         queryset = queryset.filter(is_archived=is_archived)
 
+    # Step 4: Apply date window filters.
     if expense_date_from:
         queryset = queryset.filter(expense_date__gte=expense_date_from)
 
@@ -85,6 +98,7 @@ def _apply_common_reporting_filters(
     if due_date_to:
         queryset = queryset.filter(due_date__lte=due_date_to)
 
+    # Step 5: Apply free-text search.
     if search:
         queryset = queryset.filter(
             Q(title__icontains=search)
@@ -101,10 +115,24 @@ def _base_reporting_queryset(
     *,
     organization,
     filters: dict[str, Any],
-):
-    """Return the org-scoped base queryset for expense reporting."""
+) -> QuerySet[Expense]:
+    """Return the org-scoped base queryset for expense reporting.
+
+    Args:
+        organization: Request-scoped organization.
+        filters: Normalized reporting filters.
+
+    Returns:
+        QuerySet[Expense]: Org-safe reporting queryset.
+    """
+    # Step 1: Start from the org boundary.
     queryset = Expense.objects.filter(organization=organization)
-    return _apply_common_reporting_filters(queryset=queryset, filters=filters)
+
+    # Step 2: Apply the shared reporting filters.
+    return _apply_common_reporting_filters(
+        queryset=queryset,
+        filters=filters,
+    )
 
 
 def summarize_expenses(
@@ -112,12 +140,22 @@ def summarize_expenses(
     organization,
     filters: dict[str, Any],
 ) -> dict[str, Any]:
-    """Return top-level summary metrics for expense reporting."""
+    """Return top-level summary metrics for expense reporting.
+
+    Args:
+        organization: Request-scoped organization.
+        filters: Normalized reporting filters.
+
+    Returns:
+        dict[str, Any]: KPI-style summary payload.
+    """
+    # Step 1: Resolve the reporting queryset.
     queryset = _base_reporting_queryset(
         organization=organization,
         filters=filters,
     )
 
+    # Step 2: Aggregate deterministic summary values.
     summary = queryset.aggregate(
         total_amount=Coalesce(
             Sum("amount"),
@@ -132,6 +170,7 @@ def summarize_expenses(
         ),
     )
 
+    # Step 3: Return the frontend-facing summary contract.
     return {
         "total_amount": summary["total_amount"],
         "expense_count": summary["expense_count"],
@@ -146,12 +185,22 @@ def monthly_expense_trend(
     organization,
     filters: dict[str, Any],
 ) -> list[dict[str, Any]]:
-    """Return grouped monthly expense totals for trend charts."""
+    """Return grouped monthly expense totals for trend charts.
+
+    Args:
+        organization: Request-scoped organization.
+        filters: Normalized reporting filters.
+
+    Returns:
+        list[dict[str, Any]]: Monthly reporting rows.
+    """
+    # Step 1: Resolve the reporting queryset.
     queryset = _base_reporting_queryset(
         organization=organization,
         filters=filters,
     )
 
+    # Step 2: Group by truncated expense month.
     rows = (
         queryset.annotate(month_bucket=TruncMonth("expense_date"))
         .values("month_bucket")
@@ -174,31 +223,45 @@ def expense_totals_by_category(
     filters: dict[str, Any],
     top_n: int | None = None,
 ) -> list[dict[str, Any]]:
-    """Return grouped expense totals by category."""
+    """Return grouped expense totals by category.
+
+    Args:
+        organization: Request-scoped organization.
+        filters: Normalized reporting filters.
+        top_n: Optional row limit.
+
+    Returns:
+        list[dict[str, Any]]: Category breakdown rows.
+    """
+    # Step 1: Resolve the reporting queryset.
     queryset = _base_reporting_queryset(
         organization=organization,
         filters=filters,
     )
 
+    # Step 2: Group by category and include both amount and row count.
     rows = (
         queryset.values("category_id", "category__name")
         .annotate(
+            count=Count("id"),
             amount=Coalesce(
                 Sum("amount"),
                 Value(Decimal("0.00")),
                 output_field=DecimalField(max_digits=12, decimal_places=2),
-            )
+            ),
         )
         .order_by("-amount", "category__name", "category_id")
     )
 
-    if top_n:
+    if top_n is not None:
         rows = rows[:top_n]
 
+    # Step 3: Return a stable frontend contract.
     return [
         {
             "category_id": row["category_id"],
             "category_name": row["category__name"] or "Uncategorized",
+            "count": row["count"],
             "amount": row["amount"],
         }
         for row in rows
@@ -211,31 +274,108 @@ def expense_totals_by_building(
     filters: dict[str, Any],
     top_n: int | None = None,
 ) -> list[dict[str, Any]]:
-    """Return grouped expense totals by building."""
+    """Return grouped expense totals by building.
+
+    Args:
+        organization: Request-scoped organization.
+        filters: Normalized reporting filters.
+        top_n: Optional row limit.
+
+    Returns:
+        list[dict[str, Any]]: Building breakdown rows.
+    """
+    # Step 1: Resolve the reporting queryset.
     queryset = _base_reporting_queryset(
         organization=organization,
         filters=filters,
     )
 
+    # Step 2: Group by building and include both amount and row count.
     rows = (
         queryset.values("building_id", "building__name")
         .annotate(
+            count=Count("id"),
             amount=Coalesce(
                 Sum("amount"),
                 Value(Decimal("0.00")),
                 output_field=DecimalField(max_digits=12, decimal_places=2),
-            )
+            ),
         )
         .order_by("-amount", "building__name", "building_id")
     )
 
-    if top_n:
+    if top_n is not None:
         rows = rows[:top_n]
 
+    # Step 3: Return a stable frontend contract.
     return [
         {
             "building_id": row["building_id"],
             "building_name": row["building__name"] or "Portfolio / Unassigned",
+            "count": row["count"],
+            "amount": row["amount"],
+        }
+        for row in rows
+    ]
+
+
+def expense_totals_by_unit(
+    *,
+    organization,
+    filters: dict[str, Any],
+    top_n: int | None = None,
+) -> list[dict[str, Any]]:
+    """Return grouped expense totals by unit.
+
+    Product rule:
+        This selector returns only rows that are attached to a concrete unit.
+        Building-level expenses with `unit_id=None` are intentionally excluded
+        so the unit comparison view stays unit-specific and trustworthy.
+
+    Expected usage:
+        The view layer should require a selected building before calling this
+        selector so unit comparison remains scoped to one building context.
+
+    Args:
+        organization: Request-scoped organization.
+        filters: Normalized reporting filters.
+        top_n: Optional row limit.
+
+    Returns:
+        list[dict[str, Any]]: Unit breakdown rows.
+    """
+    # Step 1: Resolve the shared reporting queryset.
+    queryset = _base_reporting_queryset(
+        organization=organization,
+        filters=filters,
+    )
+
+    # Step 2: Restrict to concrete unit-linked expenses only.
+    queryset = queryset.filter(unit_id__isnull=False)
+
+    # Step 3: Group by unit and include both amount and row count.
+    rows = (
+        queryset.values("unit_id", "unit__label")
+        .annotate(
+            count=Count("id"),
+            amount=Coalesce(
+                Sum("amount"),
+                Value(Decimal("0.00")),
+                output_field=DecimalField(max_digits=12, decimal_places=2),
+            ),
+        )
+        .order_by("-amount", "unit__label", "unit_id")
+    )
+
+    if top_n is not None:
+        rows = rows[:top_n]
+
+    # Step 4: Return a stable frontend contract.
+    return [
+        {
+            "unit_id": row["unit_id"],
+            "unit_name": row["unit__label"] or f"Unit #{row['unit_id']}",
+            "count": row["count"],
             "amount": row["amount"],
         }
         for row in rows
