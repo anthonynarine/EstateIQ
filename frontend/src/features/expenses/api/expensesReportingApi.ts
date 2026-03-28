@@ -1,6 +1,6 @@
 // # Filename: src/features/expenses/api/expensesReportingApi.ts
 
-// ✅ New Code
+
 
 import api from "../../../api/axios";
 
@@ -196,6 +196,8 @@ export async function getExpenseMonthlyTrend(
   const response = await api.get<unknown>(
     EXPENSES_REPORTING_ENDPOINTS.monthlyTrend,
     { params },
+
+
   );
 
   // # Step 3: Normalize sparse/variable payloads before they reach the UI.

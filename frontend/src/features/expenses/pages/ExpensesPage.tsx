@@ -2,9 +2,8 @@
 
 import { useEffect, useMemo, useState } from "react";
 
-import ExpenseReportingSection from "../components/ExpenseReportingSection/ExpenseReportingSection";
+import { ExpenseReportingWorkspace } from "../reporting";
 import ExpensesContent from "./components/ ExpensesContent";
-import ExpenseReportingFiltersBar from "../components/ExpenseReportingSection/ExpenseReportingFiltersBar";
 import ExpensesFiltersBar from "./components/ExpensesFiltersBar";
 import ExpensesFormSection from "./components/ExpenseFormSection";
 import ExpensesHeader from "./components/ExpensesHeader";
@@ -189,38 +188,30 @@ export default function ExpensesPage() {
           />
         </section>
       ) : (
-        <section
-          className={WORKSPACE_SECTION_CLASS}
-          aria-label="Expense reporting workspace"
-        >
-          <ExpenseReportingFiltersBar
-            selectedScope={selectedScope}
-            selectedCategoryId={selectedCategoryId}
-            selectedVendorId={selectedVendorId}
-            selectedBuildingId={selectedBuildingId}
-            selectedUnitId={selectedUnitId}
-            categories={pageData.categories}
-            vendors={pageData.vendors}
-            buildingOptions={pageData.buildingOptions}
-            unitOptions={pageData.unitOptions}
-            isPropertyLookupLoading={pageData.isPropertyLookupLoading}
-            propertyLookupErrorMessage={pageData.propertyLookupErrorMessage}
-            onScopeChange={handleScopeChange}
-            onCategoryChange={handleCategoryChange}
-            onVendorChange={handleVendorChange}
-            onBuildingChange={handleBuildingChange}
-            onUnitChange={handleUnitChange}
-          />
-
-          <ExpenseReportingSection
-            dashboard={pageData.dashboard}
-            monthlyTrend={pageData.monthlyTrend}
-            byCategory={pageData.byCategory}
-            byBuilding={pageData.byBuilding}
-            isLoading={pageData.isReportingLoading}
-            errorMessage={pageData.reportingErrorMessage}
-          />
-        </section>
+        <ExpenseReportingWorkspace
+          selectedScope={selectedScope}
+          selectedCategoryId={selectedCategoryId}
+          selectedVendorId={selectedVendorId}
+          selectedBuildingId={selectedBuildingId}
+          selectedUnitId={selectedUnitId}
+          categories={pageData.categories}
+          vendors={pageData.vendors}
+          buildingOptions={pageData.buildingOptions}
+          unitOptions={pageData.unitOptions}
+          isPropertyLookupLoading={pageData.isPropertyLookupLoading}
+          propertyLookupErrorMessage={pageData.propertyLookupErrorMessage}
+          dashboard={pageData.dashboard}
+          monthlyTrend={pageData.monthlyTrend}
+          byCategory={pageData.byCategory}
+          byBuilding={pageData.byBuilding}
+          isLoading={pageData.isReportingLoading}
+          errorMessage={pageData.reportingErrorMessage}
+          onScopeChange={handleScopeChange}
+          onCategoryChange={handleCategoryChange}
+          onVendorChange={handleVendorChange}
+          onBuildingChange={handleBuildingChange}
+          onUnitChange={handleUnitChange}
+        />
       )}
     </div>
   );

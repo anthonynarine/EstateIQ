@@ -3,8 +3,8 @@
 // ✅ New Code
 
 import type { ExpenseDashboardMetric } from "../../api/expensesTypes";
-import { formatCurrency, formatNumber } from "./reportingFormatters";
-import { isMoneyMetric } from "./reportingSelectors";
+import { formatCurrency, formatNumber } from "../../reporting/utils/reportingFormatters";
+import { isMoneyMetric } from "../../reporting/utils/reportingSelectors";
 
 /**
  * Props for the ReportingMetricsGrid component.

@@ -1,6 +1,5 @@
 // # Filename: src/features/expenses/components/ExpenseReportingSection.tsx
 
-// ✅ New Code
 
 import type {
     ExpenseByBuildingPoint,

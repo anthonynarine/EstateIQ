@@ -1,5 +1,4 @@
-// # Filename: src/features/expenses/pages/components/ExpenseReportingFiltersBar.tsx
-
+// # Filename: src/features/expenses/reporting/components/ExpenseReportingFiltersBar.tsx
 // ✅ New Code
 
 import type {
@@ -43,43 +42,43 @@ interface SelectControlProps {
 const SHELL_CLASS =
   "rounded-3xl border border-neutral-800/80 bg-neutral-950 shadow-[0_0_0_1px_rgba(255,255,255,0.02)]";
 
-const INNER_CLASS = "flex flex-col gap-5 p-5 sm:p-6";
+const INNER_CLASS = "flex flex-col gap-4 p-4 sm:gap-4 sm:p-5";
 
 const TOP_ROW_CLASS =
-  "flex flex-col gap-3 xl:flex-row xl:items-start xl:justify-between";
+  "flex flex-col gap-2 lg:flex-row lg:items-start lg:justify-between";
 
 const EYEBROW_CLASS =
   "text-[10px] font-semibold uppercase tracking-[0.22em] text-neutral-500";
 
-const TITLE_CLASS = "text-2xl font-semibold tracking-tight text-white";
+const TITLE_CLASS = "text-lg font-semibold tracking-tight text-white";
 
-const DESCRIPTION_CLASS = "max-w-3xl text-sm leading-6 text-neutral-400";
+const DESCRIPTION_CLASS = "max-w-2xl text-sm leading-5 text-neutral-400";
 
 const BADGE_CLASS =
-  "inline-flex items-center self-start rounded-full border border-neutral-800 bg-neutral-900 px-3 py-1 text-xs font-medium text-neutral-300";
+  "inline-flex items-center self-start rounded-full border border-neutral-800 bg-neutral-900 px-2.5 py-1 text-[11px] font-medium text-neutral-400";
 
 const ALERT_CLASS =
   "rounded-2xl border border-amber-500/20 bg-amber-500/10 px-4 py-3 text-sm text-amber-200";
 
 const CONTROLS_GRID_CLASS =
-  "grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-5";
+  "grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-5";
 
 const LABEL_CLASS =
-  "mb-2 block text-[11px] font-semibold uppercase tracking-[0.18em] text-neutral-500";
+  "mb-1.5 block text-[10px] font-semibold uppercase tracking-[0.18em] text-neutral-500";
 
 const SELECT_WRAPPER_CLASS = "relative";
 
 const SELECT_CLASS =
-  "w-full appearance-none rounded-2xl border border-neutral-800 bg-neutral-900 px-4 py-3 pr-11 text-sm text-white outline-none transition placeholder:text-neutral-500 hover:border-neutral-700 focus:border-emerald-500/40 focus:ring-2 focus:ring-emerald-500/15 disabled:cursor-not-allowed disabled:opacity-60";
+  "w-full appearance-none rounded-2xl border border-neutral-800 bg-neutral-900 px-3.5 py-2.5 pr-10 text-sm text-white outline-none transition placeholder:text-neutral-500 hover:border-neutral-700 focus:border-emerald-500/40 focus:ring-2 focus:ring-emerald-500/15 disabled:cursor-not-allowed disabled:opacity-60";
 
 const CHEVRON_CLASS =
-  "pointer-events-none absolute inset-y-0 right-4 flex items-center text-neutral-500";
+  "pointer-events-none absolute inset-y-0 right-3 flex items-center text-neutral-500";
 
 const ACTIVE_FILTER_PILL_CLASS =
-  "inline-flex items-center rounded-full border border-neutral-800 bg-neutral-900 px-3 py-1 text-xs font-medium text-neutral-300";
+  "inline-flex items-center rounded-full border border-neutral-800 bg-neutral-900/80 px-2.5 py-1 text-[11px] font-medium text-neutral-300";
 
 const CLEAR_BUTTON_CLASS =
-  "inline-flex items-center rounded-full border border-neutral-800 bg-neutral-950 px-3 py-1 text-xs font-medium text-neutral-300 transition hover:border-neutral-700 hover:bg-neutral-900 hover:text-white";
+  "inline-flex items-center rounded-full border border-neutral-800 bg-transparent px-2.5 py-1 text-[11px] font-medium text-neutral-400 transition hover:border-neutral-700 hover:bg-neutral-900 hover:text-white";
 
 /**
  * Lightweight select wrapper so the reporting filter bar visually matches
@@ -171,19 +170,19 @@ function getSelectedScopeLabel(
   }
 
   if (selectedScope === "organization") {
-    return "Portfolio only";
+    return "Portfolio";
   }
 
   if (selectedScope === "building") {
-    return "Building only";
+    return "Building";
   }
 
   if (selectedScope === "unit") {
-    return "Unit only";
+    return "Unit";
   }
 
   if (selectedScope === "lease") {
-    return "Lease only";
+    return "Lease";
   }
 
   return null;
@@ -335,14 +334,15 @@ export default function ExpenseReportingFiltersBar({
         <div className={TOP_ROW_CLASS}>
           <div className="flex min-w-0 flex-col gap-1">
             <p className={EYEBROW_CLASS}>Reporting workspace</p>
-            <h2 className={TITLE_CLASS}>Filter reporting</h2>
+            <div className="flex flex-wrap items-center gap-2">
+              <h2 className={TITLE_CLASS}>Reporting filters</h2>
+              <div className={BADGE_CLASS}>5 filters</div>
+            </div>
             <p className={DESCRIPTION_CLASS}>
-              Slice reporting by scope, property, category, and vendor while
-              keeping the workspace deterministic and easy to scan.
+              Narrow trend and comparison views without leaving the reporting
+              workspace.
             </p>
           </div>
-
-          <div className={BADGE_CLASS}>Shared reporting filters</div>
         </div>
 
         {propertyLookupErrorMessage ? (
@@ -417,7 +417,9 @@ export default function ExpenseReportingFiltersBar({
               onChange={(value) => onBuildingChange(parseNullableId(value))}
             >
               <option value="">
-                {isPropertyLookupLoading ? "Loading buildings..." : "All buildings"}
+                {isPropertyLookupLoading
+                  ? "Loading buildings..."
+                  : "All buildings"}
               </option>
               {buildingOptions.map((building) => (
                 <option key={building.id} value={building.id}>
@@ -439,7 +441,7 @@ export default function ExpenseReportingFiltersBar({
               disabled={!selectedBuildingId}
             >
               <option value="">
-                {selectedBuildingId ? "All units" : "Select a building first"}
+                {selectedBuildingId ? "All units" : "Select building first"}
               </option>
               {unitOptions.map((unit) => (
                 <option key={unit.id} value={unit.id}>
@@ -451,7 +453,7 @@ export default function ExpenseReportingFiltersBar({
         </div>
 
         {hasActiveFilters ? (
-          <div className="flex flex-wrap items-center gap-2 border-t border-neutral-800 pt-3">
+          <div className="flex flex-wrap items-center gap-2 border-t border-neutral-800/80 pt-3">
             {selectedScopeLabel ? (
               <span className={ACTIVE_FILTER_PILL_CLASS}>
                 Scope: {selectedScopeLabel}
