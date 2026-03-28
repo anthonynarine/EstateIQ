@@ -1,17 +1,16 @@
 // # Filename: src/features/expenses/reporting/components/ReportingCategoryTable.tsx
 
-// ✅ New Code
 
 import { useMemo, useState } from "react";
 
-import type { ExpenseByCategoryPoint } from "../../api/expensesTypes";
 import { formatCurrency, formatNumber } from "../utils/reportingFormatters";
+import type { ReportingCategoryPoint } from "../utils/reportingSelectors";
 
 /**
  * Props for the ReportingCategoryTable component.
  */
 interface ReportingCategoryTableProps {
-  points: ExpenseByCategoryPoint[];
+  points: ReportingCategoryPoint[];
 }
 
 interface CategoryBarRowProps {
@@ -19,35 +18,6 @@ interface CategoryBarRowProps {
   total: number;
   maxTotal: number;
   totalAcrossCategories: number;
-}
-
-/**
- * Safely converts reporting scalar-like values into numbers for chart math.
- *
- * @param value Raw reporting scalar.
- * @returns Safe numeric value.
- */
-function toSafeNumber(value: unknown): number {
-  // # Step 1: Handle native numeric values.
-  if (typeof value === "number") {
-    return Number.isFinite(value) ? value : 0;
-  }
-
-  // # Step 2: Handle numeric strings from API payloads.
-  if (typeof value === "string") {
-    const normalizedValue = value.trim().replace(/,/g, "");
-
-    if (!normalizedValue) {
-      return 0;
-    }
-
-    const parsedValue = Number(normalizedValue);
-
-    return Number.isFinite(parsedValue) ? parsedValue : 0;
-  }
-
-  // # Step 3: Fall back safely for nullish or unsupported values.
-  return 0;
 }
 
 /**
@@ -138,20 +108,19 @@ export default function ReportingCategoryTable({
   // # Step 1: Track whether exact detail rows are expanded.
   const [showDetails, setShowDetails] = useState(false);
 
-  // # Step 2: Sort and summarize category points once.
+  // # Step 2: Sort and summarize normalized category points once.
   const summary = useMemo(() => {
     const sortedPoints = [...points].sort(
-      (left, right) =>
-        toSafeNumber(right.total) - toSafeNumber(left.total),
+      (left, right) => right.total - left.total,
     );
 
     const totalAcrossCategories = sortedPoints.reduce(
-      (runningTotal, point) => runningTotal + toSafeNumber(point.total),
+      (runningTotal, point) => runningTotal + point.total,
       0,
     );
 
     const maxTotal = Math.max(
-      ...sortedPoints.map((point) => toSafeNumber(point.total)),
+      ...sortedPoints.map((point) => point.total),
       0,
     );
 
@@ -236,7 +205,7 @@ export default function ReportingCategoryTable({
             <CategoryBarRow
               key={`${point.category_id ?? point.category_name ?? "category"}-${index}`}
               categoryName={point.category_name ?? "Uncategorized"}
-              total={toSafeNumber(point.total)}
+              total={point.total}
               maxTotal={summary.maxTotal}
               totalAcrossCategories={summary.totalAcrossCategories}
             />
@@ -312,11 +281,11 @@ export default function ReportingCategoryTable({
                     </td>
 
                     <td className="px-4 py-3 text-right text-sm text-neutral-300">
-                      {formatNumber(toSafeNumber(point.count))}
+                      {formatNumber(point.count)}
                     </td>
 
                     <td className="px-4 py-3 text-right text-sm font-semibold text-white">
-                      {formatCurrency(toSafeNumber(point.total))}
+                      {formatCurrency(point.total)}
                     </td>
                   </tr>
                 ))}

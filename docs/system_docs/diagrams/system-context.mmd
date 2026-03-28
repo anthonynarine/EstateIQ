@@ -1,0 +1,28 @@
+flowchart LR
+    CLIENT[Client Browser]
+    DNS[DNS]
+    EDGE[CDN / Edge Cache / WAF]
+    LB[Load Balancer / Reverse Proxy]
+    FE[React + TypeScript Frontend]
+    API[Django + DRF Modular Monolith]
+    REDIS[(Redis)]
+    WORKERS[Celery Workers]
+    DB[(PostgreSQL)]
+    OBJ[(Object Storage S3 / MinIO)]
+    OBS[Observability / Audit Logs]
+
+    CLIENT --> DNS
+    DNS --> EDGE
+    EDGE --> LB
+    LB --> FE
+    LB --> API
+    FE --> API
+    API --> REDIS
+    API --> DB
+    API --> OBJ
+    API --> WORKERS
+    WORKERS --> REDIS
+    WORKERS --> DB
+    WORKERS --> OBJ
+    API --> OBS
+    WORKERS --> OBS

@@ -1,8 +1,9 @@
 // # Filename: src/features/expenses/reporting/components/ReportingBuildingTable.tsx
 
+
 import { useMemo, useState } from "react";
 
-import { type ReportingBuildingPoint } from "../utils/reportingSelectors";
+import type { ReportingBuildingPoint } from "../utils/reportingSelectors";
 import { formatCurrency, formatNumber } from "../utils/reportingFormatters";
 
 /**
@@ -17,35 +18,6 @@ interface BuildingBarRowProps {
   total: number;
   maxTotal: number;
   totalAcrossBuildings: number;
-}
-
-/**
- * Safely converts reporting scalar-like values into numbers for chart math.
- *
- * @param value Raw reporting scalar.
- * @returns Safe numeric value.
- */
-function toSafeNumber(value: unknown): number {
-  // # Step 1: Handle native numeric values.
-  if (typeof value === "number") {
-    return Number.isFinite(value) ? value : 0;
-  }
-
-  // # Step 2: Handle numeric strings from API payloads.
-  if (typeof value === "string") {
-    const normalizedValue = value.trim().replace(/,/g, "");
-
-    if (!normalizedValue) {
-      return 0;
-    }
-
-    const parsedValue = Number(normalizedValue);
-
-    return Number.isFinite(parsedValue) ? parsedValue : 0;
-  }
-
-  // # Step 3: Fall back safely for nullish or unsupported values.
-  return 0;
 }
 
 /**
@@ -136,19 +108,19 @@ export default function ReportingBuildingTable({
   // # Step 1: Track whether exact detail rows are expanded.
   const [showDetails, setShowDetails] = useState(false);
 
-  // # Step 2: Sort and summarize building points once.
+  // # Step 2: Sort and summarize normalized building points once.
   const summary = useMemo(() => {
     const sortedPoints = [...points].sort(
-      (left, right) => toSafeNumber(right.total) - toSafeNumber(left.total),
+      (left, right) => right.total - left.total,
     );
 
     const totalAcrossBuildings = sortedPoints.reduce(
-      (runningTotal, point) => runningTotal + toSafeNumber(point.total),
+      (runningTotal, point) => runningTotal + point.total,
       0,
     );
 
     const maxTotal = Math.max(
-      ...sortedPoints.map((point) => toSafeNumber(point.total)),
+      ...sortedPoints.map((point) => point.total),
       0,
     );
 
@@ -235,7 +207,7 @@ export default function ReportingBuildingTable({
             <BuildingBarRow
               key={`${point.building_id ?? point.building_name ?? "building"}-${index}`}
               buildingName={point.building_name ?? "Portfolio / Unassigned"}
-              total={toSafeNumber(point.total)}
+              total={point.total}
               maxTotal={summary.maxTotal}
               totalAcrossBuildings={summary.totalAcrossBuildings}
             />
@@ -311,11 +283,11 @@ export default function ReportingBuildingTable({
                     </td>
 
                     <td className="px-4 py-3 text-right text-sm text-neutral-300">
-                      {formatNumber(toSafeNumber(point.count))}
+                      {formatNumber(point.count)}
                     </td>
 
                     <td className="px-4 py-3 text-right text-sm font-semibold text-white">
-                      {formatCurrency(toSafeNumber(point.total))}
+                      {formatCurrency(point.total)}
                     </td>
                   </tr>
                 ))}

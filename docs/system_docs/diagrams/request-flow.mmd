@@ -1,0 +1,29 @@
+sequenceDiagram
+    autonumber
+    participant U as User Browser
+    participant D as DNS
+    participant E as CDN / Edge / WAF
+    participant L as Load Balancer
+    participant F as React Frontend
+    participant A as Django API
+    participant R as Redis
+    participant P as PostgreSQL
+    participant O as Object Storage
+
+    U->>D: Resolve app domain
+    D-->>U: Edge destination
+    U->>E: Request app
+    E->>L: Forward dynamic request / route origin
+    L->>F: Serve frontend assets
+    F-->>U: React app loads
+    U->>A: HTTPS API request
+    A->>A: Authenticate user
+    A->>A: Resolve request.org
+    A->>A: Check role permissions
+    A->>R: Optional cache / rate-limit / task interaction
+    A->>P: Org-scoped read or write
+    P-->>A: Domain data
+    A->>O: Optional signed file URL / upload metadata
+    O-->>A: File access metadata
+    A-->>U: JSON response
+    U->>F: UI re-renders with fresh data

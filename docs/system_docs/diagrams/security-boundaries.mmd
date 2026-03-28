@@ -1,0 +1,26 @@
+flowchart TB
+    USER[Authenticated User]
+    CLIENT[Browser / React Client]
+    EDGE[Edge Layer / HTTPS / WAF]
+    API[Django API]
+    AUTH[Auth / Session Validation]
+    ORG[Organization Resolution]
+    PERM[Role Permissions]
+    DOMAIN[Services / Selectors / Serializers]
+    DB[(PostgreSQL)]
+    FILES[(Private Object Storage)]
+    AUDIT[Audit Logs]
+
+    USER --> CLIENT
+    CLIENT --> EDGE
+    EDGE --> API
+    API --> AUTH
+    AUTH --> ORG
+    ORG --> PERM
+    PERM --> DOMAIN
+    DOMAIN --> DB
+    DOMAIN --> FILES
+    DOMAIN --> AUDIT
+
+    CLIENT -. never trusted for org isolation .-> DB
+    CLIENT -. never trusted for authorization .-> FILES

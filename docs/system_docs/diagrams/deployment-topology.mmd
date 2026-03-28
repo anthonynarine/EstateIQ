@@ -1,0 +1,36 @@
+flowchart LR
+    subgraph Internet[Public Internet]
+        U[Users]
+    end
+
+    subgraph Edge[Edge Layer]
+        DNS[DNS]
+        CDN[CDN / WAF]
+        LB[Load Balancer / Reverse Proxy]
+    end
+
+    subgraph App[Application Layer]
+        FE[Frontend Hosting]
+        API[Django API Instances]
+        WK[Celery Workers]
+    end
+
+    subgraph Infra[Data + Support]
+        REDIS[(Redis)]
+        DB[(PostgreSQL)]
+        OBJ[(Private Object Storage)]
+        OBS[Logs / Metrics / Error Tracking]
+    end
+
+    U --> DNS --> CDN --> LB
+    LB --> FE
+    LB --> API
+    API --> DB
+    API --> REDIS
+    API --> OBJ
+    API --> OBS
+    API --> WK
+    WK --> REDIS
+    WK --> DB
+    WK --> OBJ
+    WK --> OBS

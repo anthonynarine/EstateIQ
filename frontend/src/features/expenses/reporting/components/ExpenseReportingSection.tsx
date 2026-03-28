@@ -1,6 +1,5 @@
 // # Filename: src/features/expenses/reporting/components/ExpenseReportingSection.tsx
 
-// ✅ New Code
 
 import type {
   ExpenseByBuildingResponse,
@@ -151,17 +150,7 @@ export default function ExpenseReportingSection({
     );
   }
 
-// # Step 2: Temporary debugging logs.
-console.log("dashboard raw", dashboard);
-console.log("monthlyTrend raw", monthlyTrend);
-console.log("byCategory raw", byCategory);
-console.log("byBuilding raw", byBuilding);
-
-console.log("dashboardMetrics", dashboardMetrics);
-console.log("monthlyTrendPoints", monthlyTrendPoints);
-console.log("categoryPoints", categoryPoints);
-console.log("buildingPoints", buildingPoints);
-
+  // # Step 6: Render the reporting workspace.
   return (
     <section className="flex flex-col gap-5">
       {hasDashboardMetrics ? (
