@@ -1,5 +1,4 @@
-// # Filename: src/features/expenses/api/expensesTypes.ts
-// ✅ New Code
+
 
 /**
  * Expense domain TypeScript contracts.
@@ -213,14 +212,8 @@ export interface ExpenseDashboardSummaryFields {
   year_to_date_total?: ExpenseReportingScalar;
   average_expense_amount?: ExpenseReportingScalar;
   latest_expense_date?: string | null;
-}
-
-export interface ExpenseDashboardResponse
-  extends ExpenseDashboardSummaryFields {
-  metrics?: ExpenseDashboardMetric[];
-  summary?: ExpenseDashboardSummaryFields | null;
-  totals?: ExpenseDashboardSummaryFields | null;
-  [key: string]: unknown;
+  period_start?: string | null;
+  period_end?: string | null;
 }
 
 export interface ExpenseMonthlyTrendPoint {
@@ -279,6 +272,42 @@ export interface ExpenseByBuildingResponse {
   results?: ExpenseByBuildingPoint[];
   items?: ExpenseByBuildingPoint[];
   data?: ExpenseByBuildingPoint[];
+  [key: string]: unknown;
+}
+
+export interface ExpenseByUnitPoint {
+  unit_id?: EntityId | null;
+  unit_name?: string | null;
+  label?: string | null;
+  name?: string | null;
+  total?: ExpenseReportingScalar;
+  amount?: ExpenseReportingScalar;
+  value?: ExpenseReportingScalar;
+  count?: number;
+  [key: string]: unknown;
+}
+
+export interface ExpenseByUnitResponse {
+  points?: ExpenseByUnitPoint[];
+  results?: ExpenseByUnitPoint[];
+  items?: ExpenseByUnitPoint[];
+  data?: ExpenseByUnitPoint[];
+  [key: string]: unknown;
+}
+
+export interface ExpenseDashboardCharts {
+  monthly_expense_trend?: ExpenseMonthlyTrendPoint[];
+  expense_by_category?: ExpenseByCategoryPoint[];
+  expense_by_building?: ExpenseByBuildingPoint[];
+  expense_by_unit?: ExpenseByUnitPoint[];
+}
+
+export interface ExpenseDashboardResponse
+  extends ExpenseDashboardSummaryFields {
+  metrics?: ExpenseDashboardMetric[];
+  summary?: ExpenseDashboardSummaryFields | null;
+  totals?: ExpenseDashboardSummaryFields | null;
+  charts?: ExpenseDashboardCharts | null;
   [key: string]: unknown;
 }
 

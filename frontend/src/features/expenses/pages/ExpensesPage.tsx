@@ -1,4 +1,3 @@
-// # Filename: src/features/expenses/pages/ExpensesPage.tsx
 
 import { useEffect, useMemo, useState } from "react";
 
@@ -111,84 +110,88 @@ export default function ExpensesPage() {
 
   return (
     <div className={PAGE_CONTAINER_CLASS}>
-      <ExpensesHeader
-        isEditing={Boolean(editingExpenseId)}
-        activeWorkspace={activeWorkspace}
-        onWorkspaceChange={setActiveWorkspace}
-        onCreateNew={() => {
-          pageState.resetForm();
-          setActiveWorkspace("records");
-        }}
-      />
-
       {activeWorkspace === "records" ? (
-        <section
-          className={WORKSPACE_SECTION_CLASS}
-          aria-label="Expense records workspace"
-        >
-          <ExpensesFiltersBar
-            searchInput={searchInput}
-            selectedScope={selectedScope}
-            selectedCategoryId={selectedCategoryId}
-            selectedVendorId={selectedVendorId}
-            selectedBuildingId={selectedBuildingId}
-            selectedUnitId={selectedUnitId}
-            showArchivedOnly={showArchivedOnly}
-            totalExpenseCount={totalExpenseCount}
-            categories={pageData.categories}
-            vendors={pageData.vendors}
-            buildingOptions={pageData.buildingOptions}
-            unitOptions={pageData.unitOptions}
-            isPropertyLookupLoading={pageData.isPropertyLookupLoading}
-            propertyLookupErrorMessage={pageData.propertyLookupErrorMessage}
-            onSearchChange={handleSearchChange}
-            onScopeChange={handleScopeChange}
-            onCategoryChange={handleCategoryChange}
-            onVendorChange={handleVendorChange}
-            onBuildingChange={handleBuildingChange}
-            onUnitChange={handleUnitChange}
-            onArchivedToggle={handleArchivedToggle}
+        <>
+          <ExpensesHeader
+            isEditing={Boolean(editingExpenseId)}
+            activeWorkspace={activeWorkspace}
+            onWorkspaceChange={setActiveWorkspace}
+            onCreateNew={() => {
+              pageState.resetForm();
+              setActiveWorkspace("records");
+            }}
           />
 
-          <ExpensesContent
-            formSection={
-              <ExpensesFormSection
-                formKey={formInstanceKey}
-                mode={pageData.formMode}
-                initialValues={pageData.formInitialValues}
-                categories={pageData.categories}
-                vendors={pageData.vendors}
-                isSubmitting={pageActions.isSubmitting}
-                isLoadingDetail={pageData.isExpenseDetailLoading}
-                submitError={pageActions.submitErrorMessage}
-                onSubmit={pageActions.handleSubmit}
-                onCancel={pageActions.handleCancelEdit}
-              />
-            }
-            tableSection={
-              <ExpensesTableSection
-                expenses={pageData.expenses}
-                isLoading={pageData.isListLoading}
-                listErrorMessage={pageData.listErrorMessage}
-                showLookupWarning={pageData.hasLookupError}
-                onEdit={pageActions.handleEdit}
-                onArchive={pageActions.handleArchive}
-                onUnarchive={pageActions.handleUnarchive}
-                isArchiving={pageActions.isArchiving}
-                isUnarchiving={pageActions.isUnarchiving}
-                processingExpenseId={processingExpenseId}
-                totalExpenseCount={totalExpenseCount}
-                page={page}
-                pageSize={pageSize}
-                isListFetching={pageData.expenseListQuery.isFetching}
-                onPreviousPage={handlePreviousPage}
-                onNextPage={handleNextPage}
-              />
-            }
-          />
-        </section>
+          <section
+            className={WORKSPACE_SECTION_CLASS}
+            aria-label="Expense records workspace"
+          >
+            <ExpensesFiltersBar
+              searchInput={searchInput}
+              selectedScope={selectedScope}
+              selectedCategoryId={selectedCategoryId}
+              selectedVendorId={selectedVendorId}
+              selectedBuildingId={selectedBuildingId}
+              selectedUnitId={selectedUnitId}
+              showArchivedOnly={showArchivedOnly}
+              totalExpenseCount={totalExpenseCount}
+              categories={pageData.categories}
+              vendors={pageData.vendors}
+              buildingOptions={pageData.buildingOptions}
+              unitOptions={pageData.unitOptions}
+              isPropertyLookupLoading={pageData.isPropertyLookupLoading}
+              propertyLookupErrorMessage={pageData.propertyLookupErrorMessage}
+              onSearchChange={handleSearchChange}
+              onScopeChange={handleScopeChange}
+              onCategoryChange={handleCategoryChange}
+              onVendorChange={handleVendorChange}
+              onBuildingChange={handleBuildingChange}
+              onUnitChange={handleUnitChange}
+              onArchivedToggle={handleArchivedToggle}
+            />
+
+            <ExpensesContent
+              formSection={
+                <ExpensesFormSection
+                  formKey={formInstanceKey}
+                  mode={pageData.formMode}
+                  initialValues={pageData.formInitialValues}
+                  categories={pageData.categories}
+                  vendors={pageData.vendors}
+                  isSubmitting={pageActions.isSubmitting}
+                  isLoadingDetail={pageData.isExpenseDetailLoading}
+                  submitError={pageActions.submitErrorMessage}
+                  onSubmit={pageActions.handleSubmit}
+                  onCancel={pageActions.handleCancelEdit}
+                />
+              }
+              tableSection={
+                <ExpensesTableSection
+                  expenses={pageData.expenses}
+                  isLoading={pageData.isListLoading}
+                  listErrorMessage={pageData.listErrorMessage}
+                  showLookupWarning={pageData.hasLookupError}
+                  onEdit={pageActions.handleEdit}
+                  onArchive={pageActions.handleArchive}
+                  onUnarchive={pageActions.handleUnarchive}
+                  isArchiving={pageActions.isArchiving}
+                  isUnarchiving={pageActions.isUnarchiving}
+                  processingExpenseId={processingExpenseId}
+                  totalExpenseCount={totalExpenseCount}
+                  page={page}
+                  pageSize={pageSize}
+                  isListFetching={pageData.expenseListQuery.isFetching}
+                  onPreviousPage={handlePreviousPage}
+                  onNextPage={handleNextPage}
+                />
+              }
+            />
+          </section>
+        </>
       ) : (
         <ExpenseReportingWorkspace
+          workspaceTab={activeWorkspace}
+          onWorkspaceTabChange={setActiveWorkspace}
           selectedScope={selectedScope}
           selectedCategoryId={selectedCategoryId}
           selectedVendorId={selectedVendorId}
@@ -204,6 +207,7 @@ export default function ExpensesPage() {
           monthlyTrend={pageData.monthlyTrend}
           byCategory={pageData.byCategory}
           byBuilding={pageData.byBuilding}
+          byUnit={pageData.byUnit}
           isLoading={pageData.isReportingLoading}
           errorMessage={pageData.reportingErrorMessage}
           onScopeChange={handleScopeChange}

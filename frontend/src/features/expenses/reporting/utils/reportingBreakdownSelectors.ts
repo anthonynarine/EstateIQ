@@ -6,6 +6,8 @@ import type {
   ExpenseByBuildingResponse,
   ExpenseByCategoryPoint,
   ExpenseByCategoryResponse,
+  ExpenseByUnitPoint,
+  ExpenseByUnitResponse,
   ExpenseMonthlyTrendPoint,
   ExpenseMonthlyTrendResponse,
 } from "../../api/expensesTypes";
@@ -42,6 +44,16 @@ export interface ReportingCategoryPoint {
 export interface ReportingBuildingPoint {
   building_id?: ExpenseByBuildingPoint["building_id"];
   building_name?: ExpenseByBuildingPoint["building_name"];
+  count: number;
+  total: number;
+}
+
+/**
+ * Normalized unit reporting point used by reporting UI components.
+ */
+export interface ReportingUnitPoint {
+  unit_id?: ExpenseByUnitPoint["unit_id"];
+  unit_name?: ExpenseByUnitPoint["unit_name"];
   count: number;
   total: number;
 }
@@ -200,6 +212,57 @@ export function getBuildingPoints(
   });
 
   reportDebug("building normalized points", normalizedPoints);
+
+  return normalizedPoints;
+}
+
+/**
+ * Extracts unit breakdown points from the reporting payload.
+ *
+ * Supported collection keys:
+ * - payload.points
+ * - payload.results
+ * - payload.items
+ * - payload.data
+ *
+ * Supported aliases:
+ * - unit_name | label | name
+ * - total | amount | value | total_amount | expense_total
+ * - count | expense_count | item_count | total_count
+ *
+ * @param payload Unit breakdown API response.
+ * @returns Normalized unit breakdown points.
+ */
+export function getUnitPoints(
+  payload?: ExpenseByUnitResponse | null,
+): ReportingUnitPoint[] {
+  // # Step 1: Extract raw points from the payload.
+  const rawPoints = getRawPointsArray(payload) as ExpenseByUnitPoint[];
+
+  reportDebug("unit raw payload", payload);
+  reportDebug("unit raw points", rawPoints);
+
+  // # Step 2: Normalize unit rows for chart-safe usage.
+  const normalizedPoints = rawPoints.map((point, index) => {
+    const pointRecord = isRecord(point) ? point : {};
+
+    const normalizedPoint: ReportingUnitPoint = {
+      unit_id: point.unit_id,
+      unit_name: resolveStringLabel(pointRecord, `Unit ${index + 1}`, [
+        "unit_name",
+        "label",
+        "name",
+      ]),
+      count: resolvePointCount(pointRecord, "unit count"),
+      total: resolvePointTotal(pointRecord, "unit total"),
+    };
+
+    reportNormalizedPoint("unit normalized point", point, normalizedPoint);
+
+    return normalizedPoint;
+  });
+
+  reportDebug("unit normalized points", normalizedPoints);
 
   return normalizedPoints;
 }

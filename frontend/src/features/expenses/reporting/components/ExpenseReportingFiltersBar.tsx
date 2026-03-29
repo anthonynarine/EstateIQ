@@ -1,5 +1,4 @@
-// # Filename: src/features/expenses/reporting/components/ExpenseReportingFiltersBar.tsx
-// ✅ New Code
+import { useState, type ReactNode } from "react";
 
 import type {
   ExpenseBuildingOption,
@@ -17,13 +16,13 @@ interface ExpenseReportingFiltersBarProps {
   selectedCategoryId: number | null;
   selectedVendorId: number | null;
   selectedBuildingId: number | null;
+  isPropertyLookupLoading?: boolean;
+  propertyLookupErrorMessage?: string | null;
   selectedUnitId: number | null;
   categories?: ExpenseCategoryOption[];
   vendors?: ExpenseVendorOption[];
   buildingOptions?: ExpenseBuildingOption[];
   unitOptions?: ExpenseUnitOption[];
-  isPropertyLookupLoading?: boolean;
-  propertyLookupErrorMessage?: string | null;
   onScopeChange: (value: ExpenseScope | null) => void;
   onCategoryChange: (value: number | null) => void;
   onVendorChange: (value: number | null) => void;
@@ -35,30 +34,34 @@ interface SelectControlProps {
   id: string;
   value: string | number;
   disabled?: boolean;
-  children: React.ReactNode;
+  children: ReactNode;
   onChange: (value: string) => void;
 }
 
-const SHELL_CLASS =
-  "rounded-3xl border border-neutral-800/80 bg-neutral-950 shadow-[0_0_0_1px_rgba(255,255,255,0.02)]";
-
-const INNER_CLASS = "flex flex-col gap-4 p-4 sm:gap-4 sm:p-5";
+const WRAPPER_CLASS = "flex flex-col gap-3";
 
 const TOP_ROW_CLASS =
-  "flex flex-col gap-2 lg:flex-row lg:items-start lg:justify-between";
-
-const EYEBROW_CLASS =
-  "text-[10px] font-semibold uppercase tracking-[0.22em] text-neutral-500";
-
-const TITLE_CLASS = "text-lg font-semibold tracking-tight text-white";
-
-const DESCRIPTION_CLASS = "max-w-2xl text-sm leading-5 text-neutral-400";
-
-const BADGE_CLASS =
-  "inline-flex items-center self-start rounded-full border border-neutral-800 bg-neutral-900 px-2.5 py-1 text-[11px] font-medium text-neutral-400";
+  "flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between";
 
 const ALERT_CLASS =
   "rounded-2xl border border-amber-500/20 bg-amber-500/10 px-4 py-3 text-sm text-amber-200";
+
+const HELPER_TEXT_CLASS = "text-xs leading-5 text-neutral-500";
+
+const HELP_BUTTON_CLASS =
+  "inline-flex items-center gap-2 self-start rounded-full border border-neutral-800 bg-neutral-900 px-3 py-1.5 text-[11px] font-medium text-neutral-300 transition hover:border-neutral-700 hover:bg-neutral-800 hover:text-white";
+
+const HELP_PANEL_CLASS =
+  "rounded-2xl border border-neutral-800 bg-neutral-900/50 p-4";
+
+const HELP_GRID_CLASS = "grid grid-cols-1 gap-3 xl:grid-cols-2";
+
+const HELP_CARD_CLASS =
+  "rounded-2xl border border-neutral-800 bg-neutral-950/70 p-3";
+
+const HELP_CARD_TITLE_CLASS = "text-sm font-semibold text-white";
+
+const HELP_CARD_TEXT_CLASS = "mt-1 text-xs leading-5 text-neutral-400";
 
 const CONTROLS_GRID_CLASS =
   "grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-5";
@@ -74,15 +77,19 @@ const SELECT_CLASS =
 const CHEVRON_CLASS =
   "pointer-events-none absolute inset-y-0 right-3 flex items-center text-neutral-500";
 
-const ACTIVE_FILTER_PILL_CLASS =
+const CONTEXT_ROW_CLASS =
+  "flex flex-wrap items-center justify-between gap-3 border-t border-neutral-800/80 pt-3";
+
+const CONTEXT_CHIPS_CLASS = "flex flex-wrap items-center gap-2";
+
+const CONTEXT_PILL_CLASS =
   "inline-flex items-center rounded-full border border-neutral-800 bg-neutral-900/80 px-2.5 py-1 text-[11px] font-medium text-neutral-300";
 
 const CLEAR_BUTTON_CLASS =
   "inline-flex items-center rounded-full border border-neutral-800 bg-transparent px-2.5 py-1 text-[11px] font-medium text-neutral-400 transition hover:border-neutral-700 hover:bg-neutral-900 hover:text-white";
 
 /**
- * Lightweight select wrapper so the reporting filter bar visually matches
- * the records filter bar without forcing a broader refactor yet.
+ * Lightweight select wrapper for reporting filters.
  *
  * @param props Component props.
  * @returns Styled select control.
@@ -157,80 +164,6 @@ function parseNullableScope(value: string): ExpenseScope | null {
 }
 
 /**
- * Resolves a human-readable scope label for active filter pills.
- *
- * @param selectedScope Selected scope value.
- * @returns Readable scope label or null.
- */
-function getSelectedScopeLabel(
-  selectedScope: ExpenseScope | null,
-): string | null {
-  if (!selectedScope) {
-    return null;
-  }
-
-  if (selectedScope === "organization") {
-    return "Portfolio";
-  }
-
-  if (selectedScope === "building") {
-    return "Building";
-  }
-
-  if (selectedScope === "unit") {
-    return "Unit";
-  }
-
-  if (selectedScope === "lease") {
-    return "Lease";
-  }
-
-  return null;
-}
-
-/**
- * Resolves a selected category name from available options.
- *
- * @param categories Category options.
- * @param selectedCategoryId Selected category id.
- * @returns Category name or null.
- */
-function getSelectedCategoryName(
-  categories: ExpenseCategoryOption[],
-  selectedCategoryId: number | null,
-): string | null {
-  if (selectedCategoryId == null) {
-    return null;
-  }
-
-  const match = categories.find(
-    (category) => category.id === selectedCategoryId,
-  );
-
-  return match?.name ?? null;
-}
-
-/**
- * Resolves a selected vendor name from available options.
- *
- * @param vendors Vendor options.
- * @param selectedVendorId Selected vendor id.
- * @returns Vendor name or null.
- */
-function getSelectedVendorName(
-  vendors: ExpenseVendorOption[],
-  selectedVendorId: number | null,
-): string | null {
-  if (selectedVendorId == null) {
-    return null;
-  }
-
-  const match = vendors.find((vendor) => vendor.id === selectedVendorId);
-
-  return match?.name ?? null;
-}
-
-/**
  * Resolves a selected building name from available options.
  *
  * @param buildingOptions Building options.
@@ -273,20 +206,10 @@ function getSelectedUnitName(
 }
 
 /**
- * Reporting-focused filter bar for the expense reporting workspace.
- *
- * Responsibilities:
- * - expose reporting-safe filters only
- * - mirror the records filter bar design language
- * - surface active filter state clearly
- *
- * Non-responsibilities:
- * - fetching reporting data
- * - search input
- * - archived-only toggles
+ * Reporting-focused filter controls rendered inside the reporting header.
  *
  * @param props Component props.
- * @returns Reporting filter bar UI.
+ * @returns Reporting filter controls.
  */
 export default function ExpenseReportingFiltersBar({
   selectedScope,
@@ -306,20 +229,14 @@ export default function ExpenseReportingFiltersBar({
   onBuildingChange,
   onUnitChange,
 }: ExpenseReportingFiltersBarProps) {
-  // # Step 1: Resolve active filter labels for display pills.
-  const selectedScopeLabel = getSelectedScopeLabel(selectedScope);
-  const selectedCategoryName = getSelectedCategoryName(
-    categories,
-    selectedCategoryId,
-  );
-  const selectedVendorName = getSelectedVendorName(vendors, selectedVendorId);
+  // # Step 1: Resolve compact context labels.
   const selectedBuildingName = getSelectedBuildingName(
     buildingOptions,
     selectedBuildingId,
   );
   const selectedUnitName = getSelectedUnitName(unitOptions, selectedUnitId);
 
-  // # Step 2: Determine whether any reporting filters are active.
+  // # Step 2: Determine whether any filters are currently active.
   const hasActiveFilters = Boolean(
     selectedScope !== null ||
       selectedCategoryId !== null ||
@@ -328,178 +245,228 @@ export default function ExpenseReportingFiltersBar({
       selectedUnitId !== null,
   );
 
+  // # Step 3: Track contextual help visibility locally.
+  const [isHelpOpen, setIsHelpOpen] = useState(false);
+
   return (
-    <section className={SHELL_CLASS}>
-      <div className={INNER_CLASS}>
-        <div className={TOP_ROW_CLASS}>
-          <div className="flex min-w-0 flex-col gap-1">
-            <p className={EYEBROW_CLASS}>Reporting workspace</p>
-            <div className="flex flex-wrap items-center gap-2">
-              <h2 className={TITLE_CLASS}>Reporting filters</h2>
-              <div className={BADGE_CLASS}>5 filters</div>
-            </div>
-            <p className={DESCRIPTION_CLASS}>
-              Narrow trend and comparison views without leaving the reporting
-              workspace.
-            </p>
+    <div className={WRAPPER_CLASS}>
+      <div className={TOP_ROW_CLASS}>
+        <p className={HELPER_TEXT_CLASS}>
+          Building and Unit choose the property context. Expense level chooses
+          what level the expense record was created at.
+        </p>
+
+        <button
+          type="button"
+          onClick={() => setIsHelpOpen((currentValue) => !currentValue)}
+          aria-expanded={isHelpOpen}
+          className={HELP_BUTTON_CLASS}
+        >
+          <span>{isHelpOpen ? "Hide filter help" : "How filters work"}</span>
+
+          <svg
+            viewBox="0 0 20 20"
+            fill="none"
+            className={`h-4 w-4 transition-transform ${
+              isHelpOpen ? "rotate-180" : ""
+            }`}
+            xmlns="http://www.w3.org/2000/svg"
+            aria-hidden="true"
+          >
+            <path
+              d="M5 7.5L10 12.5L15 7.5"
+              stroke="currentColor"
+              strokeWidth="1.5"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+          </svg>
+        </button>
+      </div>
+
+      {isHelpOpen ? (
+        <section className={HELP_PANEL_CLASS} aria-label="How reporting filters work">
+          <div className={HELP_GRID_CLASS}>
+            <article className={HELP_CARD_CLASS}>
+              <h3 className={HELP_CARD_TITLE_CLASS}>Property context</h3>
+              <p className={HELP_CARD_TEXT_CLASS}>
+                Use <strong>Building</strong> and <strong>Unit</strong> to choose
+                where you are analyzing. A selected building rolls up everything
+                attributable to that building. A selected unit narrows to that
+                unit.
+              </p>
+            </article>
+
+            <article className={HELP_CARD_CLASS}>
+              <h3 className={HELP_CARD_TITLE_CLASS}>Expense level</h3>
+              <p className={HELP_CARD_TEXT_CLASS}>
+                Use <strong>Expense level</strong> to filter by the kind of
+                record that was created: portfolio-level, building-level,
+                unit-level, or lease-level.
+              </p>
+            </article>
+
+            <article className={HELP_CARD_CLASS}>
+              <h3 className={HELP_CARD_TITLE_CLASS}>Example: all properties</h3>
+              <p className={HELP_CARD_TEXT_CLASS}>
+                <strong>All properties + All expense levels</strong> shows all
+                expenses in the organization. <strong>All properties +
+                Building-level only</strong> shows only explicitly building-level
+                expenses across the portfolio.
+              </p>
+            </article>
+
+            <article className={HELP_CARD_CLASS}>
+              <h3 className={HELP_CARD_TITLE_CLASS}>Example: one building</h3>
+              <p className={HELP_CARD_TEXT_CLASS}>
+                <strong>Coconut Grove + All expense levels</strong> shows all
+                expenses attributable to Coconut Grove. <strong>Coconut Grove +
+                Building-level only</strong> shows only building-level expenses
+                created for Coconut Grove.
+              </p>
+            </article>
           </div>
+        </section>
+      ) : null}
+
+      {propertyLookupErrorMessage ? (
+        <div className={ALERT_CLASS}>{propertyLookupErrorMessage}</div>
+      ) : null}
+
+      <div className={CONTROLS_GRID_CLASS}>
+        <div>
+          <label htmlFor="reporting-building-filter" className={LABEL_CLASS}>
+            Building
+          </label>
+
+          <SelectControl
+            id="reporting-building-filter"
+            value={selectedBuildingId ?? ""}
+            onChange={(value) => onBuildingChange(parseNullableId(value))}
+          >
+            <option value="">
+              {isPropertyLookupLoading
+                ? "Loading properties..."
+                : "All properties"}
+            </option>
+            {buildingOptions.map((building) => (
+              <option key={building.id} value={building.id}>
+                {building.name}
+              </option>
+            ))}
+          </SelectControl>
         </div>
 
-        {propertyLookupErrorMessage ? (
-          <div className={ALERT_CLASS}>{propertyLookupErrorMessage}</div>
-        ) : null}
+        <div>
+          <label htmlFor="reporting-unit-filter" className={LABEL_CLASS}>
+            Unit
+          </label>
 
-        <div className={CONTROLS_GRID_CLASS}>
-          <div>
-            <label htmlFor="reporting-scope-filter" className={LABEL_CLASS}>
-              Scope
-            </label>
-
-            <SelectControl
-              id="reporting-scope-filter"
-              value={selectedScope ?? ""}
-              onChange={(value) => onScopeChange(parseNullableScope(value))}
-            >
-              <option value="">All scopes</option>
-              <option value="organization">Portfolio only</option>
-              <option value="building">Building only</option>
-              <option value="unit">Unit only</option>
-              <option value="lease">Lease only</option>
-            </SelectControl>
-          </div>
-
-          <div>
-            <label htmlFor="reporting-category-filter" className={LABEL_CLASS}>
-              Category
-            </label>
-
-            <SelectControl
-              id="reporting-category-filter"
-              value={selectedCategoryId ?? ""}
-              onChange={(value) => onCategoryChange(parseNullableId(value))}
-            >
-              <option value="">All categories</option>
-              {categories.map((category) => (
-                <option key={category.id} value={category.id}>
-                  {category.name}
-                </option>
-              ))}
-            </SelectControl>
-          </div>
-
-          <div>
-            <label htmlFor="reporting-vendor-filter" className={LABEL_CLASS}>
-              Vendor
-            </label>
-
-            <SelectControl
-              id="reporting-vendor-filter"
-              value={selectedVendorId ?? ""}
-              onChange={(value) => onVendorChange(parseNullableId(value))}
-            >
-              <option value="">All vendors</option>
-              {vendors.map((vendor) => (
-                <option key={vendor.id} value={vendor.id}>
-                  {vendor.name}
-                </option>
-              ))}
-            </SelectControl>
-          </div>
-
-          <div>
-            <label htmlFor="reporting-building-filter" className={LABEL_CLASS}>
-              Building
-            </label>
-
-            <SelectControl
-              id="reporting-building-filter"
-              value={selectedBuildingId ?? ""}
-              onChange={(value) => onBuildingChange(parseNullableId(value))}
-            >
-              <option value="">
-                {isPropertyLookupLoading
-                  ? "Loading buildings..."
-                  : "All buildings"}
+          <SelectControl
+            id="reporting-unit-filter"
+            value={selectedUnitId ?? ""}
+            onChange={(value) => onUnitChange(parseNullableId(value))}
+            disabled={!selectedBuildingId}
+          >
+            <option value="">
+              {selectedBuildingId ? "All units" : "Select building first"}
+            </option>
+            {unitOptions.map((unit) => (
+              <option key={unit.id} value={unit.id}>
+                {unit.name ?? unit.unit_number ?? `Unit #${unit.id}`}
               </option>
-              {buildingOptions.map((building) => (
-                <option key={building.id} value={building.id}>
-                  {building.name}
-                </option>
-              ))}
-            </SelectControl>
-          </div>
-
-          <div>
-            <label htmlFor="reporting-unit-filter" className={LABEL_CLASS}>
-              Unit
-            </label>
-
-            <SelectControl
-              id="reporting-unit-filter"
-              value={selectedUnitId ?? ""}
-              onChange={(value) => onUnitChange(parseNullableId(value))}
-              disabled={!selectedBuildingId}
-            >
-              <option value="">
-                {selectedBuildingId ? "All units" : "Select building first"}
-              </option>
-              {unitOptions.map((unit) => (
-                <option key={unit.id} value={unit.id}>
-                  {unit.name ?? unit.unit_number ?? `Unit #${unit.id}`}
-                </option>
-              ))}
-            </SelectControl>
-          </div>
+            ))}
+          </SelectControl>
         </div>
 
-        {hasActiveFilters ? (
-          <div className="flex flex-wrap items-center gap-2 border-t border-neutral-800/80 pt-3">
-            {selectedScopeLabel ? (
-              <span className={ACTIVE_FILTER_PILL_CLASS}>
-                Scope: {selectedScopeLabel}
-              </span>
-            ) : null}
+        <div>
+          <label htmlFor="reporting-scope-filter" className={LABEL_CLASS}>
+            Expense level
+          </label>
 
-            {selectedCategoryName ? (
-              <span className={ACTIVE_FILTER_PILL_CLASS}>
-                Category: {selectedCategoryName}
-              </span>
-            ) : null}
+          <SelectControl
+            id="reporting-scope-filter"
+            value={selectedScope ?? ""}
+            onChange={(value) => onScopeChange(parseNullableScope(value))}
+          >
+            <option value="">All expense levels</option>
+            <option value="organization">Portfolio-level only</option>
+            <option value="building">Building-level only</option>
+            <option value="unit">Unit-level only</option>
+            <option value="lease">Lease-level only</option>
+          </SelectControl>
+        </div>
 
-            {selectedVendorName ? (
-              <span className={ACTIVE_FILTER_PILL_CLASS}>
-                Vendor: {selectedVendorName}
-              </span>
-            ) : null}
+        <div>
+          <label htmlFor="reporting-category-filter" className={LABEL_CLASS}>
+            Category
+          </label>
 
+          <SelectControl
+            id="reporting-category-filter"
+            value={selectedCategoryId ?? ""}
+            onChange={(value) => onCategoryChange(parseNullableId(value))}
+          >
+            <option value="">All categories</option>
+            {categories.map((category) => (
+              <option key={category.id} value={category.id}>
+                {category.name}
+              </option>
+            ))}
+          </SelectControl>
+        </div>
+
+        <div>
+          <label htmlFor="reporting-vendor-filter" className={LABEL_CLASS}>
+            Vendor
+          </label>
+
+          <SelectControl
+            id="reporting-vendor-filter"
+            value={selectedVendorId ?? ""}
+            onChange={(value) => onVendorChange(parseNullableId(value))}
+          >
+            <option value="">All vendors</option>
+            {vendors.map((vendor) => (
+              <option key={vendor.id} value={vendor.id}>
+                {vendor.name}
+              </option>
+            ))}
+          </SelectControl>
+        </div>
+      </div>
+
+      {hasActiveFilters ? (
+        <div className={CONTEXT_ROW_CLASS}>
+          <div className={CONTEXT_CHIPS_CLASS}>
             {selectedBuildingName ? (
-              <span className={ACTIVE_FILTER_PILL_CLASS}>
+              <span className={CONTEXT_PILL_CLASS}>
                 Building: {selectedBuildingName}
               </span>
             ) : null}
 
             {selectedUnitName ? (
-              <span className={ACTIVE_FILTER_PILL_CLASS}>
+              <span className={CONTEXT_PILL_CLASS}>
                 Unit: {selectedUnitName}
               </span>
             ) : null}
-
-            <button
-              type="button"
-              onClick={() => {
-                onScopeChange(null);
-                onCategoryChange(null);
-                onVendorChange(null);
-                onBuildingChange(null);
-                onUnitChange(null);
-              }}
-              className={CLEAR_BUTTON_CLASS}
-            >
-              Clear filters
-            </button>
           </div>
-        ) : null}
-      </div>
-    </section>
+
+          <button
+            type="button"
+            onClick={() => {
+              onScopeChange(null);
+              onCategoryChange(null);
+              onVendorChange(null);
+              onBuildingChange(null);
+              onUnitChange(null);
+            }}
+            className={CLEAR_BUTTON_CLASS}
+          >
+            Clear filters
+          </button>
+        </div>
+      ) : null}
+    </div>
   );
 }

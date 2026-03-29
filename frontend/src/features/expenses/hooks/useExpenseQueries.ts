@@ -6,6 +6,7 @@ import { expenseQueryKeys } from "../api/expenseQueryKeys";
 import {
   getExpenseByBuilding,
   getExpenseByCategory,
+  getExpenseByUnit,
   getExpenseDashboard,
   getExpenseMonthlyTrend,
 } from "../api/expensesReportingApi";
@@ -22,6 +23,8 @@ import type {
   ExpenseByBuildingResponse,
   ExpenseByCategoryPoint,
   ExpenseByCategoryResponse,
+  ExpenseByUnitPoint,
+  ExpenseByUnitResponse,
   ExpenseCategoryOption,
   ExpenseDashboardResponse,
   ExpenseListFilters,
@@ -128,6 +131,26 @@ function normalizeExpenseByBuildingResponse(
   response: ExpenseByBuildingResponse,
 ): ExpenseByBuildingResponse {
   const points: ExpenseByBuildingPoint[] =
+    response.points ?? response.results ?? [];
+
+  return {
+    ...response,
+    points,
+    results: response.results ?? points,
+  };
+}
+
+/**
+ * Normalizes unit reporting payload shape so the UI can consistently
+ * render from `points`.
+ *
+ * @param response Raw unit reporting response from the API.
+ * @returns Normalized unit reporting response.
+ */
+function normalizeExpenseByUnitResponse(
+  response: ExpenseByUnitResponse,
+): ExpenseByUnitResponse {
+  const points: ExpenseByUnitPoint[] =
     response.points ?? response.results ?? [];
 
   return {
@@ -261,6 +284,27 @@ export function useExpenseByBuilding(filters?: ExpenseListFilters) {
     queryKey: expenseQueryKeys.byBuilding(filters),
     queryFn: async () => await getExpenseByBuilding(filters),
     select: normalizeExpenseByBuildingResponse,
+    staleTime: REPORTING_STALE_TIME_MS,
+    placeholderData: keepPreviousData,
+  });
+}
+
+/**
+ * Query hook for unit breakdown reporting.
+ *
+ * Product rule:
+ * - unit comparison is only meaningful inside a selected building context
+ * - skip the network request when no building is selected
+ *
+ * @param filters Optional reporting filters from the page layer.
+ * @returns TanStack Query result for expense-by-unit reporting.
+ */
+export function useExpenseByUnit(filters?: ExpenseListFilters) {
+  return useQuery({
+    queryKey: expenseQueryKeys.byUnit(filters),
+    queryFn: async () => await getExpenseByUnit(filters),
+    select: normalizeExpenseByUnitResponse,
+    enabled: Boolean(filters?.building_id),
     staleTime: REPORTING_STALE_TIME_MS,
     placeholderData: keepPreviousData,
   });

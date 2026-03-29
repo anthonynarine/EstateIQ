@@ -1,6 +1,5 @@
-// # Filename: src/features/expenses/reporting/reportingSelectors.ts
+// # Filename: src/features/expenses/reporting/utils/reportingSelectors.ts
 
-// ✅ New Code
 
 /**
  * Public reporting selector surface for the expenses reporting workspace.
@@ -14,6 +13,7 @@
  * - monthly trend normalization
  * - category breakdown normalization
  * - building breakdown normalization
+ * - unit breakdown normalization
  * - money-metric detection for UI formatting
  */
 
@@ -43,6 +43,7 @@ export type {
   ReportingBuildingPoint,
   ReportingCategoryPoint,
   ReportingMonthlyTrendPoint,
+  ReportingUnitPoint,
 } from "../utils/reportingBreakdownSelectors";
 
 /**
@@ -51,9 +52,11 @@ export type {
  * - `getBuildingPoints` normalizes building reporting rows
  * - `getCategoryPoints` normalizes category reporting rows
  * - `getMonthlyTrendPoints` normalizes monthly trend chart points
+ * - `getUnitPoints` normalizes unit reporting rows
  */
 export {
   getBuildingPoints,
   getCategoryPoints,
   getMonthlyTrendPoints,
+  getUnitPoints,
 } from "../utils/reportingBreakdownSelectors";

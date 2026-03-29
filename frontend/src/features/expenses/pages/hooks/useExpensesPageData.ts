@@ -1,5 +1,4 @@
 // # Filename: src/features/expenses/pages/hooks/useExpensesPageData.ts
-// ✅ New Code
 
 import { useMemo } from "react";
 import { useSearchParams } from "react-router-dom";
@@ -9,6 +8,7 @@ import type { ExpenseFormValues } from "../../components/expense-form/expenseFor
 import {
   useExpenseByBuilding,
   useExpenseByCategory,
+  useExpenseByUnit,
   useExpenseCategories,
   useExpenseDashboard,
   useExpenseDetail,
@@ -20,6 +20,7 @@ import type {
   ExpenseBuildingOption,
   ExpenseByBuildingResponse,
   ExpenseByCategoryResponse,
+  ExpenseByUnitResponse,
   ExpenseCategoryOption,
   ExpenseDashboardResponse,
   ExpenseListFilters,
@@ -36,7 +37,8 @@ import { listUnitsByBuilding } from "../../../buildings/api/unitsApi";
 
 export interface UseExpensesPageDataResult {
   listFilters: ExpenseListFilters;
-  reportingFilters: ExpenseListFilters;
+  reportingRollupFilters: ExpenseListFilters;
+  unitComparisonFilters: ExpenseListFilters;
   expenses: ExpenseListItem[];
   totalExpenseCount: number;
   reportingRecordCountHint: number | null;
@@ -54,6 +56,7 @@ export interface UseExpensesPageDataResult {
   monthlyTrend: ExpenseMonthlyTrendResponse | null;
   byCategory: ExpenseByCategoryResponse | null;
   byBuilding: ExpenseByBuildingResponse | null;
+  byUnit: ExpenseByUnitResponse | null;
 
   isListLoading: boolean;
   isExpenseDetailLoading: boolean;
@@ -76,6 +79,7 @@ export interface UseExpensesPageDataResult {
   monthlyTrendQuery: ReturnType<typeof useExpenseMonthlyTrend>;
   byCategoryQuery: ReturnType<typeof useExpenseByCategory>;
   byBuildingQuery: ReturnType<typeof useExpenseByBuilding>;
+  byUnitQuery: ReturnType<typeof useExpenseByUnit>;
 }
 
 function canUseListCountAsReportingHint(
@@ -138,18 +142,32 @@ export function useExpensesPageData(
     pageState.pageSize,
   ]);
 
-  const reportingFilters = useMemo<ExpenseListFilters>(() => {
+  const reportingRollupFilters = useMemo<ExpenseListFilters>(() => {
     return {
-      scope: pageState.selectedScope ?? undefined,
       building_id: pageState.selectedBuildingId,
       unit_id: pageState.selectedUnitId,
+      scope: pageState.selectedScope ?? undefined,
       category_id: pageState.selectedCategoryId,
       vendor_id: pageState.selectedVendorId,
     };
   }, [
-    pageState.selectedScope,
     pageState.selectedBuildingId,
     pageState.selectedUnitId,
+    pageState.selectedScope,
+    pageState.selectedCategoryId,
+    pageState.selectedVendorId,
+  ]);
+
+  const unitComparisonFilters = useMemo<ExpenseListFilters>(() => {
+    return {
+      building_id: pageState.selectedBuildingId,
+      scope: pageState.selectedScope ?? undefined,
+      category_id: pageState.selectedCategoryId,
+      vendor_id: pageState.selectedVendorId,
+    };
+  }, [
+    pageState.selectedBuildingId,
+    pageState.selectedScope,
     pageState.selectedCategoryId,
     pageState.selectedVendorId,
   ]);
@@ -159,10 +177,11 @@ export function useExpensesPageData(
   const vendorsQuery = useExpenseVendors();
   const expenseDetailQuery = useExpenseDetail(pageState.editingExpenseId);
 
-  const dashboardQuery = useExpenseDashboard(reportingFilters);
-  const monthlyTrendQuery = useExpenseMonthlyTrend(reportingFilters);
-  const byCategoryQuery = useExpenseByCategory(reportingFilters);
-  const byBuildingQuery = useExpenseByBuilding(reportingFilters);
+  const dashboardQuery = useExpenseDashboard(reportingRollupFilters);
+  const monthlyTrendQuery = useExpenseMonthlyTrend(reportingRollupFilters);
+  const byCategoryQuery = useExpenseByCategory(reportingRollupFilters);
+  const byBuildingQuery = useExpenseByBuilding(reportingRollupFilters);
+  const byUnitQuery = useExpenseByUnit(unitComparisonFilters);
 
   const buildingsQuery = useQuery({
     queryKey: ["org", orgSlug, "expenses-page", "buildings"],
@@ -260,14 +279,16 @@ export function useExpensesPageData(
     dashboardQuery.isLoading ||
     monthlyTrendQuery.isLoading ||
     byCategoryQuery.isLoading ||
-    byBuildingQuery.isLoading;
+    byBuildingQuery.isLoading ||
+    byUnitQuery.isLoading;
 
   const reportingErrorMessage = useMemo(() => {
     const firstError =
       dashboardQuery.error ??
       monthlyTrendQuery.error ??
       byCategoryQuery.error ??
-      byBuildingQuery.error;
+      byBuildingQuery.error ??
+      byUnitQuery.error;
 
     return firstError
       ? getExpensePageErrorMessage(
@@ -280,6 +301,7 @@ export function useExpensesPageData(
     monthlyTrendQuery.error,
     byCategoryQuery.error,
     byBuildingQuery.error,
+    byUnitQuery.error,
   ]);
 
   const listErrorMessage = useMemo(() => {
@@ -315,7 +337,8 @@ export function useExpensesPageData(
 
   return {
     listFilters,
-    reportingFilters,
+    reportingRollupFilters,
+    unitComparisonFilters,
     expenses,
     totalExpenseCount,
     reportingRecordCountHint,
@@ -329,6 +352,7 @@ export function useExpensesPageData(
     monthlyTrend: monthlyTrendQuery.data ?? null,
     byCategory: byCategoryQuery.data ?? null,
     byBuilding: byBuildingQuery.data ?? null,
+    byUnit: byUnitQuery.data ?? null,
     isListLoading,
     isExpenseDetailLoading,
     isReportingLoading,
@@ -347,5 +371,6 @@ export function useExpensesPageData(
     monthlyTrendQuery,
     byCategoryQuery,
     byBuildingQuery,
+    byUnitQuery,
   };
 }

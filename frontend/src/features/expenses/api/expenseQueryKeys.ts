@@ -106,4 +106,10 @@ export const expenseQueryKeys = {
       "by-building",
       normalizeExpenseFilters(filters),
     ] as const,
+  byUnit: (filters?: ExpenseListFilters) =>
+    [
+      ...expenseQueryKeys.reporting(),
+      "by-unit",
+      normalizeExpenseFilters(filters),
+    ] as const,
 } as const;

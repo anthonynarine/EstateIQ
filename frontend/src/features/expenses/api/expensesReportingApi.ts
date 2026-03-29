@@ -1,5 +1,3 @@
-// # Filename: src/features/expenses/api/expensesReportingApi.ts
-
 import api from "../../../api/axios";
 import { reportDebug } from "../reporting/utils/reportingDebug";
 
@@ -8,6 +6,8 @@ import type {
   ExpenseByBuildingResponse,
   ExpenseByCategoryPoint,
   ExpenseByCategoryResponse,
+  ExpenseByUnitPoint,
+  ExpenseByUnitResponse,
   ExpenseDashboardResponse,
   ExpenseListFilters,
   ExpenseMonthlyTrendPoint,
@@ -30,6 +30,7 @@ export const EXPENSES_REPORTING_ENDPOINTS = {
   monthlyTrend: `${EXPENSES_API_PREFIX}/expense-reporting/monthly-trend/`,
   byCategory: `${EXPENSES_API_PREFIX}/expense-reporting/by-category/`,
   byBuilding: `${EXPENSES_API_PREFIX}/expense-reporting/by-building/`,
+  byUnit: `${EXPENSES_API_PREFIX}/expense-reporting/by-unit/`,
 } as const;
 
 /**
@@ -182,6 +183,38 @@ function normalizeByBuildingPayload(
 }
 
 /**
+ * Normalizes a unit breakdown payload into a collection-bearing response.
+ *
+ * Supports:
+ * - plain array payloads
+ * - object payloads with results/points/items/data
+ * - null/unsupported payloads
+ *
+ * @param payload Raw API payload.
+ * @returns Safe unit breakdown response.
+ */
+function normalizeByUnitPayload(
+  payload: unknown,
+): ExpenseByUnitResponse {
+  // # Step 1: Wrap plain arrays into a stable collection key.
+  if (Array.isArray(payload)) {
+    return {
+      results: payload as ExpenseByUnitPoint[],
+    };
+  }
+
+  // # Step 2: Accept object payloads as-is.
+  if (isRecord(payload)) {
+    return payload as ExpenseByUnitResponse;
+  }
+
+  // # Step 3: Return an empty collection shape for sparse/invalid payloads.
+  return {
+    results: [],
+  };
+}
+
+/**
  * Fetches the expense dashboard summary payload.
  *
  * @param filters Optional reporting filters from the page layer.
@@ -289,6 +322,46 @@ export async function getExpenseByBuilding(
 
   // # Step 3: Normalize sparse/variable payloads before they reach the UI.
   const normalizedPayload = normalizeByBuildingPayload(response.data);
+
+  reportApiStage("normalized response", endpoint, params, normalizedPayload);
+
+  return normalizedPayload;
+}
+
+/**
+ * Fetches expense totals grouped by unit.
+ *
+ * Product rule:
+ * - unit comparison is only meaningful within a selected building context
+ * - if no building is selected, we return an empty safe payload and skip
+ *   the network request entirely
+ *
+ * @param filters Optional reporting filters from the page layer.
+ * @returns Unit breakdown payload for comparison tables and leaderboards.
+ */
+export async function getExpenseByUnit(
+  filters?: ExpenseListFilters,
+): Promise<ExpenseByUnitResponse> {
+  // # Step 1: Short-circuit when unit comparison lacks a building context.
+  if (!filters?.building_id) {
+    return {
+      results: [],
+    };
+  }
+
+  // # Step 2: Normalize page filters into request params.
+  const params = buildExpenseListParams(filters);
+  const endpoint = EXPENSES_REPORTING_ENDPOINTS.byUnit;
+
+  reportApiStage("request", endpoint, params);
+
+  // # Step 3: Request the unit breakdown reporting endpoint.
+  const response = await api.get<unknown>(endpoint, { params });
+
+  reportApiStage("raw response", endpoint, params, response.data);
+
+  // # Step 4: Normalize sparse/variable payloads before they reach the UI.
+  const normalizedPayload = normalizeByUnitPayload(response.data);
 
   reportApiStage("normalized response", endpoint, params, normalizedPayload);
 
