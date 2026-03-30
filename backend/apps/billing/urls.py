@@ -1,8 +1,31 @@
-# Filename: apps/billing/urls.py
+# Filename: backend/apps/billing/urls.py
+
+"""
+URL routes for the billing domain.
+
+This module exposes the public HTTP surface for lease-ledger and billing
+operations.
+
+Route groups:
+- lease charge generation
+- lease ledger retrieval
+- payment creation
+- billing reporting
+"""
+
+from __future__ import annotations
 
 from django.urls import path
 
-from apps.billing.views import GenerateLeaseRentChargeMonthView, LeaseLedgerView, DelinquencyReportView, OrgDashboardSummaryView, CreatePaymentView, GenerateLeaseRentChargeCurrentMonthView, RunCurrentMonthRentPostingView
+from apps.billing.views import (
+    CreatePaymentView,
+    DelinquencyReportView,
+    GenerateLeaseRentChargeCurrentMonthView,
+    GenerateLeaseRentChargeMonthView,
+    LeaseLedgerView,
+    OrgDashboardSummaryView,
+    RunCurrentMonthRentPostingView,
+)
 
 urlpatterns = [
     path(
@@ -11,9 +34,19 @@ urlpatterns = [
         name="billing.generate_month_rent_charge",
     ),
     path(
+        "leases/<int:lease_id>/charges/generate-current-month/",
+        GenerateLeaseRentChargeCurrentMonthView.as_view(),
+        name="billing.generate_current_month_rent_charge",
+    ),
+    path(
         "leases/<int:lease_id>/ledger/",
         LeaseLedgerView.as_view(),
         name="billing.lease_ledger",
+    ),
+    path(
+        "payments/",
+        CreatePaymentView.as_view(),
+        name="billing.create_payment",
     ),
     path(
         "reports/delinquency/",
@@ -24,13 +57,6 @@ urlpatterns = [
         "reports/dashboard-summary/",
         OrgDashboardSummaryView.as_view(),
         name="billing.report_dashboard_summary",
-    ),
-     path("payments/", CreatePaymentView.as_view(), name="billing.create_payment"
-    ),
-    path(
-        "leases/<int:lease_id>/charges/generate-current-month/",
-        GenerateLeaseRentChargeCurrentMonthView.as_view(),
-        name="billing.generate_current_month_rent_charge",
     ),
     path(
         "reports/rent-posting/run-current-month/",

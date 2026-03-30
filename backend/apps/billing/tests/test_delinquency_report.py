@@ -1,4 +1,4 @@
-# Filename: apps/billing/tests/test_delinquency_report.py
+# Filename: backend/apps/billing/tests/test_delinquency_report.py
 
 from __future__ import annotations
 
@@ -63,6 +63,66 @@ class DelinquencyReportTests(APITestCase):
 
         return kwargs
 
+    def _create_org_membership(self, OrganizationMember, *, organization, user) -> None:
+        """
+        Create an active organization membership in a schema-resilient way.
+        """
+        # Step 1: start with required relations
+        kwargs = {
+            "organization": organization,
+            "user": user,
+        }
+
+        field_names = {field.name for field in OrganizationMember._meta.fields}
+
+        # Step 2: set role if the schema requires one
+        if "role" in field_names:
+            role_field = OrganizationMember._meta.get_field("role")
+            role_choices = []
+            if getattr(role_field, "choices", None):
+                role_choices = [choice[0] for choice in role_field.choices]
+
+            if "owner" in role_choices:
+                kwargs["role"] = "owner"
+            elif role_choices:
+                kwargs["role"] = role_choices[0]
+
+        # Step 3: mark membership active if supported
+        if "is_active" in field_names:
+            kwargs["is_active"] = True
+        elif "active" in field_names:
+            kwargs["active"] = True
+
+        # Step 4: fill any remaining required primitive fields
+        for field in OrganizationMember._meta.fields:
+            if field.primary_key:
+                continue
+            if field.name in kwargs:
+                continue
+            if getattr(field, "auto_now", False) or getattr(field, "auto_now_add", False):
+                continue
+            if field.null or field.blank or field.has_default():
+                continue
+            if isinstance(field, models.ForeignKey):
+                continue
+
+            if isinstance(field, models.BooleanField):
+                kwargs[field.name] = True
+            elif isinstance(field, models.CharField):
+                kwargs[field.name] = "test"
+            elif isinstance(field, models.IntegerField):
+                kwargs[field.name] = 1
+            elif isinstance(field, models.DateField):
+                kwargs[field.name] = date(2026, 1, 1)
+            else:
+                raise TypeError(
+                    f"OrganizationMember has required field '{field.name}' of unsupported type "
+                    f"{field.__class__.__name__}. Add a test mapping."
+                )
+
+        # Step 5: create the membership row
+        OrganizationMember.objects.create(**kwargs)
+
     def setUp(self) -> None:
         # Step 1: auth
         User = get_user_model()
@@ -70,13 +130,17 @@ class DelinquencyReportTests(APITestCase):
         self.client = APIClient()
         self.client.force_authenticate(user=self.user)
 
-        # Step 2: org + building/unit + lease
-        from apps.core.models import Organization  # noqa: WPS433
+        # Step 2: org + memberships + building/unit + lease
+        from apps.core.models import Organization, OrganizationMember  # noqa: WPS433
         from apps.buildings.models import Building, Unit  # noqa: WPS433
         from apps.leases.models import Lease  # noqa: WPS433
 
         self.org1 = Organization.objects.create(name="Org 1", slug="org-1")
         self.org2 = Organization.objects.create(name="Org 2", slug="org-2")
+
+        # Step 3: create active memberships so tests exercise org scoping
+        self._create_org_membership(OrganizationMember, organization=self.org1, user=self.user)
+        self._create_org_membership(OrganizationMember, organization=self.org2, user=self.user)
 
         b1 = Building.objects.create(
             organization=self.org1,
@@ -87,11 +151,11 @@ class DelinquencyReportTests(APITestCase):
             postal_code="00000",
         )
 
-        # ✅ New Code: schema-resilient Unit creation
+        # Step 4: schema-resilient Unit creation
         unit_kwargs = self._build_required_kwargs(Unit, {"organization": self.org1, "building": b1})
         u1 = Unit.objects.create(**unit_kwargs)
 
-        # ✅ New Code: schema-resilient Lease creation
+        # Step 5: schema-resilient Lease creation
         lease_kwargs = self._build_required_kwargs(Lease, {"organization": self.org1, "unit": u1})
         self.lease1 = Lease.objects.create(**lease_kwargs)
 

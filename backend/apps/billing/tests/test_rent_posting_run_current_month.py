@@ -1,4 +1,4 @@
-# Filename: apps/billing/tests/test_rent_posting_run_current_month.py
+# Filename: backend/apps/billing/tests/test_rent_posting_run_current_month.py
 
 from __future__ import annotations
 
@@ -7,6 +7,7 @@ from decimal import Decimal
 from unittest.mock import patch
 
 from django.contrib.auth import get_user_model
+from django.db import models
 from rest_framework.test import APIClient, APITestCase
 
 from apps.billing.models import Charge, ChargeKind
@@ -33,7 +34,15 @@ class RentPostingRunCurrentMonthTests(APITestCase):
         # Step 3: fallback
         return Unit.objects.create(organization=organization, building=building)
 
-    def _create_lease(self, Lease, *, organization, unit, start_date: date, rent_amount: Decimal):
+    def _create_lease(
+        self,
+        Lease,
+        *,
+        organization,
+        unit,
+        start_date: date,
+        rent_amount: Decimal,
+    ):
         # Step 1: inspect fields
         field_names = self._field_names(Lease)
 
@@ -63,6 +72,66 @@ class RentPostingRunCurrentMonthTests(APITestCase):
 
         return Lease.objects.create(**kwargs)
 
+    def _create_org_membership(self, OrganizationMember, *, organization, user) -> None:
+        """
+        Create an active organization membership in a schema-resilient way.
+        """
+        # Step 1: start with required relations
+        kwargs = {
+            "organization": organization,
+            "user": user,
+        }
+
+        field_names = {field.name for field in OrganizationMember._meta.fields}
+
+        # Step 2: set role if the schema requires one
+        if "role" in field_names:
+            role_field = OrganizationMember._meta.get_field("role")
+            role_choices = []
+            if getattr(role_field, "choices", None):
+                role_choices = [choice[0] for choice in role_field.choices]
+
+            if "owner" in role_choices:
+                kwargs["role"] = "owner"
+            elif role_choices:
+                kwargs["role"] = role_choices[0]
+
+        # Step 3: mark membership active if supported
+        if "is_active" in field_names:
+            kwargs["is_active"] = True
+        elif "active" in field_names:
+            kwargs["active"] = True
+
+        # Step 4: fill any remaining required primitive fields
+        for field in OrganizationMember._meta.fields:
+            if field.primary_key:
+                continue
+            if field.name in kwargs:
+                continue
+            if getattr(field, "auto_now", False) or getattr(field, "auto_now_add", False):
+                continue
+            if field.null or field.blank or field.has_default():
+                continue
+            if isinstance(field, models.ForeignKey):
+                continue
+
+            if isinstance(field, models.BooleanField):
+                kwargs[field.name] = True
+            elif isinstance(field, models.CharField):
+                kwargs[field.name] = "test"
+            elif isinstance(field, models.IntegerField):
+                kwargs[field.name] = 1
+            elif isinstance(field, models.DateField):
+                kwargs[field.name] = date(2026, 1, 1)
+            else:
+                raise TypeError(
+                    f"OrganizationMember has required field '{field.name}' of unsupported type "
+                    f"{field.__class__.__name__}. Add a test mapping."
+                )
+
+        # Step 5: create the membership row
+        OrganizationMember.objects.create(**kwargs)
+
     def setUp(self) -> None:
         # Step 1: auth
         User = get_user_model()
@@ -71,13 +140,21 @@ class RentPostingRunCurrentMonthTests(APITestCase):
         self.client = APIClient()
         self.client.force_authenticate(user=self.user)
 
-        # Step 2: org + 2 leases
-        from apps.core.models import Organization  # noqa: WPS433
+        # Step 2: org + membership + 2 leases
+        from apps.core.models import Organization, OrganizationMember  # noqa: WPS433
         from apps.buildings.models import Building, Unit  # noqa: WPS433
         from apps.leases.models import Lease  # noqa: WPS433
 
         self.org = Organization.objects.create(name="Org 1", slug="org-1")
 
+        # Step 3: create active org membership for the authenticated user
+        self._create_org_membership(
+            OrganizationMember,
+            organization=self.org,
+            user=self.user,
+        )
+
+        # Step 4: building + lease fixtures
         b = Building.objects.create(
             organization=self.org,
             name="B1",
@@ -105,7 +182,7 @@ class RentPostingRunCurrentMonthTests(APITestCase):
             rent_amount=Decimal("900.00"),
         )
 
-    @patch("apps.billing.views.date")
+    @patch("apps.billing.views.report_views.date")
     def test_run_current_month_creates_charges_and_is_idempotent(self, mock_date) -> None:
         # Step 1: freeze server date
         mock_date.today.return_value = date(2026, 3, 15)
