@@ -114,7 +114,7 @@ class Charge(models.Model):
         ]
         constraints = [
             models.CheckConstraint(
-                check=Q(amount__gt=0),
+                condition=Q(amount__gt=0),
                 name="billing_charge_amount_gt_0",
             ),
             models.UniqueConstraint(

@@ -22,6 +22,7 @@ refactors.
 
 from __future__ import annotations
 
+from dataclasses import asdict, is_dataclass
 from datetime import date
 from typing import Any
 
@@ -93,20 +94,64 @@ class DelinquencyReportView(OrgScopedAPIView):
         # Step 3: return fallback
         return default
 
+    @staticmethod
+    def _normalize_buckets(buckets: Any) -> dict[str, Any]:
+        """
+        Normalize delinquency aging buckets into the public serializer shape.
+
+        Supported input shapes:
+        - dict
+        - dataclass instance (for example AgingBuckets)
+        - generic object with expected bucket attributes
+
+        Args:
+            buckets: Raw bucket payload from the service layer.
+
+        Returns:
+            dict[str, Any]: Serializer-ready bucket payload.
+        """
+        # Step 1: support dict payloads directly
+        if isinstance(buckets, dict):
+            return {
+                "current_0_30": buckets.get("current_0_30", "0.00"),
+                "days_31_60": buckets.get("days_31_60", "0.00"),
+                "days_61_90": buckets.get("days_61_90", "0.00"),
+                "days_90_plus": buckets.get("days_90_plus", "0.00"),
+            }
+
+        # Step 2: support dataclass payloads such as AgingBuckets
+        if buckets is not None and is_dataclass(buckets):
+            bucket_dict = asdict(buckets)
+            return {
+                "current_0_30": bucket_dict.get("current_0_30", "0.00"),
+                "days_31_60": bucket_dict.get("days_31_60", "0.00"),
+                "days_61_90": bucket_dict.get("days_61_90", "0.00"),
+                "days_90_plus": bucket_dict.get("days_90_plus", "0.00"),
+            }
+
+        # Step 3: support object-style payloads
+        return {
+            "current_0_30": getattr(buckets, "current_0_30", "0.00"),
+            "days_31_60": getattr(buckets, "days_31_60", "0.00"),
+            "days_61_90": getattr(buckets, "days_61_90", "0.00"),
+            "days_90_plus": getattr(buckets, "days_90_plus", "0.00"),
+        }
+
     @classmethod
     def _serialize_delinquency_row(cls, row: Any) -> dict[str, Any]:
         """
         Normalize one service row into the public delinquency serializer shape.
 
         This compatibility layer lets the view tolerate either:
-        - newer service rows that already expose buckets + totals
-        - older transitional rows that may use different attribute names
+        - newer service rows that already expose nested bucket objects
+        - dict-like rows
+        - older transitional rows that may expose flat bucket attributes
 
         Args:
             row: One delinquency service result row.
 
         Returns:
-            dict[str, Any]: Payload matching DelinquencyLeaseRowSerializer.
+            dict[str, Any]: Payload matching the public serializer contract.
         """
         # Step 1: gather top-level row fields with safe fallbacks
         lease_id = cls._row_value(row, "lease_id")
@@ -122,30 +167,40 @@ class DelinquencyReportView(OrgScopedAPIView):
             default=None,
         )
 
-        # Step 2: gather aging buckets, tolerating either nested or flat shapes
-        buckets = cls._row_value(row, "buckets", default=None)
-        if isinstance(buckets, dict):
-            current_0_30 = buckets.get("current_0_30", "0.00")
-            days_31_60 = buckets.get("days_31_60", "0.00")
-            days_61_90 = buckets.get("days_61_90", "0.00")
-            days_90_plus = buckets.get("days_90_plus", "0.00")
+        # Step 2: prefer a nested buckets payload when present
+        raw_buckets = cls._row_value(row, "buckets", default=None)
+        if raw_buckets is not None:
+            buckets_payload = cls._normalize_buckets(raw_buckets)
         else:
-            current_0_30 = cls._row_value(row, "current_0_30", default="0.00")
-            days_31_60 = cls._row_value(row, "days_31_60", default="0.00")
-            days_61_90 = cls._row_value(row, "days_61_90", default="0.00")
-            days_90_plus = cls._row_value(row, "days_90_plus", default="0.00")
+            buckets_payload = {
+                "current_0_30": cls._row_value(
+                    row,
+                    "current_0_30",
+                    default="0.00",
+                ),
+                "days_31_60": cls._row_value(
+                    row,
+                    "days_31_60",
+                    default="0.00",
+                ),
+                "days_61_90": cls._row_value(
+                    row,
+                    "days_61_90",
+                    default="0.00",
+                ),
+                "days_90_plus": cls._row_value(
+                    row,
+                    "days_90_plus",
+                    default="0.00",
+                ),
+            }
 
         # Step 3: return serializer-ready row payload
         return {
             "lease_id": lease_id,
             "total_outstanding": total_outstanding,
             "oldest_due_date": oldest_due_date,
-            "buckets": {
-                "current_0_30": current_0_30,
-                "days_31_60": days_31_60,
-                "days_61_90": days_61_90,
-                "days_90_plus": days_90_plus,
-            },
+            "buckets": buckets_payload,
         }
 
     def get(self, request) -> Response:

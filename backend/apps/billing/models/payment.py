@@ -93,9 +93,9 @@ class Payment(models.Model):
         ]
         constraints = [
             models.CheckConstraint(
-                check=Q(amount__gt=0),
+                condition=Q(amount__gt=0),
                 name="billing_payment_amount_gt_0",
-            ),
+            )
         ]
 
     def clean(self) -> None:
