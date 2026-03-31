@@ -1,0 +1,10 @@
+flowchart LR
+    VIEW[View]
+    SERVICE[Service\nwrite workflow + orchestration]
+    SELECTOR[Selector\ndeterministic read logic]
+    DB[(Database)]
+
+    VIEW --> SERVICE
+    SERVICE --> SELECTOR
+    SERVICE --> DB
+    SELECTOR --> DB

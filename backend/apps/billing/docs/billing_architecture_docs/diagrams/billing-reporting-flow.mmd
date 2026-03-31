@@ -1,0 +1,12 @@
+sequenceDiagram
+    participant FE as Frontend
+    participant VIEW as Reporting View
+    participant SVC as Reporting Service Facade
+    participant SEL as Reporting Selectors
+    participant DB as Database
+
+    FE->>VIEW: GET /reports/dashboard-summary or /reports/delinquency
+    VIEW->>SVC: compute / build
+    SVC->>SEL: deterministic report query
+    SEL->>DB: org-scoped aggregates
+    VIEW-->>FE: stable report contract

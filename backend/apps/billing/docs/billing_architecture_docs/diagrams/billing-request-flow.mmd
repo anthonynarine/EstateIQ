@@ -1,0 +1,15 @@
+sequenceDiagram
+    participant FE as Frontend
+    participant VIEW as View
+    participant SER as Serializer
+    participant SVC as Service
+    participant SEL as Selector
+    participant DB as Database
+
+    FE->>VIEW: request
+    VIEW->>SER: validate / shape
+    VIEW->>SVC: orchestrate workflow
+    SVC->>SEL: read deterministic data when needed
+    SVC->>DB: write within transaction when needed
+    SEL->>DB: org-scoped reads
+    VIEW-->>FE: serializer-ready response

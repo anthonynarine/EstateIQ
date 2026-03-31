@@ -1,0 +1,16 @@
+flowchart TD
+    ORG[Organization]
+    BLDG[Building]
+    UNIT[Unit]
+    LEASE[Lease]
+    CHARGE[Charge]
+    PAYMENT[Payment]
+    ALLOCATION[Allocation]
+
+    ORG --> BLDG
+    BLDG --> UNIT
+    UNIT --> LEASE
+    LEASE --> CHARGE
+    LEASE --> PAYMENT
+    PAYMENT --> ALLOCATION
+    CHARGE --> ALLOCATION

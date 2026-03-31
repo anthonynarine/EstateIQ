@@ -1,0 +1,15 @@
+flowchart LR
+    FE[React Frontend]
+    API[Django + DRF Billing API]
+    BILL[Billing Domain]
+    LEASE[Leases Domain]
+    EXP[Expenses Domain]
+    REP[Reporting]
+    DB[(PostgreSQL)]
+
+    FE --> API
+    API --> BILL
+    BILL --> LEASE
+    BILL --> REP
+    EXP --> REP
+    BILL --> DB

@@ -14,10 +14,15 @@ Why this file exists:
 - Creates a stable home for delinquency, dashboard, and rent-posting report
   contracts as the domain grows.
 
-Current refactor note:
-These serializers intentionally preserve the existing contract shape from the
-original monolithic `apps/billing/serializers.py` file so we can complete the
-package split before correcting any endpoint/view mismatches.
+Contract note:
+The organization dashboard summary intentionally distinguishes between:
+- rent expected for the current month
+- cash applied to current-month rent
+- outstanding balances
+- unapplied credits
+
+This avoids ambiguous financial labels that could confuse the frontend or the
+user later.
 """
 
 from __future__ import annotations
@@ -101,16 +106,22 @@ class OrgDashboardSummarySerializer(serializers.Serializer):
 
     Attributes:
         as_of: Report date used for the summary.
-        expected_rent_this_month: Rent expected for the current month.
-        collected_this_month: Payments collected during the current month.
+        expected_rent_this_month: Rent expected for the current month based on
+            month-due rent charges.
+        cash_applied_to_current_month_rent: Cash applied to rent charges due in
+            the current month. This is allocation-driven, not simply payment
+            receipts by payment date.
         outstanding_as_of: Total outstanding balance as of the report date.
-        delinquent_leases_count: Count of delinquent leases.
+        delinquent_leases_count: Count of leases with outstanding balances.
         unapplied_credits_total: Total payment amount not yet allocated.
     """
 
     as_of = serializers.DateField()
     expected_rent_this_month = serializers.DecimalField(max_digits=12, decimal_places=2)
-    collected_this_month = serializers.DecimalField(max_digits=12, decimal_places=2)
+    cash_applied_to_current_month_rent = serializers.DecimalField(
+        max_digits=12,
+        decimal_places=2,
+    )
     outstanding_as_of = serializers.DecimalField(max_digits=12, decimal_places=2)
     delinquent_leases_count = serializers.IntegerField()
     unapplied_credits_total = serializers.DecimalField(max_digits=12, decimal_places=2)
