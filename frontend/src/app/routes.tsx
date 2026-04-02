@@ -15,8 +15,8 @@ import DashboardPage from "../features/tenancy/pages/DashboardPage";
 import TenancyPage from "../features/tenancy/pages/TenancyPage";
 import TenantsPage from "../features/tenants/pages/TenantsPage";
 import UnitLeasesPage from "../features/tenancy/pages/UnitLeasesPage";
-import LeaseLedgerPage from "../features/finance/pages/LeaseLedgerPage";
-import ExpensesPage from "../features/expenses/pages/ExpensesPage"; // ✅ New Code
+import LeaseLedgerPage from "../features/billing/pages/  LeaseLedgerPage";
+import ExpensesPage from "../features/expenses/pages/ExpensesPage";
 
 import BuildingsPage from "../features/buildings/pages/BuildingPage/BuildingsPage";
 import BuildingDetailPage from "../features/buildings/pages/BuildingDetailPage/BuildingDetailPage";
@@ -53,15 +53,19 @@ export const routes = createBrowserRouter([
               // Tenant domain workspace
               { path: "tenants", element: <TenantsPage /> },
 
-              // Finance / expenses workspace
+              // Expenses workspace
               { path: "expenses", element: <ExpensesPage /> },
 
+              // Leasing
               { path: "units/:unitId", element: <UnitDetailPage /> },
               { path: "units/:unitId/leases", element: <UnitLeasesPage /> },
               { path: "leases/new", element: <LeaseCreatePage /> },
+
+              // Buildings
               { path: "buildings", element: <BuildingsPage /> },
               { path: "buildings/:buildingId", element: <BuildingDetailPage /> },
 
+              // Billing
               { path: "leases/:leaseId/ledger", element: <LeaseLedgerPage /> },
 
               // Fun / lab page
