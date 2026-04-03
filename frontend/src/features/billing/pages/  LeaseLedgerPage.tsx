@@ -1,13 +1,28 @@
 // # Filename: src/features/billing/pages/LeaseLedgerPage.tsx
 
-import { useMemo } from "react";
+
+
+import { useMemo, useState } from "react";
 import { useParams } from "react-router-dom";
+
+import { tokenStorage } from "../../../auth/tokenStorage";
+
+import LeaseLedgerHeader from "../components/LeaseLedgerHeader";
+import LeaseLedgerSummaryCards from "../components/LeaseLedgerSummaryCards";
+import GenerateRentChargePanel from "../components/GenerateRentChargePanel";
+import ChargesTable from "../components/ChargesTable";
+import PaymentsTable from "../components/PaymentsTable";
+import AllocationsTable from "../components/AllocationsTable";
+import RecordPaymentModal from "../components/RecordPaymentModal";
+import { useLeaseLedgerQuery } from "../hooks/useLeaseLedgerQuery";
+import type { BillingApiErrorShape, BillingId } from "../api/billingTypes";
 
 /**
  * LeaseLedgerPageParams
  *
  * Route parameter contract for the lease ledger page.
- * This page is mounted at:
+ *
+ * Mounted route:
  * `/dashboard/leases/:leaseId/ledger`
  */
 type LeaseLedgerPageParams = {
@@ -15,286 +30,256 @@ type LeaseLedgerPageParams = {
 };
 
 /**
- * PlaceholderCardProps
+ * normalizeLeaseId
  *
- * Lightweight props for scaffold cards used while the billing feature
- * is being wired one file at a time.
+ * Converts the raw route lease id into a query-safe value.
+ *
+ * @param leaseId - Raw lease identifier from route params.
+ * @returns A normalized lease id or null when invalid.
  */
-type PlaceholderCardProps = {
-  title: string;
-  description: string;
-  children?: React.ReactNode;
-};
+function normalizeLeaseId(leaseId?: string): BillingId | null {
+  const normalizedValue = leaseId?.trim();
 
-/**
- * formatLeaseDisplayLabel
- *
- * Converts a raw route lease id into a user-facing label suitable for
- * headers and breadcrumbs.
- *
- * @param leaseId - The raw lease identifier from the route params.
- * @returns A formatted display string for the page header.
- */
-function formatLeaseDisplayLabel(leaseId?: string): string {
-  if (!leaseId) {
-    return "Lease ledger";
+  if (!normalizedValue) {
+    return null;
   }
 
-  return `Lease ${leaseId}`;
+  return normalizedValue;
 }
 
 /**
- * PlaceholderCard
+ * getQueryErrorMessage
  *
- * Small presentation helper used to keep the first page scaffold visually
- * organized without prematurely coupling the page to future billing
- * components that do not exist yet.
+ * Extracts a display-safe message from the lease ledger query error.
  *
- * @param props - Card display content.
- * @returns A styled placeholder panel.
+ * @param error - Unknown query error.
+ * @returns A user-facing error message.
  */
-function PlaceholderCard({
-  title,
-  description,
-  children,
-}: PlaceholderCardProps) {
-  return (
-    <section className="rounded-2xl border border-white/10 bg-slate-900/70 p-5 shadow-sm backdrop-blur-sm">
-      <div className="mb-4">
-        <h2 className="text-base font-semibold text-slate-100">{title}</h2>
-        <p className="mt-1 text-sm text-slate-400">{description}</p>
-      </div>
+function getQueryErrorMessage(error: unknown): string {
+  if (!error) {
+    return "Unable to load the lease ledger.";
+  }
 
-      {children}
-    </section>
-  );
+  if (error instanceof Error && error.message.trim()) {
+    return error.message;
+  }
+
+  const apiError = error as BillingApiErrorShape;
+
+  if (apiError.error?.message) {
+    return apiError.error.message;
+  }
+
+  if (apiError.detail) {
+    return apiError.detail;
+  }
+
+  if (apiError.message) {
+    return apiError.message;
+  }
+
+  return "Unable to load the lease ledger.";
 }
 
 /**
  * LeaseLedgerPage
  *
- * Billing feature entry page for a single lease ledger.
+ * Primary billing page for a single lease ledger.
  *
- * Current responsibilities in this first scaffold:
- * - read and validate the `leaseId` route parameter
- * - render a production-safe page shell that matches the dashboard theme
- * - provide clear composition zones for:
- *   - lease header
- *   - summary cards
- *   - charge generation
- *   - charges table
- *   - payments table
- *   - allocations table
+ * Responsibilities:
+ * - read `leaseId` from the route
+ * - resolve the active organization slug for org-scoped billing queries
+ * - load the lease ledger read model
+ * - compose header, summary cards, write panels, tables, and modal state
  *
- * Future responsibilities after related billing files are created:
- * - call the lease ledger query hook
- * - open the RecordPaymentModal
- * - submit GenerateRentChargePanel actions
- * - render selector-backed ledger data from the backend
+ * Important architectural boundary:
+ * This page is orchestration-only. Heavy logic belongs in:
+ * - query hooks
+ * - mutation hooks
+ * - API modules
+ * - focused presentational components
  *
- * Important:
- * This page intentionally avoids importing future billing hooks/components
- * that do not exist yet. That keeps the app compiling while we build the
- * billing feature one file at a time.
- *
- * @returns The lease ledger page scaffold for the billing workspace.
+ * @returns The lease ledger workspace page.
  */
 export default function LeaseLedgerPage() {
   const { leaseId } = useParams<LeaseLedgerPageParams>();
 
-  const leaseLabel = useMemo(() => {
-    return formatLeaseDisplayLabel(leaseId);
+  const [isRecordPaymentModalOpen, setIsRecordPaymentModalOpen] =
+    useState<boolean>(false);
+
+  const normalizedLeaseId = useMemo(() => {
+    return normalizeLeaseId(leaseId);
   }, [leaseId]);
 
-  const hasLeaseId = Boolean(leaseId?.trim());
+  const orgSlug = useMemo(() => {
+    return tokenStorage.getOrgSlug();
+  }, []);
 
-  if (!hasLeaseId) {
+  const leaseLedgerQuery = useLeaseLedgerQuery({
+    leaseId: normalizedLeaseId,
+    orgSlug,
+    enabled: Boolean(normalizedLeaseId),
+  });
+
+  const isLedgerLoading = leaseLedgerQuery.isPending;
+  const leaseLedgerData = leaseLedgerQuery.data;
+  const leaseContext = leaseLedgerData?.lease;
+  const ledgerTotals = leaseLedgerData?.totals;
+  const ledgerCharges = leaseLedgerData?.charges ?? [];
+  const ledgerPayments = leaseLedgerData?.payments ?? [];
+  const ledgerAllocations = leaseLedgerData?.allocations ?? [];
+
+  if (!normalizedLeaseId) {
     return (
       <main className="space-y-6">
-        <header className="rounded-2xl border border-rose-500/20 bg-rose-500/10 p-6">
-          <p className="text-sm font-medium uppercase tracking-[0.18em] text-rose-300">
+        <section className="rounded-2xl border border-rose-500/20 bg-rose-500/10 p-6">
+          <p className="text-xs font-semibold uppercase tracking-[0.2em] text-rose-200">
             Billing
           </p>
           <h1 className="mt-2 text-2xl font-semibold text-white">
             Lease ledger unavailable
           </h1>
-          <p className="mt-3 max-w-2xl text-sm leading-6 text-slate-300">
-            The ledger route is missing a valid <code>leaseId</code> parameter.
-            This page must be opened from a lease-specific route such as
-            <code className="ml-1 rounded bg-black/20 px-1.5 py-0.5 text-slate-200">
+          <p className="mt-3 max-w-2xl text-sm leading-6 text-slate-200">
+            The current route is missing a valid lease id. Open this page from a
+            lease-specific route such as
+            <code className="ml-1 rounded bg-black/20 px-1.5 py-0.5 text-slate-100">
               /dashboard/leases/&lt;leaseId&gt;/ledger
             </code>
             .
           </p>
-        </header>
+        </section>
       </main>
     );
   }
 
   return (
     <main className="space-y-6">
-      {/* // ✅ New Code */}
-      <header className="rounded-2xl border border-white/10 bg-slate-950/70 p-6 shadow-sm backdrop-blur-sm">
-        <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-          <div className="min-w-0">
-            <p className="text-xs font-semibold uppercase tracking-[0.22em] text-cyan-300/90">
-              Billing
-            </p>
+      <LeaseLedgerHeader
+        isLoading={isLedgerLoading}
+        lease={leaseContext}
+        leaseId={normalizedLeaseId}
+      />
 
-            <h1 className="mt-2 text-2xl font-semibold tracking-tight text-white sm:text-3xl">
-              {leaseLabel}
-            </h1>
-
-            <p className="mt-3 max-w-3xl text-sm leading-6 text-slate-300">
-              This page will become the operational source of truth for lease
-              charges, payments, allocations, and delinquency context. The
-              ledger math will remain backend-derived so the frontend only
-              renders trusted billing state.
-            </p>
-          </div>
-
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-            <button
-              type="button"
-              disabled
-              className="inline-flex items-center justify-center rounded-xl border border-white/10 bg-white/5 px-4 py-2.5 text-sm font-medium text-slate-300 opacity-70"
-            >
-              Record payment
-            </button>
-
-            <button
-              type="button"
-              disabled
-              className="inline-flex items-center justify-center rounded-xl border border-cyan-400/20 bg-cyan-400/10 px-4 py-2.5 text-sm font-medium text-cyan-200 opacity-70"
-            >
-              Generate rent charge
-            </button>
-          </div>
-        </div>
-      </header>
-
-      {/* // ✅ New Code */}
-      <section
-        aria-label="Ledger status"
-        className="rounded-2xl border border-amber-400/20 bg-amber-400/10 p-4"
-      >
-        <p className="text-sm leading-6 text-amber-100">
-          The billing UI shell is in place. Next we will wire real contracts,
-          queries, and mutation flows one file at a time without leaking ledger
-          logic into the page layer.
-        </p>
+      <section className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-end">
+        <button
+          className="inline-flex items-center justify-center rounded-xl border border-white/10 bg-white/5 px-4 py-2.5 text-sm font-medium text-slate-200 transition hover:bg-white/10"
+          onClick={() => {
+            setIsRecordPaymentModalOpen(true);
+          }}
+          type="button"
+        >
+          Record payment
+        </button>
       </section>
 
-      {/* // ✅ New Code */}
-      <section
-        aria-label="Lease ledger summary cards"
-        className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4"
-      >
-        <PlaceholderCard
-          title="Outstanding balance"
-          description="Backend-derived lease balance will render here."
-        >
-          <p className="text-2xl font-semibold text-white">—</p>
-        </PlaceholderCard>
+      {!orgSlug ? (
+        <section className="rounded-2xl border border-amber-400/20 bg-amber-400/10 px-4 py-3">
+          <p className="text-sm leading-6 text-amber-100">
+            No active organization slug was found in client storage. The shared
+            axios layer may still provide org scoping, but this should be wired
+            to the real Org context next so billing queries stay explicit.
+          </p>
+        </section>
+      ) : null}
 
-        <PlaceholderCard
-          title="Current month charges"
-          description="Expected rent and posted charges summary."
-        >
-          <p className="text-2xl font-semibold text-white">—</p>
-        </PlaceholderCard>
+      {leaseLedgerQuery.isError ? (
+        <section className="rounded-2xl border border-rose-400/20 bg-rose-400/10 px-4 py-4">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <p className="text-sm font-medium text-rose-100">
+                {getQueryErrorMessage(leaseLedgerQuery.error)}
+              </p>
+              <p className="mt-1 text-xs leading-5 text-rose-200/90">
+                The lease ledger endpoint should return charges, payments,
+                allocations, totals, and lease context for this page. :contentReference[oaicite:0]{index=0}
+              </p>
+            </div>
 
-        <PlaceholderCard
-          title="Payments received"
-          description="Applied and unapplied payment totals."
-        >
-          <p className="text-2xl font-semibold text-white">—</p>
-        </PlaceholderCard>
+            <button
+              className="inline-flex items-center justify-center rounded-xl border border-rose-300/20 bg-rose-300/10 px-4 py-2 text-sm font-medium text-rose-50 transition hover:bg-rose-300/15"
+              onClick={() => {
+                void leaseLedgerQuery.refetch();
+              }}
+              type="button"
+            >
+              Retry
+            </button>
+          </div>
+        </section>
+      ) : null}
 
-        <PlaceholderCard
-          title="Delinquency status"
-          description="Aging and overdue billing signal for this lease."
-        >
-          <p className="text-2xl font-semibold text-white">—</p>
-        </PlaceholderCard>
-      </section>
+      <LeaseLedgerSummaryCards
+        isLoading={isLedgerLoading}
+        totals={ledgerTotals}
+      />
 
-      {/* // ✅ New Code */}
-      <div className="grid grid-cols-1 gap-6 xl:grid-cols-[minmax(0,1.5fr)_minmax(320px,0.8fr)]">
+      <div className="grid grid-cols-1 gap-6 xl:grid-cols-[minmax(0,1.55fr)_minmax(320px,0.85fr)]">
         <div className="space-y-6">
-          <PlaceholderCard
-            title="Charges"
-            description="Posted obligations for this lease will appear here with remaining balances."
-          >
-            <div className="rounded-xl border border-dashed border-white/10 px-4 py-8 text-sm text-slate-400">
-              ChargesTable will be mounted here after the billing read contracts
-              and query hooks are created.
-            </div>
-          </PlaceholderCard>
+          <ChargesTable
+            charges={ledgerCharges}
+            isLoading={isLedgerLoading}
+          />
 
-          <PlaceholderCard
-            title="Payments"
-            description="Recorded payments and unapplied amounts will appear here."
-          >
-            <div className="rounded-xl border border-dashed border-white/10 px-4 py-8 text-sm text-slate-400">
-              PaymentsTable will be mounted here after payment API and mutation
-              hooks are wired.
-            </div>
-          </PlaceholderCard>
+          <PaymentsTable
+            isLoading={isLedgerLoading}
+            payments={ledgerPayments}
+          />
 
-          <PlaceholderCard
-            title="Allocations"
-            description="Payment-to-charge application history will appear here."
-          >
-            <div className="rounded-xl border border-dashed border-white/10 px-4 py-8 text-sm text-slate-400">
-              AllocationsTable will be mounted here once the ledger response
-              contract is fully typed.
-            </div>
-          </PlaceholderCard>
+          <AllocationsTable
+            allocations={ledgerAllocations}
+            isLoading={isLedgerLoading}
+          />
         </div>
 
         <div className="space-y-6">
-          <PlaceholderCard
-            title="Lease context"
-            description="Header details such as tenant names, building, unit, rent, and due day."
-          >
-            <dl className="grid grid-cols-1 gap-3 text-sm">
-              <div className="flex items-center justify-between gap-4 rounded-xl border border-white/5 bg-white/[0.03] px-3 py-2.5">
-                <dt className="text-slate-400">Lease ID</dt>
-                <dd className="font-medium text-slate-200">{leaseId}</dd>
-              </div>
+          <GenerateRentChargePanel
+            leaseId={normalizedLeaseId}
+            onSuccess={() => {
+              /**
+               * Query invalidation already happens inside the charge mutation hook.
+               * This callback is intentionally available for future page-level
+               * side effects such as toasts or analytics events.
+               */
+            }}
+            orgSlug={orgSlug}
+          />
 
-              <div className="flex items-center justify-between gap-4 rounded-xl border border-white/5 bg-white/[0.03] px-3 py-2.5">
-                <dt className="text-slate-400">Status</dt>
-                <dd className="font-medium text-slate-200">Pending query</dd>
-              </div>
+          <section className="rounded-2xl border border-white/10 bg-slate-950/70 p-5 shadow-sm backdrop-blur-sm">
+            <h2 className="text-base font-semibold text-white">
+              Lease ledger notes
+            </h2>
 
-              <div className="flex items-center justify-between gap-4 rounded-xl border border-white/5 bg-white/[0.03] px-3 py-2.5">
-                <dt className="text-slate-400">Rent amount</dt>
-                <dd className="font-medium text-slate-200">Pending query</dd>
-              </div>
+            <div className="mt-4 space-y-3 text-sm leading-6 text-slate-300">
+              <p>
+                This page is driven by the lease ledger read model, not by
+                recomputing balances in the browser. The backend remains the
+                financial source of truth. 
+              </p>
 
-              <div className="flex items-center justify-between gap-4 rounded-xl border border-white/5 bg-white/[0.03] px-3 py-2.5">
-                <dt className="text-slate-400">Due day</dt>
-                <dd className="font-medium text-slate-200">Pending query</dd>
-              </div>
-            </dl>
-          </PlaceholderCard>
+              <p>
+                Recording a payment and generating a rent charge should refresh
+                the lease ledger view automatically through billing query
+                invalidation.
+              </p>
 
-          <PlaceholderCard
-            title="Next wiring steps"
-            description="Recommended implementation order to keep the billing feature stable."
-          >
-            <ol className="space-y-3 text-sm leading-6 text-slate-300">
-              <li>1. Create billingTypes.ts</li>
-              <li>2. Create billingQueryKeys.ts</li>
-              <li>3. Create ledgerApi.ts</li>
-              <li>4. Create useLeaseLedgerQuery.ts</li>
-              <li>5. Replace these placeholders with real billing components</li>
-            </ol>
-          </PlaceholderCard>
+              <p>
+                The billing slice is intentionally lease-scoped so charges,
+                payments, and allocations remain attached to the underlying
+                obligation context. 
+              </p>
+            </div>
+          </section>
         </div>
       </div>
+
+      <RecordPaymentModal
+        isOpen={isRecordPaymentModalOpen}
+        leaseId={normalizedLeaseId}
+        onClose={() => {
+          setIsRecordPaymentModalOpen(false);
+        }}
+        orgSlug={orgSlug}
+      />
     </main>
   );
 }
