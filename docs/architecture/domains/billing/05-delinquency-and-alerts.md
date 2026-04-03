@@ -32,3 +32,23 @@ flowchart TD
 - partially paid overdue
 - unallocated cash
 - lease with persistent delinquency
+
+## Why this matters
+
+Delinquency should be explainable from:
+
+- posted charges
+- allocations
+- the selected as-of date
+
+That keeps the signal trustworthy and lets later AI explanations stay grounded in real financial facts.
+
+## Frontend implication
+
+The system can later expose:
+
+- delinquency report pages
+- billing workbench queues
+- alert cards
+- lease-level delinquency badges
+- “why this lease is delinquent” explanations

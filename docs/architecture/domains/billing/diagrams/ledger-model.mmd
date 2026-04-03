@@ -1,10 +1,7 @@
 flowchart LR
-    LEASE[Lease]
-    CHARGE[Charge]
-    PAYMENT[Payment]
-    ALLOC[Allocation]
+    CH[Charge]
+    PM[Payment]
+    AL[Allocation]
 
-    LEASE --> CHARGE
-    LEASE --> PAYMENT
-    PAYMENT --> ALLOC
-    CHARGE --> ALLOC
+    CH -->|represents money owed| AL
+    PM -->|represents money received| AL

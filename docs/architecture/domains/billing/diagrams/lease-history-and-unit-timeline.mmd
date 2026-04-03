@@ -1,0 +1,19 @@
+flowchart TD
+    B[Building]
+    U[Unit]
+    C[Current Lease]
+    CL[Ledger for Current Lease]
+    H[Lease History]
+    L1[Prior Lease A]
+    L2[Prior Lease B]
+    LL1[Ledger A]
+    LL2[Ledger B]
+
+    B --> U
+    U --> C
+    C --> CL
+    U --> H
+    H --> L1
+    H --> L2
+    L1 --> LL1
+    L2 --> LL2

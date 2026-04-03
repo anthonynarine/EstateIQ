@@ -1,0 +1,23 @@
+flowchart TD
+    PAGE[LeaseLedgerPage]
+    HEADER[LeaseLedgerHeader]
+    CARDS[LeaseLedgerSummaryCards]
+    ACTION1[RecordPaymentModal]
+    ACTION2[GenerateRentChargePanel]
+    CHARGES[ChargesTable]
+    PAYMENTS[PaymentsTable]
+    ALLOCS[AllocationsTable]
+    QUERY[useLeaseLedgerQuery]
+    MUT1[usePaymentMutations]
+    MUT2[useChargeMutations]
+
+    PAGE --> HEADER
+    PAGE --> CARDS
+    PAGE --> ACTION1
+    PAGE --> ACTION2
+    PAGE --> CHARGES
+    PAGE --> PAYMENTS
+    PAGE --> ALLOCS
+    PAGE --> QUERY
+    ACTION1 --> MUT1
+    ACTION2 --> MUT2
