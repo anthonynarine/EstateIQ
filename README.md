@@ -82,7 +82,7 @@ It also reflects the central design principle of the product:
 - PostgreSQL as the system of record
 - organization-scoped access model
 - buildings, units, leasing, expenses, and reporting foundations
-- billing ledger domain being formalized
+- billing ledger domain with initial lease-ledger workspace
 - private document storage path for receipts and operational files
 
 ### Planned infrastructure
@@ -161,6 +161,63 @@ That means the system avoids the most dangerous shortcuts:
 - no accounting logic buried in views
 
 This is the right foundation for delinquency, reporting, future automation, and AI explanation.
+
+---
+
+## Billing / lease ledger domain
+
+EstateIQ treats billing as **lease-scoped accounts receivable infrastructure**.
+
+It is not modeled as a generic payments table, and it is not modeled as one endless ledger at the unit level.
+
+Each lease owns its own financial history.
+
+```mermaid
+flowchart TD
+    B[Building]
+    U[Unit]
+    C[Current Lease]
+    CL[Ledger for Current Lease]
+    H[Lease History]
+    L1[Prior Lease A]
+    L2[Prior Lease B]
+    LL1[Ledger A]
+    LL2[Ledger B]
+
+    B --> U
+    U --> C
+    C --> CL
+    U --> H
+    H --> L1
+    H --> L2
+    L1 --> LL1
+    L2 --> LL2
+```
+
+### Why this matters
+
+- the **unit** owns the occupancy timeline
+- the **lease** owns the ledger
+- ended leases keep their financial history
+- new leases start with their own clean billing lifecycle
+- late payments for an ended lease can still be recorded against that ended lease when appropriate
+
+This keeps historical obligations from being blended across tenants and keeps the system financially trustworthy.
+
+### Lease ledger workspace
+
+The lease ledger page is the billing workspace for a single lease.
+
+Its job is to let the user:
+
+- review posted charges
+- review recorded payments
+- review allocations
+- review remaining balance and unapplied amounts
+- explicitly generate a monthly rent charge
+- record payments for that lease
+
+That page is not a unit-wide combined ledger. It is the financial workspace for one obligation context.
 
 ---
 
@@ -478,18 +535,20 @@ The current platform direction and implemented foundation already support the re
 - lease-driven occupancy model
 - tenant / lease relationship flows
 - expense domain and reporting-oriented architecture
+- billing domain with initial lease ledger frontend workspace
 - React + TypeScript frontend shell and provider structure
 - Django + DRF backend with layered architecture patterns
 
-### Actively being formalized now
+### Actively being expanded now
 
-- full **billing ledger domain**
+- fuller **billing ledger domain**
   - charge
   - payment
   - allocation
   - lease ledger views
   - delinquency selectors
   - internal billing alerts
+  - lease history to ledger navigation
 
 This is important: billing is being built as **accounts receivable infrastructure**, not as a tenant portal.
 
@@ -536,34 +595,6 @@ That matters because the core product value is not service sprawl. It is trustwo
 - underperformance analysis
 - vacancy and rent stress scenarios
 - AI explanation layer across reports and dashboards
-
----
-
-## Architecture docs
-
-This repository should grow a dedicated architecture docs section so the root README stays focused and the deeper system explanations stay organized.
-
-Recommended direction:
-
-```text
-/docs
-  /architecture
-    /system
-      README.md
-      01-system-overview.md
-      02-request-flow.md
-      03-security-boundaries.md
-      04-runtime-components.md
-      /diagrams
-```
-
-The rule for these docs should be simple:
-
-- one main idea per diagram
-- each diagram paired with plain-English explanation
-- keep current architecture separate from future architecture
-- make domain ownership explicit
-- show org scoping whenever data crosses trust boundaries
 
 ---
 
