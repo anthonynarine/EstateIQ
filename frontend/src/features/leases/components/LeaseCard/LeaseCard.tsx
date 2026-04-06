@@ -1,13 +1,21 @@
 // # Filename: src/features/leases/components/LeaseCard/LeaseCard.tsx
-
+// ✅ New Code
 
 import { useMemo, useState } from "react";
+import { Link } from "react-router-dom";
 import { UserRound } from "lucide-react";
-import { getPrimaryLeaseParty, requiresPrimaryTenantRepair } from "../../utils/leaseParty";
+import {
+  getPrimaryLeaseParty,
+  requiresPrimaryTenantRepair,
+} from "../../utils/leaseParty";
 import { useEditLeaseForm } from "../../forms/EditLeaseForm/useEditLeaseForm";
 import { useEditLeaseSubmit } from "../../forms/EditLeaseForm/useEditLeaseSubmit";
 import type { LeaseCardProps } from "./types";
-import { formatDateRange, getStatusCopy, getStatusPillClasses } from "./formatters";
+import {
+  formatDateRange,
+  getStatusCopy,
+  getStatusPillClasses,
+} from "./formatters";
 import LeaseCardHeader from "./LeaseCardHeader";
 import LeaseSummaryGrid from "./LeaseSummaryGrid";
 import LeaseTenantPanel from "./LeaseTenantPanel";
@@ -41,7 +49,7 @@ export default function LeaseCard({
   const primaryParty = useMemo(() => getPrimaryLeaseParty(lease), [lease]);
   const missingPrimaryTenant = useMemo(
     () => requiresPrimaryTenantRepair(lease),
-    [lease]
+    [lease],
   );
 
   const tenantName = primaryParty?.tenant.full_name ?? "Missing primary tenant";
@@ -61,10 +69,21 @@ export default function LeaseCard({
     return "Lease";
   }, [displayLabel, lease.id, showDbId]);
 
-  // Step 3: Initialize reducer-backed edit form
+  // Step 3: Build stable ledger navigation target
+  const ledgerHref = useMemo(() => {
+    const basePath = `/dashboard/leases/${lease.id}/ledger`;
+
+    if (!orgSlug) {
+      return basePath;
+    }
+
+    return `${basePath}?org=${encodeURIComponent(orgSlug)}`;
+  }, [lease.id, orgSlug]);
+
+  // Step 4: Initialize reducer-backed edit form
   const form = useEditLeaseForm(lease);
 
-  // Step 4: Initialize safe submit workflow
+  // Step 5: Initialize safe submit workflow
   const { isSubmitting, submit } = useEditLeaseSubmit({
     orgSlug,
     unitId,
@@ -75,7 +94,7 @@ export default function LeaseCard({
     },
   });
 
-  // Step 5: Normalize mutation error display from local form state only
+  // Step 6: Normalize mutation error display from local form state only
   const onOpen = () => {
     form.reset();
     setIsOpen(true);
@@ -101,10 +120,12 @@ export default function LeaseCard({
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0 flex-1">
               <div className="flex flex-wrap items-center gap-2">
-                <p className="truncate text-sm font-semibold text-white">{title}</p>
+                <p className="truncate text-sm font-semibold text-white">
+                  {title}
+                </p>
                 <span
                   className={`rounded-full border px-2 py-0.5 text-[11px] ${getStatusPillClasses(
-                    lease.status
+                    lease.status,
                   )}`}
                 >
                   {getStatusCopy(lease.status)}
@@ -114,7 +135,9 @@ export default function LeaseCard({
               <p className="mt-2 text-xs text-neutral-400">
                 {formatDateRange(lease.start_date, lease.end_date)}
                 {showDbId ? (
-                  <span className="ml-2 text-neutral-600">(id: {lease.id})</span>
+                  <span className="ml-2 text-neutral-600">
+                    (id: {lease.id})
+                  </span>
                 ) : null}
               </p>
 
@@ -122,7 +145,9 @@ export default function LeaseCard({
                 <UserRound className="h-4 w-4 text-cyan-300" />
                 <span
                   className={
-                    missingPrimaryTenant ? "text-amber-300" : "text-neutral-200"
+                    missingPrimaryTenant
+                      ? "text-amber-300"
+                      : "text-neutral-200"
                   }
                 >
                   {tenantName}
@@ -136,7 +161,16 @@ export default function LeaseCard({
               ) : null}
             </div>
 
-            <LeaseActions compact onEdit={onOpen} />
+            <div className="flex items-center gap-2">
+              <Link
+                to={ledgerHref}
+                className="inline-flex items-center gap-2 rounded-xl bg-white/5 px-3 py-2 text-xs font-medium text-neutral-100 ring-1 ring-white/10 transition hover:bg-white/8 hover:text-white"
+              >
+                Open ledger
+              </Link>
+
+              <LeaseActions compact onEdit={onOpen} />
+            </div>
           </div>
         </article>
 
@@ -203,24 +237,32 @@ export default function LeaseCard({
 
             {missingPrimaryTenant ? <LeaseRepairBanner /> : null}
           </div>
-
-
         </div>
 
         <div className="mt-auto pt-5">
           <div className="border-t border-white/10 pt-4">
             <div className="flex items-center justify-between gap-4">
               <p className="max-w-xl text-sm text-neutral-400">
-                Review lease terms, status, and the tenant attached to this lease.
+                Review lease terms, status, tenant context, and billing activity
+                for this lease.
               </p>
 
-              <button
-                type="button"
-                onClick={onOpen}
-                className="inline-flex shrink-0 items-center gap-2 rounded-xl bg-white/5 px-3 py-2 text-sm font-medium text-neutral-100 ring-1 ring-white/10 transition hover:bg-white/8 hover:text-white"
-              >
-                Edit lease
-              </button>
+              <div className="flex items-center gap-2">
+                <Link
+                  to={ledgerHref}
+                  className="inline-flex shrink-0 items-center gap-2 rounded-xl bg-white/5 px-3 py-2 text-sm font-medium text-neutral-100 ring-1 ring-white/10 transition hover:bg-white/8 hover:text-white"
+                >
+                  Open ledger
+                </Link>
+
+                <button
+                  type="button"
+                  onClick={onOpen}
+                  className="inline-flex shrink-0 items-center gap-2 rounded-xl bg-white/5 px-3 py-2 text-sm font-medium text-neutral-100 ring-1 ring-white/10 transition hover:bg-white/8 hover:text-white"
+                >
+                  Edit lease
+                </button>
+              </div>
             </div>
           </div>
         </div>

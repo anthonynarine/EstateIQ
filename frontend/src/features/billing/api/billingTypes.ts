@@ -194,16 +194,30 @@
   * Keep this lightweight and backend-derived. The page should not guess these
   * values from other routes when the ledger payload can provide them directly.
   */
- export interface LeaseLedgerContext {
-   lease_id: BillingId;
-   lease_status?: string;
-   rent_amount?: MoneyValue;
-   due_day?: number | null;
-   tenant_names?: string[];
-   tenant_display?: string | null;
-   building?: BillingEntitySummary | null;
-   unit?: BillingEntitySummary | null;
- }
+  export interface LeaseLedgerContext {
+    lease_id: BillingId;
+    lease_status?: string;
+    rent_amount?: MoneyValue;
+    due_day?: number | null;
+    tenant_names?: string[];
+    tenant_display?: string | null;
+
+    /**
+     * Optional flat relationship ids.
+     *
+     * Why these exist:
+     * The lease ledger page may need direct navigation targets such as
+     * "Back to Unit" even when the backend returns a flatter context shape.
+     *
+     * The nested `building` / `unit` summaries remain the preferred display
+     * shape for UI rendering. These ids are navigation-friendly fallbacks.
+     */
+    building_id?: BillingId | null;
+    unit_id?: BillingId | null;
+
+    building?: BillingEntitySummary | null;
+    unit?: BillingEntitySummary | null;
+  }
  
  /**
   * LeaseLedgerResponse
