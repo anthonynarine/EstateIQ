@@ -1,5 +1,5 @@
 // # Filename: src/features/billing/components/LeaseLedgerSummaryCards.tsx
-// ✅ New Code
+
 
 import type { LeaseLedgerTotals, MoneyValue } from "../api/billingTypes";
 
@@ -18,7 +18,7 @@ export interface LeaseLedgerSummaryCardsProps {
  *
  * Visual emphasis options for summary cards.
  */
-type SummaryCardTone = "default" | "danger" | "success" | "muted";
+type SummaryCardTone = "default" | "danger" | "success" | "warning";
 
 /**
  * SummaryCardItem
@@ -29,7 +29,7 @@ interface SummaryCardItem {
   key: string;
   label: string;
   value: string;
-  helper?: string;
+  helper: string;
   tone?: SummaryCardTone;
 }
 
@@ -37,10 +37,6 @@ interface SummaryCardItem {
  * formatCurrencyValue
  *
  * Formats money-like API values into a USD currency display string.
- *
- * Why this helper matters:
- * The billing backend may return decimals as strings. This component should
- * display them consistently without pushing formatting logic into the page.
  *
  * @param value Monetary value from the ledger totals payload.
  * @returns A formatted USD string or a placeholder when missing/invalid.
@@ -67,25 +63,45 @@ function formatCurrencyValue(value?: MoneyValue): string {
 }
 
 /**
+ * getNumericMoneyValue
+ *
+ * Converts a money-like value into a safe number for UI state decisions.
+ *
+ * @param value Monetary value from the billing payload.
+ * @returns Parsed numeric value or null.
+ */
+function getNumericMoneyValue(value?: MoneyValue): number | null {
+  if (value === null || value === undefined || value === "") {
+    return null;
+  }
+
+  const parsedValue = Number(value);
+  return Number.isFinite(parsedValue) ? parsedValue : null;
+}
+
+/**
  * buildSummaryCardItems
  *
- * Maps backend ledger totals into a tighter, easier-to-scan summary row.
- *
- * Important architectural boundary:
- * These values are backend-derived. We do not recalculate ledger truth in
- * the browser. This component only formats and displays the totals payload.
+ * Maps backend ledger totals into a quieter, easier-to-scan summary row.
  *
  * @param totals Lease ledger totals payload from the backend.
  * @returns A list of summary card items for rendering.
  */
 function buildSummaryCardItems(totals?: LeaseLedgerTotals): SummaryCardItem[] {
+  const outstandingBalance = getNumericMoneyValue(totals?.outstanding_balance);
+  const unappliedAmount = getNumericMoneyValue(totals?.unapplied_amount);
+
   return [
     {
       key: "outstanding-balance",
       label: "Outstanding",
       value: formatCurrencyValue(totals?.outstanding_balance),
-      helper: "Current lease balance",
-      tone: "danger",
+      helper:
+        outstandingBalance && outstandingBalance > 0
+          ? "Balance due"
+          : "Fully paid",
+      tone:
+        outstandingBalance && outstandingBalance > 0 ? "danger" : "success",
     },
     {
       key: "total-charges",
@@ -99,14 +115,18 @@ function buildSummaryCardItems(totals?: LeaseLedgerTotals): SummaryCardItem[] {
       label: "Payments",
       value: formatCurrencyValue(totals?.total_payments),
       helper: "Recorded receipts",
-      tone: "success",
+      tone: "default",
     },
     {
       key: "unapplied-amount",
       label: "Unapplied",
       value: formatCurrencyValue(totals?.unapplied_amount),
-      helper: "Not yet allocated",
-      tone: "muted",
+      helper:
+        unappliedAmount && unappliedAmount > 0
+          ? "Needs allocation"
+          : "Fully allocated",
+      tone:
+        unappliedAmount && unappliedAmount > 0 ? "warning" : "default",
     },
   ];
 }
@@ -120,14 +140,13 @@ function buildSummaryCardItems(totals?: LeaseLedgerTotals): SummaryCardItem[] {
  * @returns Tailwind class string for card styling.
  */
 function getCardToneClasses(tone: SummaryCardTone = "default"): string {
-  // Step 1: Map semantic tone to app-consistent styling
   switch (tone) {
     case "danger":
-      return "border-rose-500/20 bg-rose-500/[0.06]";
+      return "border-rose-500/20 bg-neutral-950";
     case "success":
-      return "border-emerald-500/20 bg-emerald-500/[0.05]";
-    case "muted":
-      return "border-neutral-800/80 bg-neutral-950";
+      return "border-emerald-500/20 bg-neutral-950";
+    case "warning":
+      return "border-amber-500/20 bg-neutral-950";
     case "default":
     default:
       return "border-neutral-800/80 bg-neutral-950";
@@ -143,14 +162,13 @@ function getCardToneClasses(tone: SummaryCardTone = "default"): string {
  * @returns Tailwind class string for value styling.
  */
 function getValueToneClasses(tone: SummaryCardTone = "default"): string {
-  // Step 1: Map tone to value emphasis
   switch (tone) {
     case "danger":
       return "text-rose-100";
     case "success":
       return "text-emerald-100";
-    case "muted":
-      return "text-white";
+    case "warning":
+      return "text-amber-100";
     case "default":
     default:
       return "text-white";
@@ -161,15 +179,6 @@ function getValueToneClasses(tone: SummaryCardTone = "default"): string {
  * LeaseLedgerSummaryCards
  *
  * Presentational summary card grid for the lease ledger page.
- *
- * Responsibilities:
- * - display backend-derived totals
- * - render stable placeholders while loading
- * - keep summary presentation logic out of the page component
- *
- * Important architectural boundary:
- * This component does not fetch data, mutate records, or recompute billing
- * math. It only renders the totals payload supplied by the query/page layer.
  *
  * @param props Summary card display props.
  * @returns A responsive grid of lease ledger summary cards.
@@ -183,39 +192,37 @@ export default function LeaseLedgerSummaryCards({
   return (
     <section
       aria-label="Lease ledger summary"
-      className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4"
+      className="grid grid-cols-2 gap-3 xl:grid-cols-4"
     >
       {summaryCards.map((card) => {
         return (
           <article
             key={card.key}
-            className={`rounded-3xl border p-4 shadow-[0_0_0_1px_rgba(255,255,255,0.02)] ${getCardToneClasses(
+            className={`rounded-xl border px-4 py-3 shadow-[0_0_0_1px_rgba(255,255,255,0.02)] ${getCardToneClasses(
               card.tone,
             )}`}
           >
-            <div className="space-y-2">
-              <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-neutral-500">
+            <div className="space-y-1.5">
+              <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-neutral-500">
                 {card.label}
               </p>
 
               {isLoading ? (
-                <div className="space-y-2">
-                  <div className="h-8 w-32 animate-pulse rounded bg-white/10" />
-                  <div className="h-4 w-24 animate-pulse rounded bg-white/10" />
+                <div className="space-y-1.5">
+                  <div className="h-7 w-24 animate-pulse rounded bg-white/10" />
+                  <div className="h-3.5 w-20 animate-pulse rounded bg-white/10" />
                 </div>
               ) : (
                 <>
                   <p
-                    className={`text-2xl font-semibold tracking-tight ${getValueToneClasses(
+                    className={`text-[1.65rem] font-semibold tracking-tight ${getValueToneClasses(
                       card.tone,
                     )}`}
                   >
                     {card.value}
                   </p>
 
-                  {card.helper ? (
-                    <p className="text-sm text-neutral-400">{card.helper}</p>
-                  ) : null}
+                  <p className="text-xs text-neutral-400">{card.helper}</p>
                 </>
               )}
             </div>

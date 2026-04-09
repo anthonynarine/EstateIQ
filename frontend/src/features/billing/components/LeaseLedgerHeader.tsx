@@ -7,8 +7,8 @@ import {
   CalendarDays,
   CreditCard,
   Home,
-  RefreshCw,
   ReceiptText,
+  RefreshCw,
 } from "lucide-react";
 
 import type {
@@ -21,10 +21,6 @@ import type {
  * LeaseLedgerHeaderProps
  *
  * Presentational contract for the lease billing workspace header.
- *
- * This component stays UI-only.
- * It does not fetch data, navigate directly, or mutate billing records.
- * The page layer owns orchestration and passes in prepared context/actions.
  */
 export interface LeaseLedgerHeaderProps {
   lease?: LeaseLedgerContext;
@@ -187,16 +183,14 @@ function buildStatusLabel(status?: string): string {
 /**
  * getStatusPillClasses
  *
- * Maps lease status to the shared app pill tone.
+ * Maps lease status to shared pill styling.
  *
  * @param status Raw lease status.
- * @returns Tailwind class string for the status pill.
+ * @returns Tailwind class string.
  */
 function getStatusPillClasses(status?: string): string {
-  // Step 1: Normalize status
   const normalizedStatus = status?.trim().toLowerCase();
 
-  // Step 2: Return app-consistent pill styling
   switch (normalizedStatus) {
     case "active":
       return "border-emerald-500/30 bg-emerald-500/10 text-emerald-200";
@@ -224,19 +218,19 @@ function buildWorkspaceSubtitle(isLoading: boolean): string {
     return "Loading lease billing context…";
   }
 
-  return "Review charges, payments, and allocations for this lease, then record the next billing event.";
+  return "Review charges, payments, and allocations for this lease.";
 }
 
 /**
  * LeaseLedgerHeader
  *
- * Premium workspace header for the lease billing page.
+ * Compact workspace header for the lease billing page.
  *
  * Layout goals:
- * - match the EstateIQ lease workspace shell
- * - keep navigation contextual
- * - make the billing purpose obvious
- * - present actions intentionally, not as detached controls
+ * - reduce visual weight
+ * - keep actions in the utility row
+ * - let the title area breathe
+ * - make property metadata feel like compact stats, not mini-panels
  *
  * @param props Header display props.
  * @returns Lease billing workspace header.
@@ -269,9 +263,9 @@ export default function LeaseLedgerHeader({
         shadow-[0_0_0_1px_rgba(255,255,255,0.02)]
       "
     >
-      <div className="p-4 sm:p-5 lg:p-6">
-        <div className="space-y-6">
-          <div className="flex flex-col gap-3 sm:gap-4 lg:flex-row lg:items-start lg:justify-between">
+      <div className="p-4 sm:p-5">
+        <div className="space-y-4">
+          <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
             <div className="flex items-center">
               {onBackToUnit ? (
                 <button
@@ -334,143 +328,123 @@ export default function LeaseLedgerHeader({
                   Refreshing…
                 </span>
               ) : null}
-            </div>
-          </div>
 
-          <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
-            <div className="flex min-w-0 items-start gap-3 sm:gap-4">
-              <div
-                className="
-                  inline-flex h-11 w-11 shrink-0 items-center justify-center
-                  rounded-2xl border border-cyan-400/20 bg-cyan-500/10
-                  text-cyan-200 sm:h-12 sm:w-12
-                "
-              >
-                <ReceiptText className="h-5 w-5" />
-              </div>
-
-              <div className="min-w-0 space-y-2">
-                {breadcrumbText ? (
-                  <p className="truncate text-sm font-medium tracking-wide text-neutral-400">
-                    {breadcrumbText}
-                  </p>
-                ) : null}
-
-                <div className="flex min-w-0 items-center gap-2">
-                  <Home className="h-3.5 w-3.5 shrink-0 text-neutral-500" />
-                  <p className="truncate text-sm font-medium tracking-wide text-neutral-400">
-                    {buildingDisplay}
-                  </p>
-                </div>
-
-                <h1 className="text-3xl font-semibold tracking-tight text-white sm:text-[2rem] lg:text-[2.2rem]">
-                  Lease ledger
-                </h1>
-
-                <p className="max-w-3xl text-sm leading-6 text-neutral-300">
-                  {subtitle}
-                </p>
-
-                <p className="text-base font-semibold text-white">
-                  {tenantDisplay}
-                </p>
-              </div>
-            </div>
-
-            <div className="flex w-full flex-col gap-3 lg:w-auto lg:min-w-[220px]">
               {onRecordPayment ? (
                 <button
                   type="button"
                   onClick={onRecordPayment}
                   className="
-                    inline-flex items-center justify-center gap-2 rounded-xl
-                    bg-white/5 px-4 py-2.5 text-sm font-medium text-neutral-100
-                    ring-1 ring-white/10 transition
-                    hover:bg-white/8 hover:text-white
+                    inline-flex items-center gap-2 rounded-xl
+                    border border-white/10 bg-white/[0.03]
+                    px-3.5 py-2 text-sm font-medium text-neutral-100
+                    transition hover:bg-white/[0.06] hover:text-white
                   "
                 >
                   <CreditCard className="h-4 w-4" />
                   Record payment
                 </button>
               ) : null}
-
-              <div
-                className="
-                  rounded-2xl border border-white/10 bg-white/[0.03]
-                  px-4 py-3 text-sm text-neutral-300
-                "
-              >
-                <p className="text-[11px] uppercase tracking-[0.18em] text-neutral-500">
-                  Workspace
-                </p>
-                <p className="mt-2 leading-6">
-                  This is the billing workspace for one lease. Unit history can
-                  link here later, but it should not replace this ledger as the
-                  operational write surface.
-                </p>
-              </div>
             </div>
           </div>
 
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+          <div className="flex min-w-0 items-start gap-3">
             <div
               className="
-                rounded-2xl border border-white/10 bg-white/[0.03]
-                px-4 py-3
+                inline-flex h-10 w-10 shrink-0 items-center justify-center
+                rounded-2xl border border-cyan-400/20 bg-cyan-500/10
+                text-cyan-200
               "
             >
-              <p className="text-xs font-medium uppercase tracking-[0.16em] text-neutral-500">
+              <ReceiptText className="h-4.5 w-4.5" />
+            </div>
+
+            <div className="min-w-0 space-y-1.5">
+              {breadcrumbText ? (
+                <p className="truncate text-sm font-medium tracking-wide text-neutral-400">
+                  {breadcrumbText}
+                </p>
+              ) : null}
+
+              <div className="flex min-w-0 items-center gap-2">
+                <Home className="h-3.5 w-3.5 shrink-0 text-neutral-500" />
+                <p className="truncate text-sm font-medium tracking-wide text-neutral-400">
+                  {buildingDisplay}
+                </p>
+              </div>
+
+              <h1 className="text-[2.2rem] font-semibold tracking-tight text-white">
+                Lease ledger
+              </h1>
+
+              <p className="max-w-2xl text-sm leading-6 text-neutral-300">
+                {subtitle}
+              </p>
+
+              <p className="pt-1 text-base font-semibold text-white">
+                {tenantDisplay}
+              </p>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-3 xl:grid-cols-4">
+            <div
+              className="
+                rounded-lg border border-white/10 bg-white/[0.03]
+                px-3.5 py-3
+              "
+            >
+              <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-neutral-500">
                 Rent amount
               </p>
-              <p className="mt-2 text-lg font-semibold text-white">
+              <p className="mt-1.5 text-lg font-semibold text-white">
                 {rentAmountLabel}
               </p>
             </div>
 
             <div
               className="
-                rounded-2xl border border-white/10 bg-white/[0.03]
-                px-4 py-3
+                rounded-lg border border-white/10 bg-white/[0.03]
+                px-3.5 py-3
               "
             >
               <div className="flex items-center gap-2">
                 <CalendarDays className="h-4 w-4 text-neutral-500" />
-                <p className="text-xs font-medium uppercase tracking-[0.16em] text-neutral-500">
+                <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-neutral-500">
                   Due day
                 </p>
               </div>
-              <p className="mt-2 text-lg font-semibold text-white">
+              <p className="mt-1.5 text-lg font-semibold text-white">
                 {dueDayLabel}
               </p>
             </div>
 
             <div
               className="
-                rounded-2xl border border-white/10 bg-white/[0.03]
-                px-4 py-3
+                rounded-lg border border-white/10 bg-white/[0.03]
+                px-3.5 py-3
               "
             >
               <div className="flex items-center gap-2">
                 <Building2 className="h-4 w-4 text-neutral-500" />
-                <p className="text-xs font-medium uppercase tracking-[0.16em] text-neutral-500">
+                <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-neutral-500">
                   Building
                 </p>
               </div>
-              <p className="mt-2 truncate text-lg font-semibold text-white">
+              <p className="mt-1.5 truncate text-lg font-semibold text-white">
                 {buildingDisplay}
               </p>
             </div>
 
             <div
               className="
-                rounded-2xl border border-white/10 bg-white/[0.03]
-                px-4 py-3
+                rounded-lg border border-white/10 bg-white/[0.03]
+                px-3.5 py-3
               "
             >
-              <p className="text-xs font-medium uppercase tracking-[0.16em] text-neutral-500">
+              <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-neutral-500">
                 Unit
               </p>
-              <p className="mt-2 truncate text-lg font-semibold text-white">
+              <p className="mt-1.5 truncate text-lg font-semibold text-white">
                 {unitDisplay}
               </p>
             </div>

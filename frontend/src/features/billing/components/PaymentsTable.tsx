@@ -1,5 +1,9 @@
 // # Filename: src/features/billing/components/PaymentsTable.tsx
 
+
+import { useEffect, useMemo, useState } from "react";
+
+import CollectionPaginationFooter from "../../../components/pagination/CollectionPaginationFooter";
 import type { LeaseLedgerPayment, MoneyValue } from "../api/billingTypes";
 
 /**
@@ -13,11 +17,18 @@ export interface PaymentsTableProps {
 }
 
 /**
+ * PAYMENTS_PAGE_SIZE
+ *
+ * Section-level page size for payment rows.
+ */
+const PAYMENTS_PAGE_SIZE = 1;
+
+/**
  * formatCurrencyValue
  *
  * Formats money-like API values into USD display text.
  *
- * @param value - Monetary value from the billing read model.
+ * @param value Monetary value from the billing read model.
  * @returns A formatted currency string or a placeholder.
  */
 function formatCurrencyValue(value?: MoneyValue): string {
@@ -46,7 +57,7 @@ function formatCurrencyValue(value?: MoneyValue): string {
  *
  * Formats an ISO date or datetime string into a readable date label.
  *
- * @param value - Date-like API value.
+ * @param value Date-like API value.
  * @returns A display-safe date string.
  */
 function formatDateValue(value?: string): string {
@@ -75,7 +86,7 @@ function formatDateValue(value?: string): string {
  *
  * Converts a payment method enum-like value into readable text.
  *
- * @param method - Raw payment method value.
+ * @param method Raw payment method value.
  * @returns Human-friendly label.
  */
 function formatPaymentMethod(method?: string): string {
@@ -95,8 +106,8 @@ function formatPaymentMethod(method?: string): string {
  *
  * Builds a stable React key for payment rows.
  *
- * @param payment - Payment row.
- * @param index - Array index fallback.
+ * @param payment Payment row.
+ * @param index Array index fallback.
  * @returns A stable key string.
  */
 function buildPaymentKey(
@@ -120,22 +131,43 @@ function buildPaymentKey(
  * Responsibilities:
  * - display lease-scoped payment rows
  * - show backend-derived amount, allocated total, and unapplied amount
+ * - paginate long historical payment activity at the section level
  * - provide mobile and desktop-friendly rendering
  *
  * Important architectural boundary:
  * This component does not fetch data or recompute ledger truth.
  * It only renders the payment rows supplied by the page/query layer.
  *
- * @param props - Payment table display props.
+ * @param props Payment table display props.
  * @returns A responsive payments table surface.
  */
 export default function PaymentsTable({
   payments,
   isLoading = false,
 }: PaymentsTableProps) {
+  const [page, setPage] = useState(1);
+
+  const totalPages = Math.max(
+    1,
+    Math.ceil(payments.length / PAYMENTS_PAGE_SIZE),
+  );
+
+  const visiblePayments = useMemo(() => {
+    const startIndex = (page - 1) * PAYMENTS_PAGE_SIZE;
+    const endIndex = startIndex + PAYMENTS_PAGE_SIZE;
+
+    return payments.slice(startIndex, endIndex);
+  }, [payments, page]);
+
+  useEffect(() => {
+    if (page > totalPages) {
+      setPage(1);
+    }
+  }, [page, totalPages]);
+
   if (isLoading) {
     return (
-      <section className="overflow-hidden rounded-3xl border border-neutral-800/80 bg-neutral-950 shadow-[0_0_0_1px_rgba(255,255,255,0.02)]">
+      <section className="overflow-hidden rounded-2xl border border-neutral-800/80 bg-neutral-950 shadow-[0_0_0_1px_rgba(255,255,255,0.02)]">
         <div className="border-b border-neutral-800/80 px-5 py-4 sm:px-6">
           <h3 className="text-base font-semibold text-white">Payments</h3>
           <p className="mt-1 text-sm text-neutral-400">
@@ -163,7 +195,7 @@ export default function PaymentsTable({
 
   if (!payments.length) {
     return (
-      <section className="overflow-hidden rounded-3xl border border-neutral-800/80 bg-neutral-950 shadow-[0_0_0_1px_rgba(255,255,255,0.02)]">
+      <section className="overflow-hidden rounded-2xl border border-neutral-800/80 bg-neutral-950 shadow-[0_0_0_1px_rgba(255,255,255,0.02)]">
         <div className="border-b border-neutral-800/80 px-5 py-4 sm:px-6">
           <h3 className="text-base font-semibold text-white">Payments</h3>
           <p className="mt-1 text-sm text-neutral-400">
@@ -187,13 +219,21 @@ export default function PaymentsTable({
   }
 
   return (
-    <section className="overflow-hidden rounded-3xl border border-neutral-800/80 bg-neutral-950 shadow-[0_0_0_1px_rgba(255,255,255,0.02)]">
+    <section className="overflow-hidden rounded-2xl border border-neutral-800/80 bg-neutral-950 shadow-[0_0_0_1px_rgba(255,255,255,0.02)]">
       <div className="border-b border-neutral-800/80 px-5 py-4 sm:px-6">
-        <h3 className="text-base font-semibold text-white">Payments</h3>
-        <p className="mt-1 text-sm text-neutral-400">
-          Recorded receipts for this lease, including how much remains
-          unapplied.
-        </p>
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <h3 className="text-base font-semibold text-white">Payments</h3>
+            <p className="mt-1 text-sm text-neutral-400">
+              Recorded receipts for this lease, including how much remains
+              unapplied.
+            </p>
+          </div>
+
+          <div className="text-xs font-medium uppercase tracking-[0.16em] text-neutral-500">
+            {payments.length} payment{payments.length === 1 ? "" : "s"}
+          </div>
+        </div>
       </div>
 
       <div className="hidden overflow-x-auto lg:block">
@@ -222,7 +262,7 @@ export default function PaymentsTable({
           </thead>
 
           <tbody className="divide-y divide-neutral-800/80">
-            {payments.map((payment, index) => {
+            {visiblePayments.map((payment, index) => {
               return (
                 <tr
                   key={buildPaymentKey(payment, index)}
@@ -268,7 +308,7 @@ export default function PaymentsTable({
       </div>
 
       <div className="space-y-4 p-5 sm:p-6 lg:hidden">
-        {payments.map((payment, index) => {
+        {visiblePayments.map((payment, index) => {
           return (
             <article
               key={buildPaymentKey(payment, index)}
@@ -343,6 +383,19 @@ export default function PaymentsTable({
           );
         })}
       </div>
+
+      {!isLoading && payments.length > PAYMENTS_PAGE_SIZE ? (
+        <CollectionPaginationFooter
+          page={page}
+          pageSize={PAYMENTS_PAGE_SIZE}
+          totalCount={payments.length}
+          itemLabel="payment"
+          onPrevious={() => setPage((previous) => Math.max(1, previous - 1))}
+          onNext={() =>
+            setPage((previous) => Math.min(totalPages, previous + 1))
+          }
+        />
+      ) : null}
     </section>
   );
 }

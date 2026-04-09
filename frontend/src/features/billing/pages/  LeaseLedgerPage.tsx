@@ -1,5 +1,5 @@
 // # Filename: src/features/billing/pages/LeaseLedgerPage.tsx
-// ✅ New Code
+
 
 import { useMemo, useState } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
@@ -110,11 +110,6 @@ function isRecord(value: unknown): value is MaybeRecord {
  *
  * Best-effort extraction of the unit id from the lease ledger context.
  *
- * Why this helper exists:
- * The page should support Back to Unit immediately, but the exact backend
- * field path may evolve. This helper keeps navigation resilient while the
- * response shape stabilizes.
- *
  * @param lease Lease ledger context.
  * @returns Unit id as a string or null when unavailable.
  */
@@ -124,27 +119,22 @@ function getLeaseUnitId(lease?: LeaseLedgerContext): string | null {
     return null;
   }
 
-  // Step 2: Try the most likely unit id locations
+  // Step 2: Try direct unit id first
   const directUnitId = lease.unit_id;
-  if (
-    typeof directUnitId === "string" ||
-    typeof directUnitId === "number"
-  ) {
+  if (typeof directUnitId === "string" || typeof directUnitId === "number") {
     return String(directUnitId);
   }
 
+  // Step 3: Fallback to nested summary id
   const unitValue = lease.unit;
   if (isRecord(unitValue)) {
     const nestedUnitId = unitValue.id;
-    if (
-      typeof nestedUnitId === "string" ||
-      typeof nestedUnitId === "number"
-    ) {
+    if (typeof nestedUnitId === "string" || typeof nestedUnitId === "number") {
       return String(nestedUnitId);
     }
   }
 
-  // Step 3: Fallback unavailable
+  // Step 4: No unit id available
   return null;
 }
 
@@ -267,6 +257,9 @@ export default function LeaseLedgerPage() {
     return getLeaseUnitId(leaseContext);
   }, [leaseContext]);
 
+  const showAllocationsSection =
+    isLedgerLoading || ledgerAllocations.length > 0;
+
   const handleBackToUnit = () => {
     // Step 1: Prefer explicit unit navigation when available
     if (unitId) {
@@ -281,7 +274,7 @@ export default function LeaseLedgerPage() {
   if (!normalizedLeaseId) {
     return (
       <div className="p-4 sm:p-6">
-        <main className="mx-auto w-full max-w-6xl space-y-6">
+        <main className="mx-auto w-full max-w-6xl space-y-5">
           <section className="rounded-2xl border border-rose-500/20 bg-rose-500/10 p-6">
             <p className="text-xs font-semibold uppercase tracking-[0.2em] text-rose-200">
               Billing
@@ -307,7 +300,7 @@ export default function LeaseLedgerPage() {
 
   return (
     <div className="p-4 sm:p-6">
-      <main className="mx-auto w-full max-w-7xl space-y-6">
+      <main className="mx-auto w-full max-w-6xl space-y-5">
         <LeaseLedgerHeader
           isLoading={isLedgerLoading}
           isRefreshing={leaseLedgerQuery.isFetching}
@@ -365,57 +358,27 @@ export default function LeaseLedgerPage() {
           totals={ledgerTotals}
         />
 
-        <div className="grid grid-cols-1 gap-6 xl:grid-cols-[minmax(0,1.55fr)_minmax(320px,0.85fr)]">
-          <div className="space-y-6">
-            <section className="space-y-3">
-              <div className="px-1">
-                <h2 className="text-base font-semibold text-white">Charges</h2>
-                <p className="mt-1 text-sm text-neutral-400">
-                  Review posted obligations for this lease and track what
-                  remains open.
-                </p>
-              </div>
+        <div className="grid grid-cols-1 gap-5 xl:grid-cols-[minmax(0,1fr)_340px]">
+          <div className="space-y-5">
+            <ChargesTable
+              charges={ledgerCharges}
+              isLoading={isLedgerLoading}
+            />
 
-              <ChargesTable
-                charges={ledgerCharges}
-                isLoading={isLedgerLoading}
-              />
-            </section>
+            <PaymentsTable
+              isLoading={isLedgerLoading}
+              payments={ledgerPayments}
+            />
 
-            <section className="space-y-3">
-              <div className="px-1">
-                <h2 className="text-base font-semibold text-white">Payments</h2>
-                <p className="mt-1 text-sm text-neutral-400">
-                  Review recorded receipts for this lease, including any
-                  unapplied remainder.
-                </p>
-              </div>
-
-              <PaymentsTable
-                isLoading={isLedgerLoading}
-                payments={ledgerPayments}
-              />
-            </section>
-
-            <section className="space-y-3">
-              <div className="px-1">
-                <h2 className="text-base font-semibold text-white">
-                  Allocations
-                </h2>
-                <p className="mt-1 text-sm text-neutral-400">
-                  Review how each payment was applied across posted lease
-                  charges.
-                </p>
-              </div>
-
+            {showAllocationsSection ? (
               <AllocationsTable
                 allocations={ledgerAllocations}
                 isLoading={isLedgerLoading}
               />
-            </section>
+            ) : null}
           </div>
 
-          <aside className="space-y-6">
+          <aside className="space-y-4 xl:sticky xl:top-6 xl:self-start">
             <GenerateRentChargePanel
               leaseId={normalizedLeaseId}
               onSuccess={() => {
@@ -428,40 +391,15 @@ export default function LeaseLedgerPage() {
               orgSlug={orgSlug}
             />
 
-            <section className="rounded-3xl border border-neutral-800/80 bg-neutral-950 shadow-[0_0_0_1px_rgba(255,255,255,0.02)]">
-              <div className="space-y-5 p-5 sm:p-6">
-                <div className="space-y-1">
-                  <p className="text-xs font-semibold uppercase tracking-[0.18em] text-neutral-500">
-                    Lease workspace
-                  </p>
+            <section className="rounded-2xl border border-neutral-800/80 bg-neutral-950 px-4 py-4 shadow-[0_0_0_1px_rgba(255,255,255,0.02)]">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-neutral-500">
+                How to use
+              </p>
 
-                  <p className="text-lg font-semibold text-white">
-                    Billing guide
-                  </p>
-
-                  <p className="text-sm text-neutral-300">
-                    This page is the lease-scoped billing source of truth.
-                  </p>
-                </div>
-
-                <div className="space-y-3 text-sm leading-6 text-neutral-400">
-                  <p>
-                    Charges represent what is owed. Payments represent money
-                    received. Allocations show how those payments were applied.
-                  </p>
-
-                  <p>
-                    Balance visibility comes from the backend ledger read model,
-                    not from recomputing billing truth in the browser.
-                  </p>
-
-                  <p>
-                    Unit history can link to this ledger later, but it should
-                    remain a historical index of lease ledgers rather than a
-                    blended replacement for this workspace.
-                  </p>
-                </div>
-              </div>
+              <p className="mt-2 text-sm leading-6 text-neutral-400">
+                Review the ledger first. Use rent charge generation only when
+                the current month has not already been posted for this lease.
+              </p>
             </section>
           </aside>
         </div>
