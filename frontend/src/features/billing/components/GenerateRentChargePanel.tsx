@@ -199,14 +199,14 @@ function resolveResponseNotice(
   if (response.already_exists) {
     return {
       tone: "info",
-      message: "A rent charge for this month is already on the ledger.",
+      message: "Already posted for this month.",
     };
   }
 
   if (response.created) {
     return {
       tone: "success",
-      message: "Rent charge generated successfully.",
+      message: "Rent charge generated.",
     };
   }
 
@@ -226,14 +226,14 @@ function resolveResponseNotice(
  */
 function getNoticeContainerClasses(tone: PanelNoticeTone): string {
   if (tone === "success") {
-    return "rounded-xl border border-emerald-400/20 bg-emerald-400/10 px-3.5 py-3";
+    return "rounded-xl border border-emerald-400/15 bg-emerald-400/8 px-3 py-2.5";
   }
 
   if (tone === "error") {
-    return "rounded-xl border border-rose-400/20 bg-rose-400/10 px-3.5 py-3";
+    return "rounded-xl border border-rose-400/15 bg-rose-400/8 px-3 py-2.5";
   }
 
-  return "rounded-xl border border-cyan-400/20 bg-cyan-400/10 px-3.5 py-3";
+  return "rounded-xl border border-white/10 bg-white/[0.03] px-3 py-2.5";
 }
 
 /**
@@ -246,14 +246,14 @@ function getNoticeContainerClasses(tone: PanelNoticeTone): string {
  */
 function getNoticeTextClasses(tone: PanelNoticeTone): string {
   if (tone === "success") {
-    return "text-sm leading-6 text-emerald-100";
+    return "text-sm leading-5 text-emerald-100";
   }
 
   if (tone === "error") {
-    return "text-sm leading-6 text-rose-100";
+    return "text-sm leading-5 text-rose-100";
   }
 
-  return "text-sm leading-6 text-cyan-100";
+  return "text-sm leading-5 text-neutral-300";
 }
 
 /**
@@ -325,7 +325,7 @@ export default function GenerateRentChargePanel({
     if (selectedMonthAlreadyExists) {
       return {
         tone: "info",
-        message: "A rent charge for this month is already on the ledger.",
+        message: "Already posted for this month.",
       };
     }
 
@@ -407,7 +407,7 @@ export default function GenerateRentChargePanel({
     if (selectedMonthAlreadyExists) {
       setPanelNotice({
         tone: "info",
-        message: "A rent charge for this month is already on the ledger.",
+        message: "Already posted for this month.",
       });
       return;
     }
@@ -433,38 +433,39 @@ export default function GenerateRentChargePanel({
   }
 
   return (
-    <section className="rounded-2xl border border-white/10 bg-slate-950/45 p-4 shadow-sm">
+    <section className="rounded-2xl border border-neutral-800/80 bg-neutral-950 px-4 py-4 shadow-[0_0_0_1px_rgba(255,255,255,0.02)]">
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-neutral-500">
             Rent posting
           </p>
-          <h2 className="mt-1 text-sm font-semibold text-white">
+
+          <h2 className="mt-1 text-base font-semibold text-white">
             Generate monthly rent charge
           </h2>
-          <p className="mt-1 text-xs leading-5 text-slate-400">
-            Explicit monthly posting only. Eligibility, duplicate protection,
-            and due date stay backend-owned.
+
+          <p className="mt-1 text-sm leading-6 text-neutral-400">
+            Post one explicit month at a time.
           </p>
         </div>
 
         {selectedChargeMonthValue ? (
-          <span className="shrink-0 rounded-full border border-white/10 bg-white/5 px-2.5 py-1 text-[11px] font-medium text-slate-300">
+          <span className="shrink-0 rounded-full border border-white/10 bg-white/[0.03] px-2.5 py-1 text-[11px] font-medium text-neutral-300">
             {selectedChargeMonthValue}
           </span>
         ) : null}
       </div>
 
       <form className="mt-4 space-y-4" onSubmit={handleSubmit}>
-        <div className="grid gap-3 xl:grid-cols-[minmax(0,1fr)_auto] xl:items-end">
+        <div className="space-y-2">
           <label className="block">
-            <span className="text-sm font-medium text-slate-200">
+            <span className="text-sm font-medium text-neutral-200">
               Charge month
             </span>
 
-            <div className="mt-2 flex flex-col gap-2 sm:flex-row sm:items-center">
+            <div className="mt-2 flex flex-col gap-2">
               <input
-                className="w-full rounded-xl border border-white/10 bg-slate-900/90 px-3 py-2.5 text-sm text-white outline-none transition focus:border-cyan-400/40 disabled:cursor-not-allowed disabled:opacity-60"
+                className="w-full rounded-xl border border-white/10 bg-black/20 px-3 py-2.5 text-sm text-white outline-none transition focus:border-white/20 disabled:cursor-not-allowed disabled:opacity-60"
                 disabled={generateRentChargeMutation.isPending}
                 onChange={(event) => {
                   handleMonthChange(event.target.value);
@@ -475,34 +476,34 @@ export default function GenerateRentChargePanel({
 
               {!isCurrentMonthSelected ? (
                 <button
-                  className="inline-flex items-center justify-center rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-xs font-medium text-slate-200 transition hover:bg-white/10"
+                  className="inline-flex w-fit items-center justify-center rounded-xl border border-white/10 bg-white/[0.03] px-3 py-2 text-xs font-medium text-neutral-200 transition hover:bg-white/[0.06]"
                   onClick={handleResetToCurrentMonth}
                   type="button"
                 >
-                  Current month
+                  Use current month
                 </button>
               ) : null}
             </div>
-
-            <p className="mt-2 text-[11px] leading-5 text-slate-500">
-              {selectedChargeMonthValue
-                ? `Posts as ${selectedChargeMonthValue}.`
-                : "Select a valid month to continue."}
-            </p>
           </label>
 
-          <button
-            className="inline-flex min-w-[172px] items-center justify-center rounded-xl border border-cyan-400/20 bg-cyan-400/8 px-4 py-2.5 text-sm font-medium text-cyan-100 transition hover:bg-cyan-400/12 disabled:cursor-not-allowed disabled:opacity-60"
-            disabled={isSubmitDisabled}
-            type="submit"
-          >
-            {generateRentChargeMutation.isPending
-              ? "Generating..."
-              : selectedMonthAlreadyExists
-                ? "Already on ledger"
-                : "Generate charge"}
-          </button>
+          <p className="text-[11px] leading-5 text-neutral-500">
+            {selectedChargeMonthValue
+              ? `Posts as ${selectedChargeMonthValue}.`
+              : "Select a valid month to continue."}
+          </p>
         </div>
+
+        <button
+          className="inline-flex w-full items-center justify-center rounded-xl border border-white/10 bg-white/[0.03] px-4 py-2.5 text-sm font-medium text-white transition hover:bg-white/[0.06] disabled:cursor-not-allowed disabled:opacity-60"
+          disabled={isSubmitDisabled}
+          type="submit"
+        >
+          {generateRentChargeMutation.isPending
+            ? "Generating..."
+            : selectedMonthAlreadyExists
+              ? "Already on ledger"
+              : "Generate charge"}
+        </button>
 
         {activeNotice ? (
           <div
@@ -515,14 +516,14 @@ export default function GenerateRentChargePanel({
           </div>
         ) : null}
 
-        <div className="flex flex-wrap items-center justify-between gap-2 border-t border-white/5 pt-3">
-          <p className="text-[11px] leading-5 text-slate-500">
+        <div className="flex items-center justify-between gap-3 border-t border-white/5 pt-3">
+          <p className="text-[11px] leading-5 text-neutral-500">
             Lease{" "}
-            <span className="font-medium text-slate-400">{String(leaseId)}</span>
+            <span className="font-medium text-neutral-400">{String(leaseId)}</span>
           </p>
 
-          <p className="text-[11px] leading-5 text-slate-500">
-            One explicit month posting at a time.
+          <p className="text-[11px] leading-5 text-neutral-500">
+            Explicit only
           </p>
         </div>
       </form>

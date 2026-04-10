@@ -1,10 +1,14 @@
 // # Filename: src/features/billing/components/ChargesTable.tsx
 
-
-import { useEffect, useMemo, useState } from "react";
-
-import CollectionPaginationFooter from "../../../components/pagination/CollectionPaginationFooter";
 import type { LeaseLedgerCharge, MoneyValue } from "../api/billingTypes";
+
+/**
+ * LedgerTableVariant
+ *
+ * Controls whether the table renders as a full standalone card or as
+ * an embeddable renderer inside a parent shell.
+ */
+type LedgerTableVariant = "standalone" | "embedded";
 
 /**
  * ChargesTableProps
@@ -15,14 +19,23 @@ export interface ChargesTableProps {
   charges?: LeaseLedgerCharge[];
   isLoading?: boolean;
   emptyMessage?: string;
+  variant?: LedgerTableVariant;
 }
 
 /**
- * CHARGES_PAGE_SIZE
+ * DESKTOP_TABLE_CELL_CLASS
  *
- * Section-level page size for ledger charge rows.
+ * Shared desktop body cell spacing so the row rhythm matches the Payments view.
  */
-const CHARGES_PAGE_SIZE = 1;
+const DESKTOP_TABLE_CELL_CLASS = "px-5 py-4 align-top text-sm";
+
+/**
+ * DESKTOP_TABLE_HEADER_CLASS
+ *
+ * Shared desktop header cell styling for ledger tables.
+ */
+const DESKTOP_TABLE_HEADER_CLASS =
+  "px-5 py-3 text-left text-xs font-semibold uppercase tracking-[0.16em] text-neutral-500";
 
 /**
  * formatCurrencyValue
@@ -182,16 +195,17 @@ function getChargeDisplayState(charge: LeaseLedgerCharge): {
 }
 
 /**
- * getChargeSecondaryText
+ * getChargeDesktopPreview
  *
- * Produces one short supporting line for the charge row.
+ * Builds a compact one-line charge preview for desktop so row height matches
+ * the Payments table.
  *
- * @param charge Charge row from the billing payload.
- * @returns Short supporting text or null.
+ * @param charge Charge row from the lease ledger payload.
+ * @returns A compact preview string or null.
  */
-function getChargeSecondaryText(charge: LeaseLedgerCharge): string | null {
+function getChargeDesktopPreview(charge: LeaseLedgerCharge): string | null {
   if (charge.charge_month) {
-    return `For ${formatMonthValue(charge.charge_month)}`;
+    return formatMonthValue(charge.charge_month);
   }
 
   if (charge.notes?.trim()) {
@@ -202,96 +216,233 @@ function getChargeSecondaryText(charge: LeaseLedgerCharge): string | null {
 }
 
 /**
- * renderTableBody
+ * getChargeMobileSecondaryText
  *
- * Renders loading, empty, or populated charge rows.
+ * Produces a slightly richer supporting line for mobile cards where there is
+ * more vertical room.
  *
- * @param charges Visible charge rows for the current page.
- * @param isLoading Whether the table is currently loading.
- * @param emptyMessage Empty state message.
- * @returns Table body markup.
+ * @param charge Charge row from the billing payload.
+ * @returns Supporting text or null.
  */
-function renderTableBody(
+function getChargeMobileSecondaryText(charge: LeaseLedgerCharge): string | null {
+  if (charge.charge_month) {
+    return `Rent charge for ${formatMonthValue(charge.charge_month)}`;
+  }
+
+  if (charge.notes?.trim()) {
+    return charge.notes.trim();
+  }
+
+  return null;
+}
+
+/**
+ * renderChargesDesktopTable
+ *
+ * Renders the desktop table view.
+ *
+ * Important:
+ * - Keeps the Charge column to a single line plus state pill so the row height
+ *   matches the Payments view more closely.
+ * - Uses the same desktop padding rhythm as Payments.
+ *
+ * @param charges Visible charge rows.
+ * @returns Desktop table markup.
+ */
+function renderChargesDesktopTable(charges: LeaseLedgerCharge[]) {
+  return (
+    <div className="hidden md:block">
+      <table className="min-w-full table-fixed border-collapse">
+        <colgroup>
+          <col className="w-[30%]" />
+          <col className="w-[19%]" />
+          <col className="w-[17%]" />
+          <col className="w-[19%]" />
+          <col className="w-[15%]" />
+        </colgroup>
+
+        <thead className="bg-white/[0.02]">
+          <tr className="text-left">
+            <th className={DESKTOP_TABLE_HEADER_CLASS}>Charge</th>
+            <th className={DESKTOP_TABLE_HEADER_CLASS}>Due Date</th>
+            <th className={DESKTOP_TABLE_HEADER_CLASS}>Amount</th>
+            <th className={DESKTOP_TABLE_HEADER_CLASS}>Remaining</th>
+            <th className={DESKTOP_TABLE_HEADER_CLASS}>State</th>
+          </tr>
+        </thead>
+
+        <tbody className="divide-y divide-neutral-800/80">
+          {charges.map((charge) => {
+            const displayState = getChargeDisplayState(charge);
+            const desktopPreview = getChargeDesktopPreview(charge);
+
+            return (
+              <tr
+                key={String(charge.id)}
+                className="transition hover:bg-white/[0.02]"
+              >
+                <td className={`${DESKTOP_TABLE_CELL_CLASS} text-neutral-200`}>
+                  <div className="flex min-w-0 items-center gap-2 overflow-hidden">
+                    <span className="truncate font-medium text-white">
+                      {formatChargeKindLabel(charge.kind)}
+                    </span>
+
+                    {desktopPreview ? (
+                      <span
+                        className="truncate text-xs text-neutral-500"
+                        title={desktopPreview}
+                      >
+                        · {desktopPreview}
+                      </span>
+                    ) : null}
+                  </div>
+                </td>
+
+                <td
+                  className={`${DESKTOP_TABLE_CELL_CLASS} whitespace-nowrap text-neutral-300`}
+                >
+                  {formatDateValue(charge.due_date)}
+                </td>
+
+                <td
+                  className={`${DESKTOP_TABLE_CELL_CLASS} whitespace-nowrap font-medium text-white`}
+                >
+                  {formatCurrencyValue(charge.amount)}
+                </td>
+
+                <td
+                  className={`${DESKTOP_TABLE_CELL_CLASS} whitespace-nowrap text-neutral-300`}
+                >
+                  {formatCurrencyValue(charge.remaining_balance)}
+                </td>
+
+                <td className={DESKTOP_TABLE_CELL_CLASS}>
+                  <span
+                    className={`inline-flex rounded-full px-2.5 py-1 text-xs font-medium ${displayState.classes}`}
+                  >
+                    {displayState.label}
+                  </span>
+                </td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+/**
+ * renderChargesMobileCards
+ *
+ * Renders the mobile card view.
+ *
+ * @param charges Visible charge rows.
+ * @returns Mobile card markup.
+ */
+function renderChargesMobileCards(charges: LeaseLedgerCharge[]) {
+  return (
+    <div className="space-y-3 p-4 md:hidden">
+      {charges.map((charge) => {
+        const displayState = getChargeDisplayState(charge);
+        const secondaryText = getChargeMobileSecondaryText(charge);
+
+        return (
+          <article
+            key={String(charge.id)}
+            className="rounded-2xl border border-white/10 bg-white/[0.03] p-4"
+          >
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <p className="text-sm font-semibold text-white">
+                  {formatChargeKindLabel(charge.kind)}
+                </p>
+
+                {secondaryText ? (
+                  <p className="mt-1 text-xs leading-5 text-neutral-500">
+                    {secondaryText}
+                  </p>
+                ) : null}
+              </div>
+
+              <span
+                className={`inline-flex rounded-full px-2.5 py-1 text-xs font-medium ${displayState.classes}`}
+              >
+                {displayState.label}
+              </span>
+            </div>
+
+            <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-3">
+              <div className="rounded-xl border border-white/10 bg-black/10 px-3 py-2">
+                <p className="text-[11px] uppercase tracking-[0.16em] text-neutral-500">
+                  Due Date
+                </p>
+                <p className="mt-1 text-sm text-white">
+                  {formatDateValue(charge.due_date)}
+                </p>
+              </div>
+
+              <div className="rounded-xl border border-white/10 bg-black/10 px-3 py-2">
+                <p className="text-[11px] uppercase tracking-[0.16em] text-neutral-500">
+                  Amount
+                </p>
+                <p className="mt-1 text-sm font-semibold text-white">
+                  {formatCurrencyValue(charge.amount)}
+                </p>
+              </div>
+
+              <div className="rounded-xl border border-white/10 bg-black/10 px-3 py-2">
+                <p className="text-[11px] uppercase tracking-[0.16em] text-neutral-500">
+                  Remaining
+                </p>
+                <p className="mt-1 text-sm font-semibold text-white">
+                  {formatCurrencyValue(charge.remaining_balance)}
+                </p>
+              </div>
+            </div>
+          </article>
+        );
+      })}
+    </div>
+  );
+}
+
+/**
+ * renderChargesContent
+ *
+ * Renders loading, empty, or populated charge content.
+ *
+ * @param charges Visible charge rows.
+ * @param isLoading Whether the table is loading.
+ * @param emptyMessage Empty state copy.
+ * @returns Charges content markup.
+ */
+function renderChargesContent(
   charges: LeaseLedgerCharge[],
   isLoading: boolean,
   emptyMessage: string,
 ) {
   if (isLoading) {
     return (
-      <tbody>
-        <tr>
-          <td
-            className="px-4 py-10 text-center text-sm text-neutral-400"
-            colSpan={5}
-          >
-            Loading charges…
-          </td>
-        </tr>
-      </tbody>
+      <div className="px-5 py-12 text-center text-sm text-neutral-400">
+        Loading charges…
+      </div>
     );
   }
 
   if (!charges.length) {
     return (
-      <tbody>
-        <tr>
-          <td
-            className="px-4 py-10 text-center text-sm text-neutral-400"
-            colSpan={5}
-          >
-            {emptyMessage}
-          </td>
-        </tr>
-      </tbody>
+      <div className="px-5 py-12 text-center text-sm text-neutral-400">
+        {emptyMessage}
+      </div>
     );
   }
 
   return (
-    <tbody className="divide-y divide-neutral-800/80">
-      {charges.map((charge) => {
-        const displayState = getChargeDisplayState(charge);
-        const secondaryText = getChargeSecondaryText(charge);
-
-        return (
-          <tr
-            key={String(charge.id)}
-            className="transition hover:bg-white/[0.02]"
-          >
-            <td className="px-4 py-4 align-top text-sm text-neutral-200">
-              <div className="font-medium text-white">
-                {formatChargeKindLabel(charge.kind)}
-              </div>
-
-              {secondaryText ? (
-                <p className="mt-1 max-w-xs text-xs leading-5 text-neutral-500">
-                  {secondaryText}
-                </p>
-              ) : null}
-            </td>
-
-            <td className="px-4 py-4 align-top text-sm text-neutral-300">
-              {formatDateValue(charge.due_date)}
-            </td>
-
-            <td className="px-4 py-4 align-top text-sm font-medium text-white">
-              {formatCurrencyValue(charge.amount)}
-            </td>
-
-            <td className="px-4 py-4 align-top text-sm text-neutral-300">
-              {formatCurrencyValue(charge.remaining_balance)}
-            </td>
-
-            <td className="px-4 py-4 align-top text-sm">
-              <span
-                className={`inline-flex rounded-full px-2.5 py-1 text-xs font-medium ${displayState.classes}`}
-              >
-                {displayState.label}
-              </span>
-            </td>
-          </tr>
-        );
-      })}
-    </tbody>
+    <>
+      {renderChargesDesktopTable(charges)}
+      {renderChargesMobileCards(charges)}
+    </>
   );
 }
 
@@ -304,33 +455,23 @@ function renderTableBody(
  * Responsibilities:
  * - render backend-derived charge rows
  * - show amount, remaining balance, and clear row state
- * - paginate long historical ledgers at the section level
- * - match the current EstateIQ theme
+ * - keep desktop row rhythm aligned with the Payments table
+ * - support standalone and embeddable rendering
  *
  * @param props Charges table props.
- * @returns A styled responsive charges table.
+ * @returns A styled charges table.
  */
 export default function ChargesTable({
   charges = [],
   isLoading = false,
   emptyMessage = "No charges have been posted for this lease yet.",
+  variant = "standalone",
 }: ChargesTableProps) {
-  const [page, setPage] = useState(1);
+  const content = renderChargesContent(charges, isLoading, emptyMessage);
 
-  const totalPages = Math.max(1, Math.ceil(charges.length / CHARGES_PAGE_SIZE));
-
-  const visibleCharges = useMemo(() => {
-    const startIndex = (page - 1) * CHARGES_PAGE_SIZE;
-    const endIndex = startIndex + CHARGES_PAGE_SIZE;
-
-    return charges.slice(startIndex, endIndex);
-  }, [charges, page]);
-
-  useEffect(() => {
-    if (page > totalPages) {
-      setPage(1);
-    }
-  }, [page, totalPages]);
+  if (variant === "embedded") {
+    return content;
+  }
 
   return (
     <section className="overflow-hidden rounded-2xl border border-neutral-800/80 bg-neutral-950 shadow-[0_0_0_1px_rgba(255,255,255,0.02)]">
@@ -349,44 +490,7 @@ export default function ChargesTable({
         </div>
       </div>
 
-      <div className="overflow-x-auto">
-        <table className="min-w-full border-collapse">
-          <thead className="bg-white/[0.02]">
-            <tr className="text-left">
-              <th className="px-4 py-3 text-xs font-semibold uppercase tracking-[0.16em] text-neutral-500">
-                Charge
-              </th>
-              <th className="px-4 py-3 text-xs font-semibold uppercase tracking-[0.16em] text-neutral-500">
-                Due Date
-              </th>
-              <th className="px-4 py-3 text-xs font-semibold uppercase tracking-[0.16em] text-neutral-500">
-                Amount
-              </th>
-              <th className="px-4 py-3 text-xs font-semibold uppercase tracking-[0.16em] text-neutral-500">
-                Remaining
-              </th>
-              <th className="px-4 py-3 text-xs font-semibold uppercase tracking-[0.16em] text-neutral-500">
-                State
-              </th>
-            </tr>
-          </thead>
-
-          {renderTableBody(visibleCharges, isLoading, emptyMessage)}
-        </table>
-      </div>
-
-      {!isLoading && charges.length > CHARGES_PAGE_SIZE ? (
-        <CollectionPaginationFooter
-          page={page}
-          pageSize={CHARGES_PAGE_SIZE}
-          totalCount={charges.length}
-          itemLabel="charge"
-          onPrevious={() => setPage((previous) => Math.max(1, previous - 1))}
-          onNext={() =>
-            setPage((previous) => Math.min(totalPages, previous + 1))
-          }
-        />
-      ) : null}
+      {content}
     </section>
   );
 }

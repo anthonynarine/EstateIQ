@@ -1,9 +1,9 @@
 // # Filename: src/features/billing/pages/LeaseLedgerPage.tsx
 
-
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 
+import CollectionPaginationFooter from "../../../components/pagination/CollectionPaginationFooter";
 import { tokenStorage } from "../../../auth/tokenStorage";
 
 import LeaseLedgerHeader from "../components/LeaseLedgerHeader";
@@ -17,7 +17,10 @@ import { useLeaseLedgerQuery } from "../hooks/useLeaseLedgerQuery";
 import type {
   BillingApiErrorShape,
   BillingId,
+  LeaseLedgerAllocation,
+  LeaseLedgerCharge,
   LeaseLedgerContext,
+  LeaseLedgerPayment,
 } from "../api/billingTypes";
 
 /**
@@ -33,6 +36,14 @@ type LeaseLedgerPageParams = {
 };
 
 type MaybeRecord = Record<string, unknown>;
+type LedgerActivityTab = "charges" | "payments" | "allocations";
+
+/**
+ * LEDGER_ACTIVITY_PAGE_SIZE
+ *
+ * Shared page size for the unified ledger activity surface.
+ */
+const LEDGER_ACTIVITY_PAGE_SIZE = 4;
 
 /**
  * normalizeLeaseId
@@ -200,6 +211,62 @@ function buildBreadcrumbText(lease?: LeaseLedgerContext): string | null {
 }
 
 /**
+ * getLedgerActivityDescription
+ *
+ * Returns a compact description for the active activity tab.
+ *
+ * @param tab Active ledger tab.
+ * @returns Tab-specific helper copy.
+ */
+function getLedgerActivityDescription(tab: LedgerActivityTab): string {
+  if (tab === "charges") {
+    return "What this lease owes and what remains open.";
+  }
+
+  if (tab === "payments") {
+    return "Recorded receipts and any unapplied remainder.";
+  }
+
+  return "The payment-to-charge application trail for audit and review.";
+}
+
+/**
+ * getLedgerActivityItemLabel
+ *
+ * Returns the singular item label used by shared pagination.
+ *
+ * @param tab Active ledger tab.
+ * @returns Singular pagination label.
+ */
+function getLedgerActivityItemLabel(tab: LedgerActivityTab): string {
+  if (tab === "charges") {
+    return "charge";
+  }
+
+  if (tab === "payments") {
+    return "payment";
+  }
+
+  return "allocation";
+}
+
+/**
+ * sliceLedgerRows
+ *
+ * Slices a ledger collection for shared section-level pagination.
+ *
+ * @param rows Full collection.
+ * @param page Current page number.
+ * @returns Visible row subset.
+ */
+function sliceLedgerRows<T>(rows: T[], page: number): T[] {
+  const startIndex = (page - 1) * LEDGER_ACTIVITY_PAGE_SIZE;
+  const endIndex = startIndex + LEDGER_ACTIVITY_PAGE_SIZE;
+
+  return rows.slice(startIndex, endIndex);
+}
+
+/**
  * LeaseLedgerPage
  *
  * Primary billing page for a single lease ledger.
@@ -208,7 +275,7 @@ function buildBreadcrumbText(lease?: LeaseLedgerContext): string | null {
  * - read `leaseId` from the route
  * - resolve the active organization slug for org-scoped billing queries
  * - load the lease ledger read model
- * - compose header, summary cards, write panels, tables, and modal state
+ * - compose header, summary cards, write panels, unified ledger activity, and modal state
  *
  * Important architectural boundary:
  * This page is orchestration-only. Heavy logic belongs in:
@@ -226,6 +293,13 @@ export default function LeaseLedgerPage() {
 
   const [isRecordPaymentModalOpen, setIsRecordPaymentModalOpen] =
     useState<boolean>(false);
+  const [activeLedgerTab, setActiveLedgerTab] =
+    useState<LedgerActivityTab>("charges");
+  const [ledgerPages, setLedgerPages] = useState<Record<LedgerActivityTab, number>>({
+    charges: 1,
+    payments: 1,
+    allocations: 1,
+  });
 
   const normalizedLeaseId = useMemo(() => {
     return normalizeLeaseId(leaseId);
@@ -257,8 +331,70 @@ export default function LeaseLedgerPage() {
     return getLeaseUnitId(leaseContext);
   }, [leaseContext]);
 
-  const showAllocationsSection =
-    isLedgerLoading || ledgerAllocations.length > 0;
+  const ledgerTabMeta = useMemo(() => {
+    return [
+      {
+        key: "charges" as const,
+        label: "Charges",
+        count: ledgerCharges.length,
+      },
+      {
+        key: "payments" as const,
+        label: "Payments",
+        count: ledgerPayments.length,
+      },
+      {
+        key: "allocations" as const,
+        label: "Allocations",
+        count: ledgerAllocations.length,
+      },
+    ];
+  }, [ledgerAllocations.length, ledgerCharges.length, ledgerPayments.length]);
+
+  const activePage = ledgerPages[activeLedgerTab];
+
+  const activeCollectionCount = useMemo(() => {
+    if (activeLedgerTab === "charges") {
+      return ledgerCharges.length;
+    }
+
+    if (activeLedgerTab === "payments") {
+      return ledgerPayments.length;
+    }
+
+    return ledgerAllocations.length;
+  }, [
+    activeLedgerTab,
+    ledgerAllocations.length,
+    ledgerCharges.length,
+    ledgerPayments.length,
+  ]);
+
+  const totalPages = Math.max(
+    1,
+    Math.ceil(activeCollectionCount / LEDGER_ACTIVITY_PAGE_SIZE),
+  );
+
+  const visibleCharges = useMemo<LeaseLedgerCharge[]>(() => {
+    return sliceLedgerRows(ledgerCharges, ledgerPages.charges);
+  }, [ledgerCharges, ledgerPages.charges]);
+
+  const visiblePayments = useMemo<LeaseLedgerPayment[]>(() => {
+    return sliceLedgerRows(ledgerPayments, ledgerPages.payments);
+  }, [ledgerPages.payments, ledgerPayments]);
+
+  const visibleAllocations = useMemo<LeaseLedgerAllocation[]>(() => {
+    return sliceLedgerRows(ledgerAllocations, ledgerPages.allocations);
+  }, [ledgerAllocations, ledgerPages.allocations]);
+
+  useEffect(() => {
+    if (activePage > totalPages) {
+      setLedgerPages((previousPages) => ({
+        ...previousPages,
+        [activeLedgerTab]: 1,
+      }));
+    }
+  }, [activeLedgerTab, activePage, totalPages]);
 
   const handleBackToUnit = () => {
     // Step 1: Prefer explicit unit navigation when available
@@ -269,6 +405,24 @@ export default function LeaseLedgerPage() {
 
     // Step 2: Graceful fallback for incomplete lease context
     navigate(-1);
+  };
+
+  const handleLedgerTabChange = (tab: LedgerActivityTab) => {
+    setActiveLedgerTab(tab);
+  };
+
+  const handleLedgerPreviousPage = () => {
+    setLedgerPages((previousPages) => ({
+      ...previousPages,
+      [activeLedgerTab]: Math.max(1, previousPages[activeLedgerTab] - 1),
+    }));
+  };
+
+  const handleLedgerNextPage = () => {
+    setLedgerPages((previousPages) => ({
+      ...previousPages,
+      [activeLedgerTab]: Math.min(totalPages, previousPages[activeLedgerTab] + 1),
+    }));
   };
 
   if (!normalizedLeaseId) {
@@ -358,25 +512,95 @@ export default function LeaseLedgerPage() {
           totals={ledgerTotals}
         />
 
-        <div className="grid grid-cols-1 gap-5 xl:grid-cols-[minmax(0,1fr)_340px]">
-          <div className="space-y-5">
-            <ChargesTable
-              charges={ledgerCharges}
-              isLoading={isLedgerLoading}
-            />
+        <div className="grid grid-cols-1 items-start gap-5 xl:grid-cols-[minmax(0,1fr)_320px]">
+          <section className="overflow-hidden rounded-2xl border border-neutral-800/80 bg-neutral-950 shadow-[0_0_0_1px_rgba(255,255,255,0.02)]">
+            <div className="border-b border-neutral-800/80 px-5 py-4">
+              <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_440px] xl:items-start xl:gap-5">
+                <div className="min-w-0 max-w-[34rem]">
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-neutral-500">
+                    Ledger activity
+                  </p>
 
-            <PaymentsTable
-              isLoading={isLedgerLoading}
-              payments={ledgerPayments}
-            />
+                  <h2 className="mt-1 text-lg font-semibold text-white">
+                    Charges, payments, and allocation trail
+                  </h2>
 
-            {showAllocationsSection ? (
-              <AllocationsTable
-                allocations={ledgerAllocations}
+                  <p className="mt-1 text-sm text-neutral-400">
+                    {getLedgerActivityDescription(activeLedgerTab)}
+                  </p>
+                </div>
+
+                <div className="flex items-center gap-2 overflow-x-auto pb-1 xl:flex-nowrap xl:justify-end xl:overflow-visible xl:pb-0">
+                  {ledgerTabMeta.map((tab) => {
+                    const isActive = activeLedgerTab === tab.key;
+
+                    return (
+                      <button
+                        key={tab.key}
+                        className={`shrink-0 inline-flex items-center gap-2 rounded-xl border px-3 py-2 text-[15px] font-medium transition ${
+                          isActive
+                            ? "border-cyan-400/25 bg-cyan-400/10 text-cyan-100"
+                            : "border-white/10 bg-white/[0.03] text-neutral-300 hover:bg-white/[0.06]"
+                        }`}
+                        onClick={() => {
+                          handleLedgerTabChange(tab.key);
+                        }}
+                        type="button"
+                      >
+                        <span>{tab.label}</span>
+
+                        <span
+                          className={`rounded-full px-2 py-0.5 text-[11px] ${
+                            isActive
+                              ? "bg-cyan-400/15 text-cyan-100"
+                              : "bg-white/[0.05] text-neutral-400"
+                          }`}
+                        >
+                          {isLedgerLoading ? "—" : tab.count}
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
+
+            {activeLedgerTab === "charges" ? (
+              <ChargesTable
+                charges={visibleCharges}
                 isLoading={isLedgerLoading}
+                variant="embedded"
               />
             ) : null}
-          </div>
+
+            {activeLedgerTab === "payments" ? (
+              <PaymentsTable
+                isLoading={isLedgerLoading}
+                payments={visiblePayments}
+                variant="embedded"
+              />
+            ) : null}
+
+            {activeLedgerTab === "allocations" ? (
+              <AllocationsTable
+                allocations={visibleAllocations}
+                isLoading={isLedgerLoading}
+                variant="embedded"
+              />
+            ) : null}
+
+            {!isLedgerLoading &&
+            activeCollectionCount > LEDGER_ACTIVITY_PAGE_SIZE ? (
+              <CollectionPaginationFooter
+                page={activePage}
+                pageSize={LEDGER_ACTIVITY_PAGE_SIZE}
+                totalCount={activeCollectionCount}
+                itemLabel={getLedgerActivityItemLabel(activeLedgerTab)}
+                onPrevious={handleLedgerPreviousPage}
+                onNext={handleLedgerNextPage}
+              />
+            ) : null}
+          </section>
 
           <aside className="space-y-4 xl:sticky xl:top-6 xl:self-start">
             <GenerateRentChargePanel
@@ -390,17 +614,6 @@ export default function LeaseLedgerPage() {
               }}
               orgSlug={orgSlug}
             />
-
-            <section className="rounded-2xl border border-neutral-800/80 bg-neutral-950 px-4 py-4 shadow-[0_0_0_1px_rgba(255,255,255,0.02)]">
-              <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-neutral-500">
-                How to use
-              </p>
-
-              <p className="mt-2 text-sm leading-6 text-neutral-400">
-                Review the ledger first. Use rent charge generation only when
-                the current month has not already been posted for this lease.
-              </p>
-            </section>
           </aside>
         </div>
 
