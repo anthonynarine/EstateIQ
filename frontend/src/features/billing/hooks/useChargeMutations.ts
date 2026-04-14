@@ -1,5 +1,5 @@
-// # Filename: src/features/billing/hooks/useChargeMutations.ts
 
+// # Filename: src/features/billing/hooks/useChargeMutations.ts
 
 import { useMemo } from "react";
 import {
@@ -11,9 +11,7 @@ import {
 import api from "../../../api/axios";
 
 import billingQueryKeys from "../api/billingQueryKeys";
-import createChargesApi, {
-  type ChargeRequestFieldMode,
-} from "../api/chargesApi";
+import createChargesApi from "../api/chargesApi";
 import type {
   BillingApiErrorShape,
   BillingId,
@@ -29,7 +27,6 @@ import type {
 export interface GenerateRentChargeMutationVariables {
   payload: GenerateRentChargeFormValues;
   orgSlug?: string | null;
-  requestFieldMode?: ChargeRequestFieldMode;
 }
 
 /**
@@ -40,7 +37,6 @@ export interface GenerateRentChargeMutationVariables {
 export interface UseChargeMutationsOptions {
   orgSlug?: string | null;
   leaseId?: BillingId | null;
-  requestFieldMode?: ChargeRequestFieldMode;
 }
 
 /**
@@ -133,23 +129,6 @@ function resolveMutationLeaseId(
 }
 
 /**
- * resolveRequestFieldMode
- *
- * Resolves the backend request field mode for charge generation.
- * Mutation-level input wins over hook-level defaults.
- *
- * @param hookRequestFieldMode - Default request field mode from the hook.
- * @param mutationRequestFieldMode - Optional request field mode from mutate().
- * @returns The resolved backend request field mode.
- */
-function resolveRequestFieldMode(
-  hookRequestFieldMode?: ChargeRequestFieldMode,
-  mutationRequestFieldMode?: ChargeRequestFieldMode,
-): ChargeRequestFieldMode {
-  return mutationRequestFieldMode ?? hookRequestFieldMode ?? "charge_month";
-}
-
-/**
  * useChargeMutations
  *
  * Centralized TanStack Query mutation hook for billing charge writes.
@@ -164,7 +143,7 @@ function resolveRequestFieldMode(
  *   idempotency, due date derivation, audit logging, and ledger math.
  * - This hook only orchestrates the write and subsequent cache refresh.
  *
- * @param options - Optional org, lease, and request-field defaults.
+ * @param options - Optional org and lease defaults.
  * @returns Charge mutation handles for the billing feature.
  */
 export function useChargeMutations(
@@ -192,21 +171,15 @@ export function useChargeMutations(
     mutationFn: async ({
       payload,
       orgSlug,
-      requestFieldMode,
     }: GenerateRentChargeMutationVariables): Promise<GenerateRentChargeResponse> => {
       const resolvedOrgSlug = resolveMutationOrgSlug(
         normalizedHookOrgSlug,
         orgSlug,
       );
-      const resolvedRequestFieldMode = resolveRequestFieldMode(
-        options.requestFieldMode,
-        requestFieldMode,
-      );
 
       return await chargesApi.generateRentCharge({
         payload,
         orgSlug: resolvedOrgSlug,
-        requestFieldMode: resolvedRequestFieldMode,
       });
     },
 

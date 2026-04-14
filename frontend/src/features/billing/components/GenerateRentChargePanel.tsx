@@ -1,3 +1,4 @@
+
 // # Filename: src/features/billing/components/GenerateRentChargePanel.tsx
 
 import { useEffect, useMemo, useState, type FormEvent } from "react";
@@ -35,7 +36,6 @@ export interface GenerateRentChargePanelProps {
   leaseId: BillingId;
   orgSlug?: string | null;
   onSuccess?: (response: GenerateRentChargeResponse) => void;
-  requestFieldMode?: "charge_month" | "month";
 
   /**
    * Known posted charge months for this lease.
@@ -68,10 +68,12 @@ interface GenerateRentChargeFormState {
  * @returns A month-input-safe current month string.
  */
 function getCurrentMonthValue(): string {
+  // Step 1: Read the current local date.
   const today = new Date();
   const year = today.getFullYear();
   const month = String(today.getMonth() + 1).padStart(2, "0");
 
+  // Step 2: Return the native month-input format.
   return `${year}-${month}`;
 }
 
@@ -92,13 +94,17 @@ function buildInitialFormState(): GenerateRentChargeFormState {
  * mapMonthInputToChargeMonth
  *
  * Converts a native month input value such as `2026-04` into the explicit
- * charge-month format expected by the billing UI contract: `2026-04-01`.
+ * charge-month format expected by the backend contract: `2026-04-01`.
  *
  * @param monthValue - Native month input value.
  * @returns A backend-friendly charge month string.
  */
 function mapMonthInputToChargeMonth(monthValue: string): string {
-  return `${monthValue}-01`;
+  // Step 1: Normalize the input.
+  const normalizedMonthValue = monthValue.trim();
+
+  // Step 2: Convert it into the month-anchor payload.
+  return `${normalizedMonthValue}-01`;
 }
 
 /**
@@ -114,6 +120,7 @@ function mapMonthInputToChargeMonth(monthValue: string): string {
  * @returns True when the input appears usable.
  */
 function isValidMonthInput(monthValue: string): boolean {
+  // Step 1: Validate the browser month input shape.
   return /^\d{4}-\d{2}$/.test(monthValue.trim());
 }
 
@@ -130,51 +137,127 @@ function isValidMonthInput(monthValue: string): boolean {
  * @returns A normalized comparable month value or null.
  */
 function normalizeKnownChargeMonth(value: string): string | null {
+  // Step 1: Normalize whitespace.
   const trimmedValue = value.trim();
 
+  // Step 2: Pass through already-normalized month values.
   if (/^\d{4}-\d{2}$/.test(trimmedValue)) {
     return trimmedValue;
   }
 
+  // Step 3: Reduce full dates to comparable month values.
   if (/^\d{4}-\d{2}-\d{2}$/.test(trimmedValue)) {
     return trimmedValue.slice(0, 7);
+  }
+
+  // Step 4: Reject unsupported shapes.
+  return null;
+}
+
+/**
+ * getNestedFieldErrorMessage
+ *
+ * Attempts to extract a human-readable message from field-level DRF-style
+ * validation errors.
+ *
+ * @param value - Unknown nested error value.
+ * @returns A display-safe message or null.
+ */
+function getNestedFieldErrorMessage(value: unknown): string | null {
+  // Step 1: Accept direct string messages.
+  if (typeof value === "string" && value.trim()) {
+    return value;
+  }
+
+  // Step 2: Accept first string item from array-based field errors.
+  if (Array.isArray(value) && value.length > 0) {
+    const firstValue = value[0];
+
+    if (typeof firstValue === "string" && firstValue.trim()) {
+      return firstValue;
+    }
   }
 
   return null;
 }
 
-/**
- * getBillingErrorMessage
- *
- * Extracts a safe user-facing message from a billing API error shape or
- * generic JavaScript error.
- *
- * @param error - Unknown mutation error.
- * @returns A display-safe error message.
- */
 function getBillingErrorMessage(error: unknown): string {
+  // Step 1: Handle empty errors.
   if (!error) {
     return "Unable to generate the rent charge.";
   }
 
+  // Step 2: Check axios-like response payload first.
+  if (typeof error === "object" && error !== null) {
+    const errorRecord = error as {
+      response?: {
+        data?: Record<string, unknown>;
+      };
+      error?: {
+        message?: string;
+      };
+      detail?: string;
+      message?: string;
+    };
+
+    const responseData = errorRecord.response?.data;
+
+    if (responseData) {
+      if (
+        typeof responseData.error === "object" &&
+        responseData.error !== null &&
+        "message" in responseData.error
+      ) {
+        const nestedMessage = (responseData.error as { message?: unknown }).message;
+
+        if (typeof nestedMessage === "string" && nestedMessage.trim()) {
+          return nestedMessage;
+        }
+      }
+
+      if (typeof responseData.detail === "string" && responseData.detail.trim()) {
+        return responseData.detail;
+      }
+
+      if (typeof responseData.message === "string" && responseData.message.trim()) {
+        return responseData.message;
+      }
+
+      for (const value of Object.values(responseData)) {
+        const fieldMessage = getNestedFieldErrorMessage(value);
+        if (fieldMessage) {
+          return fieldMessage;
+        }
+      }
+    }
+
+    // Step 3: Check top-level narrowed API fields next.
+    if (errorRecord.error?.message) {
+      return errorRecord.error.message;
+    }
+
+    if (errorRecord.detail?.trim()) {
+      return errorRecord.detail;
+    }
+
+    if (
+      errorRecord.message?.trim() &&
+      errorRecord.message !== "Request failed with status code 400"
+    ) {
+      return errorRecord.message;
+    }
+  }
+
+  // Step 4: Fall back to ordinary JS errors only after response parsing.
   if (error instanceof Error && error.message.trim()) {
+    if (error.message === "Request failed with status code 400") {
+      return "Unable to generate the rent charge.";
+    }
+
     return error.message;
   }
 
-  const apiError = error as BillingApiErrorShape;
-
-  if (apiError.error?.message) {
-    return apiError.error.message;
-  }
-
-  if (apiError.detail) {
-    return apiError.detail;
-  }
-
-  if (apiError.message) {
-    return apiError.message;
-  }
-
+  // Step 5: Final fallback.
   return "Unable to generate the rent charge.";
 }
 
@@ -189,6 +272,7 @@ function getBillingErrorMessage(error: unknown): string {
 function resolveResponseNotice(
   response: GenerateRentChargeResponse,
 ): PanelNotice {
+  // Step 1: Prefer explicit backend messages when present.
   if (response.message?.trim()) {
     return {
       tone: response.already_exists ? "info" : "success",
@@ -196,13 +280,15 @@ function resolveResponseNotice(
     };
   }
 
-  if (response.already_exists) {
+  // Step 2: Treat non-created responses as existing/idempotent outcomes.
+  if (response.already_exists || response.created === false) {
     return {
       tone: "info",
       message: "Already posted for this month.",
     };
   }
 
+  // Step 3: Handle successful creation.
   if (response.created) {
     return {
       tone: "success",
@@ -210,6 +296,7 @@ function resolveResponseNotice(
     };
   }
 
+  // Step 4: Provide a final safe fallback.
   return {
     tone: "info",
     message: "Charge request completed.",
@@ -279,7 +366,6 @@ export default function GenerateRentChargePanel({
   leaseId,
   orgSlug,
   onSuccess,
-  requestFieldMode = "charge_month",
   existingChargeMonths = [],
 }: GenerateRentChargePanelProps) {
   const [formState, setFormState] = useState<GenerateRentChargeFormState>(
@@ -290,7 +376,6 @@ export default function GenerateRentChargePanel({
   const { generateRentChargeMutation } = useChargeMutations({
     leaseId,
     orgSlug,
-    requestFieldMode,
   });
 
   const currentMonthValue = useMemo(() => getCurrentMonthValue(), []);
@@ -366,10 +451,12 @@ export default function GenerateRentChargePanel({
    * @param value - New month input value from the form control.
    */
   function handleMonthChange(value: string) {
+    // Step 1: Update local form state.
     setFormState({
       monthValue: value,
     });
 
+    // Step 2: Clear active notice when the user changes the target month.
     if (panelNotice) {
       setPanelNotice(null);
     }
@@ -381,6 +468,7 @@ export default function GenerateRentChargePanel({
    * Resets the month selector back to the current month.
    */
   function handleResetToCurrentMonth() {
+    // Step 1: Reset the month input.
     handleMonthChange(currentMonthValue);
   }
 
@@ -392,10 +480,13 @@ export default function GenerateRentChargePanel({
    * @param event - Native form submit event.
    */
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
+    // Step 1: Stop native form submission.
     event.preventDefault();
 
+    // Step 2: Clear any existing active notice.
     setPanelNotice(null);
 
+    // Step 3: Validate the browser month input.
     if (!isValidMonthInput(formState.monthValue)) {
       setPanelNotice({
         tone: "error",
@@ -404,6 +495,7 @@ export default function GenerateRentChargePanel({
       return;
     }
 
+    // Step 4: Short-circuit obvious existing-month attempts.
     if (selectedMonthAlreadyExists) {
       setPanelNotice({
         tone: "info",
@@ -413,18 +505,20 @@ export default function GenerateRentChargePanel({
     }
 
     try {
+      // Step 5: Submit the stabilized charge_month payload.
       const response = await generateRentChargeMutation.mutateAsync({
         payload: {
           leaseId,
           chargeMonth: mapMonthInputToChargeMonth(formState.monthValue),
         },
         orgSlug,
-        requestFieldMode,
       });
 
+      // Step 6: Show a result notice and bubble success upward.
       setPanelNotice(resolveResponseNotice(response));
       onSuccess?.(response);
     } catch (error) {
+      // Step 7: Show a clean user-facing error message.
       setPanelNotice({
         tone: "error",
         message: getBillingErrorMessage(error),

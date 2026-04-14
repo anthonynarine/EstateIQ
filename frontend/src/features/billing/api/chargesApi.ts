@@ -1,5 +1,5 @@
-// # Filename: src/features/billing/api/chargesApi.ts
 
+// # Filename: src/features/billing/api/chargesApi.ts
 
 import type { AxiosResponse } from "axios";
 
@@ -11,17 +11,12 @@ import type {
   GenerateRentChargeFormValues,
   GenerateRentChargeRequest,
   GenerateRentChargeResponse,
-  LegacyGenerateRentChargeRequest,
 } from "./billingTypes";
 
 /**
  * BillingPostClient
  *
  * Minimal axios-like POST contract required by the billing charges API.
- *
- * We keep this interface narrow so the API module remains easy to test,
- * easy to mock, and independent from the exact shared axios client
- * implementation details.
  */
 export interface BillingPostClient {
   post<TResponse, TRequest>(
@@ -35,22 +30,6 @@ export interface BillingPostClient {
 }
 
 /**
- * ChargeRequestFieldMode
- *
- * Controls which backend request field name is used for monthly rent charge
- * generation.
- *
- * Why this exists:
- * There is known contract drift between older and newer backend shapes:
- * - legacy: `month`
- * - stabilized: `charge_month`
- *
- * This lets the API layer adapt without leaking transport uncertainty into
- * the page or component layer.
- */
-export type ChargeRequestFieldMode = "charge_month" | "month";
-
-/**
  * CreateRentChargeParams
  *
  * Input contract for explicitly generating a monthly rent charge for a lease.
@@ -59,7 +38,6 @@ export interface CreateRentChargeParams {
   payload: GenerateRentChargeFormValues;
   orgSlug?: string | null;
   signal?: AbortSignal;
-  requestFieldMode?: ChargeRequestFieldMode;
 }
 
 /**
@@ -97,8 +75,8 @@ function normalizeBillingId(value: BillingId): string {
  *
  * Validates the UI-facing charge month string before it is sent to the API.
  *
- * Current expectation:
- * The frontend should pass a date-like month anchor such as `2026-04-01`.
+ * Expected format:
+ * `YYYY-MM-01`
  *
  * We keep validation intentionally lightweight here because the backend
  * remains the source of truth for business validation.
@@ -144,10 +122,6 @@ function buildOrgScopedHeaders(
  *
  * Builds the canonical monthly rent charge generation endpoint path.
  *
- * Important:
- * We include the trailing slash to stay aligned with Django installations
- * that enforce slash-terminated API routes.
- *
  * @param leaseId - Lease identifier used in the route path.
  * @returns Lease-specific rent charge generation endpoint URL.
  */
@@ -175,35 +149,10 @@ export function mapGenerateRentChargeFormValuesToRequest(
 }
 
 /**
- * mapGenerateRentChargeFormValuesToLegacyRequest
- *
- * Maps the UI-facing generate-charge form contract to the legacy backend
- * transport contract using `month`.
- *
- * @param payload - UI-facing generate-charge values.
- * @returns Legacy backend request payload.
- */
-export function mapGenerateRentChargeFormValuesToLegacyRequest(
-  payload: GenerateRentChargeFormValues,
-): LegacyGenerateRentChargeRequest {
-  return {
-    month: normalizeChargeMonth(payload.chargeMonth),
-  };
-}
-
-/**
  * mapGenerateRentChargeResponse
  *
  * Normalizes the response into a stable frontend-friendly shape without
  * inventing business data that the backend did not return.
- *
- * Why this helper exists:
- * Some backend versions may return:
- * - status metadata only
- * - serialized charge fields
- * - created/existing flags
- *
- * We preserve known fields and return the rest as-is.
  *
  * @param response - Raw backend response payload.
  * @returns Normalized generate-charge response.
@@ -263,16 +212,11 @@ export async function generateRentCharge(
   client: BillingPostClient,
   params: CreateRentChargeParams,
 ): Promise<GenerateRentChargeResponse> {
-  const requestFieldMode = params.requestFieldMode ?? "charge_month";
-
-  const requestBody =
-    requestFieldMode === "month"
-      ? mapGenerateRentChargeFormValuesToLegacyRequest(params.payload)
-      : mapGenerateRentChargeFormValuesToRequest(params.payload);
+  const requestBody = mapGenerateRentChargeFormValuesToRequest(params.payload);
 
   const response = await client.post<
     GenerateRentChargeResponse,
-    GenerateRentChargeRequest | LegacyGenerateRentChargeRequest
+    GenerateRentChargeRequest
   >(buildGenerateRentChargeUrl(params.payload.leaseId), requestBody, {
     headers: buildOrgScopedHeaders(params.orgSlug),
     signal: params.signal,

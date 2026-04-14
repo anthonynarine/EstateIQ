@@ -1,30 +1,21 @@
-# Filename: backend/apps/billing/views/lease_charge_views.py
-
 """
-Lease charge generation views for the billing domain.
+Lease-charge views for the billing domain.
 
-This module contains endpoints responsible for generating lease-scoped rent
-charges.
+This module contains endpoints responsible for generating manual monthly
+rent charges for a single lease.
 
 Why this file exists:
-- Keeps charge-generation endpoints separate from ledger reads, payment writes,
-  and reporting endpoints.
-- Makes the billing view layer easier to navigate by grouping closely related
-  charge-generation flows together.
-- Provides a clean home for future charge-generation variants, such as
-  selected-month posting or admin-only backfill tools.
-
-Current refactor note:
-This module preserves the current behavior from the original monolithic
-`apps/billing/views.py` file while moving the code into a focused view module.
+- Keeps charge-generation endpoints separate from ledger reads and payment writes.
+- Preserves a thin-view architecture.
+- Resolves organization scope in the view and delegates rent-generation logic
+  to the service layer.
 """
 
 from __future__ import annotations
 
-from datetime import date
-
+from django.core.exceptions import ValidationError as DjangoValidationError
 from django.shortcuts import get_object_or_404
-from rest_framework import status
+from rest_framework import serializers, status
 from rest_framework.response import Response
 
 from apps.billing.serializers import (
@@ -36,119 +27,103 @@ from apps.billing.views.mixins import OrgScopedAPIView
 from apps.leases.models import Lease
 
 
-class GenerateLeaseRentChargeMonthView(OrgScopedAPIView):
+class LeaseGenerateMonthChargeView(OrgScopedAPIView):
     """
-    Generate a rent charge for a lease for a specific year and month.
+    Generate a monthly rent charge for a lease.
 
-    This endpoint is explicit rather than assumptive. The caller provides the
-    target month, and the billing service decides whether a new charge should
-    be created or an existing one should be returned.
+    This endpoint is:
+    - lease-scoped
+    - organization-scoped
+    - explicit/manual rather than automatic
 
-    URL params:
-        lease_id: Primary key of the target lease.
-
-    Request body:
-        {
-            "year": 2026,
-            "month": 4
-        }
-
-    Response:
-        {
-            "created": true,
-            "charge_id": 123,
-            "due_date": "2026-04-01"
-        }
+    The view does not own billing business rules.
+    It only:
+    - resolves org scope
+    - validates request shape
+    - calls the service layer
+    - serializes the stable response
     """
 
     def post(self, request, lease_id: int) -> Response:
         """
-        Generate a monthly rent charge for the requested lease and month.
+        Generate the rent charge for the requested lease and month.
 
         Args:
             request: DRF request object.
             lease_id: Primary key of the target lease.
 
         Returns:
-            Response: Serialized create-or-existing charge payload.
+            Response: Serialized monthly charge generation result.
         """
-        # Step 1: validate request payload
-        serializer = GenerateMonthChargeSerializer(data=request.data)
-        serializer.is_valid(raise_exception=True)
-        year = serializer.validated_data["year"]
-        month = serializer.validated_data["month"]
-
-        # Step 2: resolve org boundary
+        # Step 1: Resolve org boundary.
         org, err = self._get_org_or_response(request)
         if err:
             return err
 
-        # Step 3: enforce org-safe lease lookup
+        # Step 2: Enforce org-safe lease lookup.
         lease = get_object_or_404(Lease, id=lease_id, organization=org)
 
-        # Step 4: call billing service
-        result = RentChargeService.generate_monthly_rent_charge(
-            lease_id=lease.id,
-            year=year,
-            month=month,
-        )
+        # Step 3: Validate and normalize the incoming request payload.
+        request_serializer = GenerateMonthChargeSerializer(data=request.data)
+        request_serializer.is_valid(raise_exception=True)
+        validated_data = request_serializer.validated_data
 
-        # Step 5: serialize response
+        try:
+            # Step 4: Delegate charge generation to the service layer.
+            result = RentChargeService.generate_monthly_rent_charge(
+                lease_id=lease.id,
+                year=validated_data["year"],
+                month=validated_data["month"],
+                created_by_id=(
+                    request.user.id if request.user.is_authenticated else None
+                ),
+            )
+        except DjangoValidationError as exc:
+            # Step 5: Normalize Django validation errors into DRF-friendly 400s.
+            detail = (
+                getattr(exc, "message_dict", None)
+                or getattr(exc, "messages", None)
+            )
+
+            if detail:
+                raise serializers.ValidationError(detail)
+
+            raise serializers.ValidationError(str(exc))
+
+        # Step 6: Serialize the richer response contract for the frontend.
         response_serializer = GenerateMonthChargeResponseSerializer(
             instance={
                 "created": result.created,
+                "already_exists": not result.created,
                 "charge_id": result.charge_id,
                 "due_date": result.due_date,
+                "charge_month": validated_data["charge_month"],
+                "message": (
+                    "Monthly rent charge generated successfully."
+                    if result.created
+                    else "Monthly rent charge already exists for that month."
+                ),
             }
         )
+
         return Response(response_serializer.data, status=status.HTTP_200_OK)
 
 
-class GenerateLeaseRentChargeCurrentMonthView(OrgScopedAPIView):
+class GenerateLeaseRentChargeMonthView(LeaseGenerateMonthChargeView):
     """
-    Generate the current-month rent charge for a lease.
-
-    This endpoint derives the current year and month on the server side rather
-    than requiring the client to provide them.
+    Backward-compatible alias for legacy monthly rent charge imports.
     """
 
-    def post(self, request, lease_id: int) -> Response:
-        """
-        Generate a rent charge for the current server month.
+    pass
 
-        Args:
-            request: DRF request object.
-            lease_id: Primary key of the target lease.
 
-        Returns:
-            Response: Serialized create-or-existing charge payload.
-        """
-        # Step 1: resolve org boundary
-        org, err = self._get_org_or_response(request)
-        if err:
-            return err
+class GenerateLeaseRentChargeCurrentMonthView(LeaseGenerateMonthChargeView):
+    """
+    Backward-compatible alias for legacy current-month rent charge imports.
 
-        # Step 2: enforce org-safe lease lookup
-        lease = get_object_or_404(Lease, id=lease_id, organization=org)
+    Note:
+    This temporarily points to the same base view so existing imports stop
+    failing while the billing refactor settles.
+    """
 
-        # Step 3: derive current server year and month
-        today = date.today()
-        year = today.year
-        month = today.month
-
-        # Step 4: call billing service
-        result = RentChargeService.generate_monthly_rent_charge(
-            lease_id=lease.id,
-            year=year,
-            month=month,
-        )
-
-        # Step 5: serialize response
-        response_serializer = GenerateMonthChargeResponseSerializer(
-            instance={
-                "created": result.created,
-                "charge_id": result.charge_id,
-                "due_date": result.due_date,
-            }
-        )
-        return Response(response_serializer.data, status=status.HTTP_200_OK)
+    pass

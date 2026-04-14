@@ -344,38 +344,36 @@ class RentChargeService:
         """
         Return an existing idempotent rent charge for the target month, if any.
 
-        Current idempotency rule:
-        - organization_id
-        - lease_id
-        - kind=rent
-        - due_date
+        Idempotency rule:
+        - Preferred anchor when supported:
+            organization_id + lease_id + kind + charge_month
+        - Legacy fallback when `charge_month` is not available:
+            organization_id + lease_id + kind + due_date
 
-        If the Charge model exposes `charge_month`, include it as a stronger
-        month anchor without breaking compatibility.
-
-        Args:
-            lease: Locked lease instance.
-            year: Four-digit year.
-            month: Month number, 1 through 12.
-            due_date: Derived due date for the month.
-
-        Returns:
-            Charge | None: Existing matching charge, if any.
+        Why this matters:
+        If a lease due day changes later, `due_date` may change for the same
+        month. Using `charge_month` as the primary anchor prevents accidental
+        duplicate month posting.
         """
-        # Step 1: build the base idempotency filter
-        filters: dict[str, Any] = {
-            "organization_id": lease.organization_id,
-            "lease_id": lease.id,
-            "kind": ChargeKind.RENT,
-            "due_date": due_date,
-        }
+        # Step 1: inspect schema support once
+        field_names = cls._field_names(Charge)
 
-        # Step 2: strengthen idempotency when the schema supports charge_month
-        if "charge_month" in cls._field_names(Charge):
-            filters["charge_month"] = cls._month_start(year, month)
+        # Step 2: prefer charge_month as the true monthly uniqueness anchor
+        if "charge_month" in field_names:
+            return Charge.objects.filter(
+                organization_id=lease.organization_id,
+                lease_id=lease.id,
+                kind=ChargeKind.RENT,
+                charge_month=cls._month_start(year, month),
+            ).first()
 
-        # Step 3: return the first matching existing charge
-        return Charge.objects.filter(**filters).first()
+        # Step 3: fall back to due_date only for legacy schemas
+        return Charge.objects.filter(
+            organization_id=lease.organization_id,
+            lease_id=lease.id,
+            kind=ChargeKind.RENT,
+            due_date=due_date,
+        ).first()
 
     @classmethod
     def _build_charge_create_payload(
@@ -493,13 +491,13 @@ class RentChargeService:
                         "charge_id": existing_charge.id,
                         "year": year,
                         "month": month,
-                        "due_date": due_date.isoformat(),
+                        "due_date": existing_charge.due_date.isoformat(),
                         "actor_id": created_by_id,
                     },
                 )
                 return GenerateMonthResult(
                     lease_id=lease.id,
-                    due_date=due_date,
+                    due_date=existing_charge.due_date,
                     created=False,
                     charge_id=existing_charge.id,
                 )

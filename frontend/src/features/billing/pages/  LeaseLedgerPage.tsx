@@ -1,5 +1,4 @@
-// # Filename: src/features/billing/pages/LeaseLedgerPage.tsx
-
+// ✅ New Code
 import { useEffect, useMemo, useState } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 
@@ -54,15 +53,15 @@ const LEDGER_ACTIVITY_PAGE_SIZE = 4;
  * @returns A normalized lease id or null when invalid.
  */
 function normalizeLeaseId(leaseId?: string): BillingId | null {
-  // Step 1: Normalize input
+  // Step 1: Normalize input.
   const normalizedValue = leaseId?.trim();
 
-  // Step 2: Guard empty route param
+  // Step 2: Guard empty route param.
   if (!normalizedValue) {
     return null;
   }
 
-  // Step 3: Return stable billing id
+  // Step 3: Return stable billing id.
   return normalizedValue;
 }
 
@@ -75,17 +74,17 @@ function normalizeLeaseId(leaseId?: string): BillingId | null {
  * @returns A user-facing error message.
  */
 function getQueryErrorMessage(error: unknown): string {
-  // Step 1: Guard empty error
+  // Step 1: Guard empty error.
   if (!error) {
     return "Unable to load the lease ledger.";
   }
 
-  // Step 2: Prefer standard Error messages
+  // Step 2: Prefer standard Error messages.
   if (error instanceof Error && error.message.trim()) {
     return error.message;
   }
 
-  // Step 3: Try API error envelopes
+  // Step 3: Try API error envelopes.
   const apiError = error as BillingApiErrorShape;
 
   if (apiError.error?.message) {
@@ -100,7 +99,7 @@ function getQueryErrorMessage(error: unknown): string {
     return apiError.message;
   }
 
-  // Step 4: Final fallback
+  // Step 4: Final fallback.
   return "Unable to load the lease ledger.";
 }
 
@@ -125,18 +124,18 @@ function isRecord(value: unknown): value is MaybeRecord {
  * @returns Unit id as a string or null when unavailable.
  */
 function getLeaseUnitId(lease?: LeaseLedgerContext): string | null {
-  // Step 1: Guard missing context
+  // Step 1: Guard missing context.
   if (!lease || !isRecord(lease)) {
     return null;
   }
 
-  // Step 2: Try direct unit id first
+  // Step 2: Try direct unit id first.
   const directUnitId = lease.unit_id;
   if (typeof directUnitId === "string" || typeof directUnitId === "number") {
     return String(directUnitId);
   }
 
-  // Step 3: Fallback to nested summary id
+  // Step 3: Fallback to nested summary id.
   const unitValue = lease.unit;
   if (isRecord(unitValue)) {
     const nestedUnitId = unitValue.id;
@@ -145,7 +144,7 @@ function getLeaseUnitId(lease?: LeaseLedgerContext): string | null {
     }
   }
 
-  // Step 4: No unit id available
+  // Step 4: No unit id available.
   return null;
 }
 
@@ -190,23 +189,23 @@ function getUnitLabel(lease?: LeaseLedgerContext): string | null {
  * @returns Breadcrumb-style display text or null.
  */
 function buildBreadcrumbText(lease?: LeaseLedgerContext): string | null {
-  // Step 1: Resolve available labels
+  // Step 1: Resolve available labels.
   const buildingLabel = getBuildingLabel(lease);
   const unitLabel = getUnitLabel(lease);
 
-  // Step 2: Build ordered segments
+  // Step 2: Build ordered segments.
   const segments = [
     buildingLabel,
     unitLabel ? `Unit ${unitLabel}` : null,
     "Lease Billing",
   ].filter(Boolean) as string[];
 
-  // Step 3: Return null if nothing useful exists
+  // Step 3: Return null if nothing useful exists.
   if (!segments.length) {
     return null;
   }
 
-  // Step 4: Join for header display
+  // Step 4: Join for header display.
   return segments.join(" / ");
 }
 
@@ -220,14 +219,14 @@ function buildBreadcrumbText(lease?: LeaseLedgerContext): string | null {
  */
 function getLedgerActivityDescription(tab: LedgerActivityTab): string {
   if (tab === "charges") {
-    return "What this lease owes and what remains open.";
+    return "Newest posted obligations first, including what remains open.";
   }
 
   if (tab === "payments") {
-    return "Recorded receipts and any unapplied remainder.";
+    return "Newest recorded receipts first, including any unapplied remainder.";
   }
 
-  return "The payment-to-charge application trail for audit and review.";
+  return "Newest payment-to-charge application activity first for audit and review.";
 }
 
 /**
@@ -248,6 +247,138 @@ function getLedgerActivityItemLabel(tab: LedgerActivityTab): string {
   }
 
   return "allocation";
+}
+
+/**
+ * getTimestampOrMin
+ *
+ * Converts a date-like string into a numeric timestamp for sorting.
+ * Invalid or missing values are pushed to the bottom.
+ *
+ * @param value Date-like string from the ledger payload.
+ * @returns Numeric timestamp or Number.NEGATIVE_INFINITY.
+ */
+function getTimestampOrMin(value?: string | null): number {
+  if (!value?.trim()) {
+    return Number.NEGATIVE_INFINITY;
+  }
+
+  const parsedTimestamp = new Date(value).getTime();
+
+  if (Number.isNaN(parsedTimestamp)) {
+    return Number.NEGATIVE_INFINITY;
+  }
+
+  return parsedTimestamp;
+}
+
+/**
+ * getChargeSortTimestamp
+ *
+ * Resolves the best timestamp anchor for charge ordering.
+ *
+ * Sort priority:
+ * 1. charge_month
+ * 2. due_date
+ *
+ * @param charge Lease-ledger charge row.
+ * @returns Timestamp used for newest-first sorting.
+ */
+function getChargeSortTimestamp(charge: LeaseLedgerCharge): number {
+  const chargeMonthTimestamp = getTimestampOrMin(charge.charge_month);
+
+  if (chargeMonthTimestamp !== Number.NEGATIVE_INFINITY) {
+    return chargeMonthTimestamp;
+  }
+
+  return getTimestampOrMin(charge.due_date);
+}
+
+/**
+ * sortChargesNewestFirst
+ *
+ * Returns a newest-first charge list for the lease ledger workspace.
+ *
+ * @param charges Raw ledger charges.
+ * @returns New sorted charge array.
+ */
+function sortChargesNewestFirst(
+  charges: LeaseLedgerCharge[],
+): LeaseLedgerCharge[] {
+  return [...charges].sort((leftCharge, rightCharge) => {
+    // Step 1: Sort primarily by charge month, falling back to due date.
+    const primaryDifference =
+      getChargeSortTimestamp(rightCharge) - getChargeSortTimestamp(leftCharge);
+
+    if (primaryDifference !== 0) {
+      return primaryDifference;
+    }
+
+    // Step 2: Use due date as a secondary tie-breaker when both rows share
+    // the same charge month or when both fell back to due date.
+    const secondaryDifference =
+      getTimestampOrMin(rightCharge.due_date) -
+      getTimestampOrMin(leftCharge.due_date);
+
+    if (secondaryDifference !== 0) {
+      return secondaryDifference;
+    }
+
+    // Step 3: Use id as a stable final tie-breaker.
+    return String(rightCharge.id).localeCompare(String(leftCharge.id));
+  });
+}
+
+/**
+ * sortPaymentsNewestFirst
+ *
+ * Returns a newest-first payment list for the lease ledger workspace.
+ *
+ * @param payments Raw ledger payments.
+ * @returns New sorted payment array.
+ */
+function sortPaymentsNewestFirst(
+  payments: LeaseLedgerPayment[],
+): LeaseLedgerPayment[] {
+  return [...payments].sort((leftPayment, rightPayment) => {
+    // Step 1: Sort by newest paid_at first.
+    const timestampDifference =
+      getTimestampOrMin(rightPayment.paid_at) -
+      getTimestampOrMin(leftPayment.paid_at);
+
+    if (timestampDifference !== 0) {
+      return timestampDifference;
+    }
+
+    // Step 2: Use id as a stable final tie-breaker.
+    return String(rightPayment.id).localeCompare(String(leftPayment.id));
+  });
+}
+
+/**
+ * sortAllocationsNewestFirst
+ *
+ * Returns a newest-first allocation list for the lease ledger workspace.
+ *
+ * @param allocations Raw ledger allocations.
+ * @returns New sorted allocation array.
+ */
+function sortAllocationsNewestFirst(
+  allocations: LeaseLedgerAllocation[],
+): LeaseLedgerAllocation[] {
+  return [...allocations].sort((leftAllocation, rightAllocation) => {
+    // Step 1: Sort by newest created_at first.
+    const timestampDifference =
+      getTimestampOrMin(rightAllocation.created_at) -
+      getTimestampOrMin(leftAllocation.created_at);
+
+    if (timestampDifference !== 0) {
+      return timestampDifference;
+    }
+
+    // Step 2: Use id as a stable final tie-breaker.
+    return String(rightAllocation.id).localeCompare(String(leftAllocation.id));
+  });
 }
 
 /**
@@ -319,9 +450,25 @@ export default function LeaseLedgerPage() {
   const leaseLedgerData = leaseLedgerQuery.data;
   const leaseContext = leaseLedgerData?.lease;
   const ledgerTotals = leaseLedgerData?.totals;
-  const ledgerCharges = leaseLedgerData?.charges ?? [];
-  const ledgerPayments = leaseLedgerData?.payments ?? [];
-  const ledgerAllocations = leaseLedgerData?.allocations ?? [];
+
+  const ledgerCharges = useMemo<LeaseLedgerCharge[]>(() => {
+    return sortChargesNewestFirst(leaseLedgerData?.charges ?? []);
+  }, [leaseLedgerData?.charges]);
+
+  const ledgerPayments = useMemo<LeaseLedgerPayment[]>(() => {
+    return sortPaymentsNewestFirst(leaseLedgerData?.payments ?? []);
+  }, [leaseLedgerData?.payments]);
+
+  const ledgerAllocations = useMemo<LeaseLedgerAllocation[]>(() => {
+    return sortAllocationsNewestFirst(leaseLedgerData?.allocations ?? []);
+  }, [leaseLedgerData?.allocations]);
+
+  const existingChargeMonths = useMemo<string[]>(() => {
+    // Step 1: Extract known charge month anchors from ledger charges.
+    return ledgerCharges
+      .map((charge) => charge.charge_month)
+      .filter((chargeMonth): chargeMonth is string => Boolean(chargeMonth?.trim()));
+  }, [ledgerCharges]);
 
   const breadcrumbText = useMemo(() => {
     return buildBreadcrumbText(leaseContext);
@@ -397,13 +544,13 @@ export default function LeaseLedgerPage() {
   }, [activeLedgerTab, activePage, totalPages]);
 
   const handleBackToUnit = () => {
-    // Step 1: Prefer explicit unit navigation when available
+    // Step 1: Prefer explicit unit navigation when available.
     if (unitId) {
       navigate(`/dashboard/units/${unitId}${location.search || ""}`);
       return;
     }
 
-    // Step 2: Graceful fallback for incomplete lease context
+    // Step 2: Graceful fallback for incomplete lease context.
     navigate(-1);
   };
 
@@ -605,6 +752,8 @@ export default function LeaseLedgerPage() {
           <aside className="space-y-4 xl:sticky xl:top-6 xl:self-start">
             <GenerateRentChargePanel
               leaseId={normalizedLeaseId}
+              orgSlug={orgSlug}
+              existingChargeMonths={existingChargeMonths}
               onSuccess={() => {
                 /**
                  * Query invalidation already happens inside the charge mutation
@@ -612,7 +761,6 @@ export default function LeaseLedgerPage() {
                  * side effects such as toasts or analytics events.
                  */
               }}
-              orgSlug={orgSlug}
             />
           </aside>
         </div>
