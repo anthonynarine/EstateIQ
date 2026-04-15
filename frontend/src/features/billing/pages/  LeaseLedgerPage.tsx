@@ -8,7 +8,7 @@ import { tokenStorage } from "../../../auth/tokenStorage";
 import LeaseLedgerHeader from "../components/LeaseLedgerHeader";
 import LeaseLedgerSummaryCards from "../components/LeaseLedgerSummaryCards";
 import GenerateRentChargePanel from "../components/GenerateRentChargePanel";
-import ChargesTable from "../components/ChargesTable";
+import ChargesTable from "../components/chargesTable/ChargesTable";
 import PaymentsTable from "../components/PaymentsTable";
 import AllocationsTable from "../components/AllocationsTable";
 import RecordPaymentModal from "../components/RecordPaymentModal";
