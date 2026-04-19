@@ -6,7 +6,7 @@ import type {
   BillingId,
   BillingApiErrorShape,
   LeaseLedgerResponse,
-} from "./billingTypes";
+} from "./types";
 
 /**
  * BillingGetClient

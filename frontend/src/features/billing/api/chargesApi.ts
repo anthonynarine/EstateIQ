@@ -11,7 +11,7 @@ import type {
   GenerateRentChargeFormValues,
   GenerateRentChargeRequest,
   GenerateRentChargeResponse,
-} from "./billingTypes";
+} from "../api/types";
 
 /**
  * BillingPostClient

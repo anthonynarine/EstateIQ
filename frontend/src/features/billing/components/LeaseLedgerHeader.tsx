@@ -1,5 +1,5 @@
 // # Filename: src/features/billing/components/LeaseLedgerHeader.tsx
-// ✅ New Code
+
 
 import {
   ArrowLeft,
@@ -15,7 +15,7 @@ import type {
   BillingEntitySummary,
   LeaseLedgerContext,
   MoneyValue,
-} from "../api/billingTypes";
+} from "../api/types";
 
 /**
  * LeaseLedgerHeaderProps

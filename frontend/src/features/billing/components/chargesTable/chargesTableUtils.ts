@@ -1,7 +1,7 @@
 
 // # Filename: src/features/billing/components/chargesTableUtils.ts
 
-import type { LeaseLedgerCharge, MoneyValue } from "../../api/billingTypes";
+import type { LeaseLedgerCharge, MoneyValue } from "../../api/types";
 
 /**
  * formatCurrencyValue

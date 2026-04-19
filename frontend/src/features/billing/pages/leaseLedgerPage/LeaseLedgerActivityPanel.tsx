@@ -1,6 +1,5 @@
 // # Filename: src/features/billing/pages/leaseLedgerPage/LeaseLedgerActivityPanel.tsx
 
-// ✅ New Code
 
 import CollectionPaginationFooter from "../../../../components/pagination/CollectionPaginationFooter";
 import AllocationsTable from "../../components/AllocationsTable";
@@ -10,7 +9,7 @@ import type {
   LeaseLedgerAllocation,
   LeaseLedgerCharge,
   LeaseLedgerPayment,
-} from "../../api/billingTypes";
+} from "../../api/types";
 
 /**
  * LedgerActivityTab

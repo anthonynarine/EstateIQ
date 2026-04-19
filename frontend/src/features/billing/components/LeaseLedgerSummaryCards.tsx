@@ -1,7 +1,7 @@
 // # Filename: src/features/billing/components/LeaseLedgerSummaryCards.tsx
 
 
-import type { LeaseLedgerTotals, MoneyValue } from "../api/billingTypes";
+import type { LeaseLedgerTotals, MoneyValue } from "../api/types";
 
 /**
  * LeaseLedgerSummaryCardsProps

@@ -1,5 +1,3 @@
-# Filename: backend/apps/billing/views/__init__.py
-
 """
 Public view exports for the billing domain.
 
@@ -25,6 +23,7 @@ from __future__ import annotations
 from datetime import date
 
 from apps.billing.views.lease_charge_views import (
+    CreateLeaseManualChargeView,
     GenerateLeaseRentChargeCurrentMonthView,
     GenerateLeaseRentChargeMonthView,
 )
@@ -37,6 +36,7 @@ from apps.billing.views.report_views import (
 )
 
 __all__ = [
+    "CreateLeaseManualChargeView",
     "CreatePaymentView",
     "DelinquencyReportView",
     "GenerateLeaseRentChargeCurrentMonthView",

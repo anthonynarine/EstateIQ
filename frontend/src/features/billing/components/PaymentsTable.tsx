@@ -1,6 +1,6 @@
 // # Filename: src/features/billing/components/PaymentsTable.tsx
 
-import type { LeaseLedgerPayment, MoneyValue } from "../api/billingTypes";
+import type { LeaseLedgerPayment, MoneyValue } from "../api/types";
 
 /**
  * LedgerTableVariant

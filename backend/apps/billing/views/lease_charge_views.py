@@ -1,19 +1,33 @@
 """
 Lease-charge views for the billing domain.
 
-This module contains endpoints responsible for generating manual monthly
-rent charges for a single lease.
+This module contains endpoints responsible for lease-scoped charge creation.
 
 Why this file exists:
-- Keeps charge-generation endpoints separate from ledger reads and payment writes.
+- Keeps charge-related endpoints separate from ledger reads and payment writes.
 - Preserves a thin-view architecture.
-- Resolves organization scope in the view and delegates rent-generation logic
+- Resolves organization scope in the view and delegates business logic
   to the service layer.
+
+This module intentionally supports two different charge workflows:
+
+1. Monthly rent generation
+   - explicit
+   - month-anchored
+   - idempotent
+   - handled by the rent charge service
+
+2. Manual non-rent charge creation
+   - explicit
+   - one-off
+   - lease-scoped
+   - handled by the charge write service
 """
 
 from __future__ import annotations
 
 from django.core.exceptions import ValidationError as DjangoValidationError
+from django.db import IntegrityError
 from django.shortcuts import get_object_or_404
 from rest_framework import serializers, status
 from rest_framework.response import Response
@@ -21,7 +35,10 @@ from rest_framework.response import Response
 from apps.billing.serializers import (
     GenerateMonthChargeResponseSerializer,
     GenerateMonthChargeSerializer,
+    ManualLeaseChargeCreateSerializer,
+    ManualLeaseChargeResponseSerializer,
 )
+from apps.billing.services.charge_write_service import ChargeWriteService
 from apps.billing.services.rent_charge_service import RentChargeService
 from apps.billing.views.mixins import OrgScopedAPIView
 from apps.leases.models import Lease
@@ -107,6 +124,95 @@ class LeaseGenerateMonthChargeView(OrgScopedAPIView):
         )
 
         return Response(response_serializer.data, status=status.HTTP_200_OK)
+
+
+class CreateLeaseManualChargeView(OrgScopedAPIView):
+    """
+    Create a manual non-rent charge for a lease.
+
+    This endpoint is:
+    - lease-scoped
+    - organization-scoped
+    - explicit/manual
+    - limited to non-rent charge kinds for this phase
+
+    Supported manual charge kinds:
+    - late_fee
+    - misc
+
+    Important:
+    - This endpoint must not be used for monthly rent posting.
+    - Rent remains a dedicated, idempotent workflow.
+    """
+
+    def post(self, request, lease_id: int) -> Response:
+        """
+        Create an explicit manual charge for the requested lease.
+
+        Args:
+            request: DRF request object.
+            lease_id: Primary key of the target lease.
+
+        Returns:
+            Response: Serialized created charge payload.
+
+        Raises:
+            serializers.ValidationError: If the input payload is invalid or
+                the service layer rejects the request.
+        """
+        # Step 1: Resolve the active organization boundary.
+        org, err = self._get_org_or_response(request)
+        if err:
+            return err
+
+        # Step 2: Enforce org-safe lease lookup up front for a clean 404 path.
+        lease = get_object_or_404(Lease, id=lease_id, organization=org)
+
+        # Step 3: Validate the incoming request contract.
+        request_serializer = ManualLeaseChargeCreateSerializer(data=request.data)
+        request_serializer.is_valid(raise_exception=True)
+        validated_data = request_serializer.validated_data
+
+        try:
+            # Step 4: Delegate write logic to the dedicated manual charge service.
+            charge = ChargeWriteService.create_manual_lease_charge(
+                organization_id=org.id,
+                lease_id=lease.id,
+                kind=validated_data["kind"],
+                amount=validated_data["amount"],
+                due_date=validated_data["due_date"],
+                notes=validated_data.get("notes", ""),
+                created_by_id=(
+                    request.user.id if request.user.is_authenticated else None
+                ),
+            )
+        except DjangoValidationError as exc:
+            # Step 5: Normalize Django validation errors into DRF 400 responses.
+            detail = (
+                getattr(exc, "message_dict", None)
+                or getattr(exc, "messages", None)
+            )
+
+            if detail:
+                raise serializers.ValidationError(detail)
+
+            raise serializers.ValidationError(str(exc))
+        except IntegrityError:
+            # Step 6: Normalize current DB uniqueness collisions into a stable
+            # API-level validation error.
+            raise serializers.ValidationError(
+                {
+                    "non_field_errors": [
+                        "A charge with this kind and due date already exists "
+                        "for this lease."
+                    ]
+                }
+            )
+
+        # Step 7: Serialize the created charge record.
+        response_serializer = ManualLeaseChargeResponseSerializer(instance=charge)
+
+        return Response(response_serializer.data, status=status.HTTP_201_CREATED)
 
 
 class GenerateLeaseRentChargeMonthView(LeaseGenerateMonthChargeView):

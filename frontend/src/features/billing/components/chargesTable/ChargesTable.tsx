@@ -1,7 +1,7 @@
 
 // # Filename: src/features/billing/components/ChargesTable.tsx
 
-import type { LeaseLedgerCharge } from "../../api/billingTypes";
+import type { LeaseLedgerCharge } from "../../api/types";
 import ChargesDesktopTable from "./ChargesDesktopTable";
 import ChargesMobileCards from "./ChargesMobileCards";
 

@@ -13,7 +13,7 @@ import type {
   PaymentAllocationInput,
   PaymentMethod,
   RecordPaymentFormValues,
-} from "./billingTypes";
+} from "./types";
 
 /**
  * BillingPostClient

@@ -1,5 +1,3 @@
-# Filename: backend/apps/billing/serializers/__init__.py
-
 """
 Public serializer exports for the billing domain.
 
@@ -22,6 +20,8 @@ from __future__ import annotations
 from apps.billing.serializers.charge_serializers import (
     GenerateMonthChargeResponseSerializer,
     GenerateMonthChargeSerializer,
+    ManualLeaseChargeCreateSerializer,
+    ManualLeaseChargeResponseSerializer,
 )
 from apps.billing.serializers.ledger_serializers import (
     LeaseLedgerChargeRowSerializer,
@@ -59,6 +59,8 @@ __all__ = [
     "LeaseLedgerPaymentRowSerializer",
     "LeaseLedgerResponseSerializer",
     "LeaseLedgerTotalsSerializer",
+    "ManualLeaseChargeCreateSerializer",
+    "ManualLeaseChargeResponseSerializer",
     "OrgDashboardQuerySerializer",
     "OrgDashboardSummarySerializer",
     "PaymentAllocationItemSerializer",

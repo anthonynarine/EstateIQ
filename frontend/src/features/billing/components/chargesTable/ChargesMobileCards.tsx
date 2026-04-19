@@ -1,7 +1,7 @@
 
 // # Filename: src/features/billing/components/ChargesMobileCards.tsx
 
-import type { LeaseLedgerCharge } from "../../api/billingTypes";
+import type { LeaseLedgerCharge } from "../../api/types";
 import {
   formatChargeKindLabel,
   formatCurrencyValue,

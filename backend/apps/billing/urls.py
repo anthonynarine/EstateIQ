@@ -1,5 +1,3 @@
-# Filename: backend/apps/billing/urls.py
-
 """
 URL routes for the billing domain.
 
@@ -8,6 +6,7 @@ operations.
 
 Route groups:
 - lease charge generation
+- manual lease charge creation
 - lease ledger retrieval
 - payment creation
 - billing reporting
@@ -18,6 +17,7 @@ from __future__ import annotations
 from django.urls import path
 
 from apps.billing.views import (
+    CreateLeaseManualChargeView,
     CreatePaymentView,
     DelinquencyReportView,
     GenerateLeaseRentChargeCurrentMonthView,
@@ -28,6 +28,11 @@ from apps.billing.views import (
 )
 
 urlpatterns = [
+    path(
+        "leases/<int:lease_id>/charges/",
+        CreateLeaseManualChargeView.as_view(),
+        name="billing.create_manual_lease_charge",
+    ),
     path(
         "leases/<int:lease_id>/charges/generate-month/",
         GenerateLeaseRentChargeMonthView.as_view(),

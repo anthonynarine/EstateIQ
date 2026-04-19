@@ -8,7 +8,7 @@ import type {
   BillingApiErrorShape,
   BillingId,
   GenerateRentChargeResponse,
-} from "../api/billingTypes";
+} from "../api/types";
 
 /**
  * PanelNoticeTone

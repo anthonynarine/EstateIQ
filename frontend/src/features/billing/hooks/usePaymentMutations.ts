@@ -17,7 +17,7 @@ import type {
   BillingId,
   CreatePaymentResponse,
   RecordPaymentFormValues,
-} from "../api/billingTypes";
+} from "../api/types";
 
 /**
  * CreatePaymentMutationVariables

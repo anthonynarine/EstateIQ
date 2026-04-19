@@ -1,6 +1,6 @@
 // # Filename: src/features/billing/components/AllocationsTable.tsx
 
-import type { LeaseLedgerAllocation, MoneyValue } from "../api/billingTypes";
+import type { LeaseLedgerAllocation, MoneyValue } from "../api/types";
 
 /**
  * LedgerTableVariant

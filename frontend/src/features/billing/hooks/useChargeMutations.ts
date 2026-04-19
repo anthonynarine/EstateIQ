@@ -17,7 +17,7 @@ import type {
   BillingId,
   GenerateRentChargeFormValues,
   GenerateRentChargeResponse,
-} from "../api/billingTypes";
+} from "../api/types";
 
 /**
  * GenerateRentChargeMutationVariables

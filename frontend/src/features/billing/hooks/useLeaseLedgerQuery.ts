@@ -12,7 +12,7 @@ import type {
   BillingApiErrorShape,
   BillingId,
   LeaseLedgerResponse,
-} from "../api/billingTypes";
+} from "../api/types";
 
 /**
  * UseLeaseLedgerQueryParams
